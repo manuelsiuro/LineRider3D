@@ -29,6 +29,7 @@ export const MAT = {
 };
 
 export const UP = new THREE.Vector3(0, 1, 0);
+const limbDir = new THREE.Vector3();
 
 /** A capsule (cylinder + rounded ends) that can be stretched between two points. */
 export class Limb {
@@ -53,7 +54,7 @@ export class Limb {
     this.capA.visible = this.capB.visible = v && this.caps;
   }
   set(a: THREE.Vector3, b: THREE.Vector3) {
-    const d = new THREE.Vector3().subVectors(b, a);
+    const d = limbDir.subVectors(b, a);
     const len = d.length();
     this.mesh.position.addVectors(a, b).multiplyScalar(0.5);
     if (len > 1e-6) this.mesh.quaternion.setFromUnitVectors(UP, d.divideScalar(len));

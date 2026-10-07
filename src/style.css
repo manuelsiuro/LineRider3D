@@ -1162,6 +1162,7 @@ body.is-playing .bottom > * {
 .card {
   width: min(520px, 100%);
   max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   overflow: auto;
   background: rgba(255, 255, 255, 0.96);
   border-radius: 26px;
@@ -1652,9 +1653,20 @@ body.is-playing .bottom > * {
   }
 }
 
-@media (max-width: 420px) {
-  #focus-btn {
+/* Phones: trim the top bar and give the timeline room. */
+@media (max-width: 480px) {
+  .focus-btn,
+  .top-right .btn-group:last-child .icon-btn:last-child,
+  .text-btn span {
     display: none;
+  }
+  .player .slow-btn,
+  body.level-mode .player .rider-btn {
+    display: none;
+  }
+  .player .time {
+    min-width: 0;
+    font-size: 11px;
   }
 }
 
@@ -2206,4 +2218,14 @@ body.level-mode .share-btn {
 
 .pad-spin.down {
   background: rgba(255, 138, 61, 0.78);
+}
+
+/* Touch riding: the HUD moves up under the player bar so the pads stay clear. */
+body.rider-mode .touch-pad:not(.hidden) ~ .hud {
+  left: 50%;
+  bottom: auto;
+  top: calc(max(12px, env(safe-area-inset-top)) + 118px);
+  transform: translateX(-50%) scale(0.82);
+  transform-origin: top center;
+  opacity: 0.92;
 }

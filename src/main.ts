@@ -11,7 +11,7 @@ import { VEHICLES, vehicleById, type VehicleDef } from './physics/vehicles';
 import { Environment } from './world/Environment';
 import { terrainHeight } from './world/terrain';
 import { Editor } from './editor/Editor';
-import { UI } from './ui/UI';
+import { UI, overlayOpen } from './ui/UI';
 import { Effects } from './render/Effects';
 import { Trail } from './render/Trail';
 import { PostFX } from './render/PostFX';
@@ -133,7 +133,7 @@ addEventListener('keyup', (e) => {
 addEventListener('blur', () => (keyMask = 0));
 addEventListener('keydown', (e) => {
   // V: next ride while editing (levels and challenges pick theirs on the intro).
-  if ((e.key === 'v' || e.key === 'V') && mode === 'game' && currentLevel === null && challengeScore === 0 && !(e.target instanceof HTMLInputElement)) {
+  if ((e.key === 'v' || e.key === 'V') && mode === 'game' && currentLevel === null && challengeScore === 0 && !overlayOpen() && !(e.target instanceof HTMLInputElement)) {
     cycleVehicle();
   }
 });
@@ -149,9 +149,15 @@ function applyVehicle(def: VehicleDef) {
   sim.setVehicle(def);
   riderView.setVehicle(def);
   sound.setRide(def.sound);
-  ui.setVehicle(def.id, def.name, lockedVehicle !== null);
+  ui.setVehicle(def.id, def.name, lockReason());
   ghost = null;
   resetRun();
+}
+
+/** Why the ride can't be switched right now (null: it can). */
+function lockReason() {
+  if (!lockedVehicle) return null;
+  return challengeScore > 0 ? "the challenger's ride" : "this level's ride";
 }
 
 /** Picks a ride as the player's choice (persisted). */
@@ -196,6 +202,8 @@ let loading = false;
 let saveTimer = 0;
 
 function loadInto(fn: () => void) {
+  // A pending autosave belongs to the track being replaced.
+  clearTimeout(saveTimer);
   loading = true;
   fn();
   loading = false;
@@ -351,7 +359,7 @@ function loadBests(): Record<string, BestRecord> {
 /** Keeps the best score and star rating of the current track. */
 function recordBest(score: number, stars: number): { best: number; newBest: boolean } {
   const all = loadBests();
-  const key = trackKey();
+  const key = ghostKey();
   const prev = all[key] ?? { score: 0, stars: 0 };
   const newBest = score > prev.score && score > 0;
   all[key] = { score: Math.max(prev.score, score), stars: Math.max(prev.stars, stars) };
@@ -403,8 +411,9 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
       const ok = await ui.confirm('Load the demo?', 'Your current track will be replaced. Export it first if you want to keep it.', 'Load demo');
       if (!ok) return;
     }
+    challengeScore = 0;
+    setLevel(null);
     loadInto(() => buildDemoTrack(track));
-applyOutfit(selectedOutfit());
     pristine = true;
     editor.history.clear();
     stop();
@@ -422,6 +431,7 @@ applyOutfit(selectedOutfit());
   importTrack(file) {
     file.text().then((text) => {
       try {
+        challengeScore = 0;
         setLevel(null);
         track.load(JSON.parse(text) as SerializedTrack);
         editor.history.clear();
@@ -472,6 +482,7 @@ applyOutfit(selectedOutfit());
   cycleVehicle,
   click: () => sound.click(),
 }, riderMode);
+ui.setSoundState(sound.sfxOn, sound.musicOn);
 applyVehicle(vehicle);
 
 function startNewTrack() {
@@ -498,7 +509,6 @@ function enterTitle() {
   ghost = null;
   setLevel(null);
   loadInto(() => buildDemoTrack(track));
-applyOutfit(selectedOutfit());
   pristine = true;
   resetRun();
   sim.clearInputs();
@@ -605,14 +615,14 @@ function setLevel(index: number | null) {
   lockedVehicle = fixed ? vehicleById(fixed) : null;
   const want = lockedVehicle ?? vehicleById(selectedVehicleId());
   if (want !== vehicle) applyVehicle(want);
-  else ui.setVehicle(vehicle.id, vehicle.name, lockedVehicle !== null);
+  else ui.setVehicle(vehicle.id, vehicle.name, lockReason());
   editor.enabled = index === null;
   document.body.classList.toggle('level-mode', index !== null);
   ui.setRiderMode(index !== null ? true : riderMode);
 }
 
 /** Effective rider mode: always on in levels. */
-const riderOn = () => currentLevel !== null || riderMode;
+const riderOn = () => currentLevel !== null || challengeScore > 0 || riderMode;
 
 async function startLevel(index: number) {
   leaveTitle();
@@ -729,6 +739,11 @@ function handleRideEvents(events: number, justCrashed: boolean) {
 
 function checkRunEnd(dt: number) {
   if (summaryShown || mode !== 'game') return;
+  // Paused or scrubbing: the run hasn't ended, the player is looking around.
+  if (!playing) {
+    crashClock = finishClock = 0;
+    return;
+  }
   const s = runStats.stats;
   crashClock = s.crashed ? crashClock + dt : 0;
   finishClock = s.finished ? finishClock + dt : 0;
@@ -915,6 +930,7 @@ renderer.setAnimationLoop(loop);
 async function enterShared(data: SerializedTrack, challenge: number, vehicleId: string | null) {
   leaveTitle();
   setLevel(null);
+  challengeScore = challenge;
   // A challenge is ridden on the challenger's ride.
   if (challenge > 0 && vehicleId) {
     lockedVehicle = vehicleById(vehicleId);
@@ -922,12 +938,8 @@ async function enterShared(data: SerializedTrack, challenge: number, vehicleId: 
   }
   loadInto(() => track.load(data));
   pristine = true;
-  challengeScore = challenge;
   history.replaceState(null, '', location.pathname + location.search);
-  if (challenge > 0) {
-    riderMode = true;
-    ui.setRiderMode(true);
-  }
+  if (challenge > 0) ui.setRiderMode(true);
   const v = startView();
   flyTo(v.pos, v.target, 1.3);
   await ui.showSharedIntro(challenge, rateRun(track, runStats.stats).goals.map((g) => g.label), keysFor(vehicle), ridePicker());

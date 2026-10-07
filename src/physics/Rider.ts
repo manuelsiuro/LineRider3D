@@ -64,6 +64,19 @@ function bonesMirrored(def: VehicleDef): Bone[] {
 const tmp = new THREE.Vector3();
 const tmp2 = new THREE.Vector3();
 const vel = new THREE.Vector3();
+// Scratch objects for spins and assists, so stepping allocates nothing.
+const sFwd = new THREE.Vector3();
+const sLat = new THREE.Vector3();
+const sUp = new THREE.Vector3();
+const sN = new THREE.Vector3();
+const sD = new THREE.Vector3();
+const sV = new THREE.Vector3();
+const sSide = new THREE.Vector3();
+const sCross = new THREE.Vector3();
+const sPrevFwd = new THREE.Vector3();
+const sC = new THREE.Vector3();
+const qA = new THREE.Quaternion();
+const qB = new THREE.Quaternion();
 
 export class Rider {
   readonly pos: THREE.Vector3[];
@@ -223,7 +236,7 @@ export class Rider {
    */
   private rotateAll(q: THREE.Quaternion, aboutBase = false) {
     for (const pts of [this.pos, this.prev]) {
-      const c = new THREE.Vector3();
+      const c = sC.set(0, 0, 0);
       if (aboutBase) {
         for (const i of [P.tailL, P.tailR, P.noseL, P.noseR]) c.add(pts[i]);
         c.divideScalar(4);
@@ -243,40 +256,40 @@ export class Rider {
   private assist(input: number) {
     const h = this.def.handling;
     if (this.crashed || (h.balance === 0 && h.airAlign === 0 && h.steer === 0)) return;
-    const fwd = this.forward(new THREE.Vector3());
-    const lat = new THREE.Vector3().subVectors(this.pos[P.tailR], this.pos[P.tailL]).normalize();
-    const up = new THREE.Vector3().crossVectors(lat, fwd).normalize();
+    const fwd = this.forward(sFwd);
+    const lat = sLat.subVectors(this.pos[P.tailR], this.pos[P.tailL]).normalize();
+    const up = sUp.crossVectors(lat, fwd).normalize();
     const grounded = [P.tailL, P.tailR, P.noseL, P.noseR].some((i) => this.contact[i]);
     if (grounded && h.balance > 0 && this.normalSum.lengthSq() > 1e-6) {
       // Roll and pitch toward the surface normal.
-      const n = this.normalSum.clone().normalize();
+      const n = sN.copy(this.normalSum).normalize();
       const angle = up.angleTo(n);
       if (angle > 1e-4 && angle < 1.2) {
-        const q = new THREE.Quaternion().setFromUnitVectors(up, n);
-        this.rotateAll(new THREE.Quaternion().slerp(q, h.balance), true);
+        qA.setFromUnitVectors(up, n);
+        this.rotateAll(qB.identity().slerp(qA, h.balance), true);
       }
     }
     if (grounded && h.steer > 0 && this.dirSum.lengthSq() > 1e-6) {
       // Yaw (around the vehicle's up axis) toward the track direction, aiming
       // a little toward the center line (lane keeping).
-      const d = this.dirSum.clone().normalize();
+      const d = sD.copy(this.dirSum).normalize();
       if (this.offCount > 0) {
-        const off = this.offSum.clone().divideScalar(this.offCount);
+        const off = sV.copy(this.offSum).divideScalar(this.offCount);
         const len = off.length();
         if (len > 1e-6) d.addScaledVector(off, -Math.min(len * 0.15, 0.25) / len);
       }
       d.addScaledVector(up, -d.dot(up));
       if (d.lengthSq() > 1e-6) {
         d.normalize();
-        const yaw = Math.atan2(new THREE.Vector3().crossVectors(fwd, d).dot(up), fwd.dot(d));
-        if (Math.abs(yaw) > 1e-4 && Math.abs(yaw) < 0.9) this.rotateAll(new THREE.Quaternion().setFromAxisAngle(up, yaw * h.steer), true);
+        const yaw = Math.atan2(sCross.crossVectors(fwd, d).dot(up), fwd.dot(d));
+        if (Math.abs(yaw) > 1e-4 && Math.abs(yaw) < 0.9) this.rotateAll(qA.setFromAxisAngle(up, yaw * h.steer), true);
       }
     }
     if (grounded && h.carve > 0 && this.gripContacts > 0) {
       // Carve: the whole rider follows the edges instead of sliding wide.
-      const n = this.normalSum.lengthSq() > 1e-6 ? this.normalSum.clone().normalize() : up;
-      const side = lat.clone().addScaledVector(n, -lat.dot(n)).normalize();
-      const v = new THREE.Vector3();
+      const n = this.normalSum.lengthSq() > 1e-6 ? sN.copy(this.normalSum).normalize() : up;
+      const side = sSide.copy(lat).addScaledVector(n, -lat.dot(n)).normalize();
+      const v = sV.set(0, 0, 0);
       for (let i = 0; i < this.count; i++) v.add(tmp.subVectors(this.pos[i], this.prev[i]));
       v.divideScalar(this.count);
       const slip = v.dot(side) * h.carve;
@@ -286,27 +299,27 @@ export class Rider {
     if (airborne && h.airAlign > 0 && !(input & (INPUT.push | INPUT.brake)) && Math.abs(this.spin) < 0.02) {
       // Angular-velocity controller on pitch: the nose eases toward the
       // direction of flight instead of tumbling from the takeoff.
-      const v = new THREE.Vector3();
+      const v = sV.set(0, 0, 0);
       for (let i = 0; i < this.count; i++) v.add(tmp.subVectors(this.pos[i], this.prev[i]));
       v.addScaledVector(lat, -v.dot(lat));
       if (v.lengthSq() > 1e-6) {
         v.normalize();
-        const pitchErr = Math.atan2(new THREE.Vector3().crossVectors(fwd, v).dot(lat), fwd.dot(v));
+        const pitchErr = Math.atan2(sCross.crossVectors(fwd, v).dot(lat), fwd.dot(v));
         // Only near the flight direction: a flip in progress is left alone.
         if (Math.abs(pitchErr) < 1.6) {
-          const prevFwd = new THREE.Vector3()
+          const prevFwd = sPrevFwd
             .addVectors(this.prev[P.noseL], this.prev[P.noseR])
             .sub(this.prev[P.tailL])
             .sub(this.prev[P.tailR])
             .normalize();
-          const omega = Math.atan2(new THREE.Vector3().crossVectors(prevFwd, fwd).dot(lat), prevFwd.dot(fwd));
+          const omega = Math.atan2(sCross.crossVectors(prevFwd, fwd).dot(lat), prevFwd.dot(fwd));
           const target = THREE.MathUtils.clamp(pitchErr * 0.08, -0.04, 0.04);
           const delta = (omega - target) * h.airAlign;
           // Turning the previous pose toward the current one changes the spin rate only.
-          const c = new THREE.Vector3();
+          const c = sC.set(0, 0, 0);
           for (const p of this.prev) c.add(p);
           c.divideScalar(this.count);
-          const q = new THREE.Quaternion().setFromAxisAngle(lat, delta);
+          const q = qA.setFromAxisAngle(lat, delta);
           for (const p of this.prev) p.sub(c).applyQuaternion(q).add(c);
         }
       }
@@ -371,16 +384,16 @@ export class Rider {
       if (Math.abs(this.yawSpin) < 1e-4) this.yawSpin = 0;
     }
     if (this.spin === 0 && this.yawSpin === 0) return;
-    const lat = new THREE.Vector3().subVectors(this.pos[P.tailR], this.pos[P.tailL]).normalize();
-    const q = new THREE.Quaternion();
+    const lat = sLat.subVectors(this.pos[P.tailR], this.pos[P.tailL]).normalize();
+    const q = qA.identity();
     if (this.spin !== 0) q.setFromAxisAngle(lat, this.spin);
     if (this.yawSpin !== 0) {
-      const fwd = this.forward(new THREE.Vector3());
-      const up = new THREE.Vector3().crossVectors(lat, fwd).normalize();
-      q.premultiply(new THREE.Quaternion().setFromAxisAngle(up, this.yawSpin));
+      const fwd = this.forward(sFwd);
+      const up = sUp.crossVectors(lat, fwd).normalize();
+      q.premultiply(qB.setFromAxisAngle(up, this.yawSpin));
     }
     for (const pts of [this.pos, this.prev]) {
-      const c = new THREE.Vector3();
+      const c = sC.set(0, 0, 0);
       for (const p of pts) c.add(p);
       c.divideScalar(this.count);
       for (const p of pts) p.sub(c).applyQuaternion(q).add(c);

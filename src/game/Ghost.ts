@@ -9,6 +9,8 @@ export interface GhostRecord {
   frames: number;
   score: number;
   finishTime: number;
+  /** When it was saved (ms), for evicting the oldest ghosts. */
+  savedAt?: number;
 }
 
 export function encodeInputs(inputs: number[]): number[] {
@@ -40,9 +42,9 @@ export function loadGhost(trackKey: string): GhostRecord | null {
 export function saveGhost(trackKey: string, g: GhostRecord) {
   try {
     const all = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, GhostRecord>;
-    all[trackKey] = g;
-    // Keep storage bounded: drop the oldest entries beyond 40 tracks.
-    const keys = Object.keys(all);
+    all[trackKey] = { ...g, savedAt: Date.now() };
+    // Keep storage bounded: drop the least recently saved beyond 40 ghosts.
+    const keys = Object.keys(all).sort((a, b) => (all[a].savedAt ?? 0) - (all[b].savedAt ?? 0));
     for (const k of keys.slice(0, Math.max(0, keys.length - 40))) delete all[k];
     localStorage.setItem(KEY, JSON.stringify(all));
   } catch {

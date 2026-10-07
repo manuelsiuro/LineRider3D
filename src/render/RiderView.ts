@@ -5,6 +5,8 @@ import { Limb, MAT } from './riderParts';
 import { buildVehicleModel, type Basis, type VehicleModel } from './vehicleModels';
 
 /** Recolors Bosh and his ride (all player riders share these materials). */
+const X_AXIS = new THREE.Vector3(1, 0, 0);
+
 export function applyOutfit(o: { jacket: number; pants: number; scarf: number; hat: number; sled: number }) {
   MAT.jacket.color.setHex(o.jacket);
   MAT.pants.color.setHex(o.pants);
@@ -162,23 +164,41 @@ export class RiderView {
     this.shins[k].set(knee, foot);
   }
 
+  /** Reused per frame (no allocations while riding). */
+  private v = {
+    tail: new THREE.Vector3(),
+    nose: new THREE.Vector3(),
+    fwd: new THREE.Vector3(),
+    right: new THREE.Vector3(),
+    up: new THREE.Vector3(),
+    spine: new THREE.Vector3(),
+    toe: new THREE.Vector3(),
+    neck: new THREE.Vector3(),
+    look: new THREE.Vector3(),
+    side: new THREE.Vector3(),
+    knot: new THREE.Vector3(),
+    target: new THREE.Vector3(),
+    d: new THREE.Vector3(),
+  };
+  private m = new THREE.Matrix4();
+  private basis: Basis = { origin: this.v.tail, fwd: this.v.fwd, up: this.v.up, right: this.v.right };
+
   /** Positions every part from the simulated points. */
   update(dt: number, crashed: boolean) {
     const p = this.pts;
     // Vehicle basis from the contact points.
-    const tail = new THREE.Vector3().addVectors(p[P.tailL], p[P.tailR]).multiplyScalar(0.5);
-    const nose = new THREE.Vector3().addVectors(p[P.noseL], p[P.noseR]).multiplyScalar(0.5);
-    const fwd = new THREE.Vector3().subVectors(nose, tail).normalize();
-    const right = new THREE.Vector3().subVectors(p[P.tailR], p[P.tailL]);
+    const tail = this.v.tail.addVectors(p[P.tailL], p[P.tailR]).multiplyScalar(0.5);
+    const nose = this.v.nose.addVectors(p[P.noseL], p[P.noseR]).multiplyScalar(0.5);
+    const fwd = this.v.fwd.subVectors(nose, tail).normalize();
+    const right = this.v.right.subVectors(p[P.tailR], p[P.tailL]);
     right.addScaledVector(fwd, -right.dot(fwd)).normalize();
-    const up = new THREE.Vector3().crossVectors(right, fwd).normalize();
-    const basis: Basis = { origin: tail, fwd, up, right };
-    const posed = this.model.update(p, basis, dt, crashed);
+    this.v.up.crossVectors(right, fwd).normalize();
+    const posed = this.model.update(p, this.basis, dt, crashed);
 
     // Body.
     const shoulder = p[P.shoulder];
     const butt = p[P.butt];
-    const spine = new THREE.Vector3().subVectors(shoulder, butt).normalize();
+    const spine = this.v.spine.subVectors(shoulder, butt).normalize();
     const feet = posed && posed.feet ? posed.feet : [p[P.lFoot], p[P.rFoot]];
     this.torso.set(butt, shoulder);
     this.arms[0].set(shoulder, p[P.lHand]);
@@ -194,38 +214,38 @@ export class RiderView {
     // Boots point along the ride (across the board when sideways), or along the leg once thrown off.
     for (let k = 0; k < 2; k++) {
       let toe: THREE.Vector3;
-      if (!crashed) toe = (this.def.sideways ? right : fwd).clone();
+      if (!crashed) toe = this.v.toe.copy(this.def.sideways ? right : fwd);
       else {
-        const leg = new THREE.Vector3().subVectors(this.feet[k].position, butt);
+        const leg = this.v.toe.subVectors(this.feet[k].position, butt);
         leg.y = Math.min(leg.y, 0);
-        toe = leg.lengthSq() > 1e-6 ? leg.normalize() : fwd.clone();
+        toe = leg.lengthSq() > 1e-6 ? leg.normalize() : leg.copy(fwd);
       }
-      this.feet[k].quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), toe);
+      this.feet[k].quaternion.setFromUnitVectors(X_AXIS, toe);
     }
 
     // Head looks where the ride is going (at the hands once thrown off).
-    const neck = shoulder.clone().addScaledVector(spine, 0.2);
+    const neck = this.v.neck.copy(shoulder).addScaledVector(spine, 0.2);
     this.head.position.copy(neck);
-    const look = crashed ? new THREE.Vector3().addVectors(p[P.lHand], p[P.rHand]).multiplyScalar(0.5).sub(shoulder) : fwd.clone();
+    const look = crashed ? this.v.look.addVectors(p[P.lHand], p[P.rHand]).multiplyScalar(0.5).sub(shoulder) : this.v.look.copy(fwd);
     look.addScaledVector(spine, -look.dot(spine));
     if (look.lengthSq() < 1e-6) look.copy(fwd);
     look.normalize();
-    const side = new THREE.Vector3().crossVectors(look, spine).normalize();
-    this.head.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(look, spine, side));
+    const side = this.v.side.crossVectors(look, spine).normalize();
+    this.head.quaternion.setFromRotationMatrix(this.m.makeBasis(look, spine, side));
 
     // Scarf: two segments trailing behind with a little lag.
-    const knot = neck.clone().addScaledVector(spine, -0.17).addScaledVector(look, -0.1);
+    const knot = this.v.knot.copy(neck).addScaledVector(spine, -0.17).addScaledVector(look, -0.1);
     const k = 1 - Math.exp(-dt * 18);
     this.scarf[0].copy(knot);
     const seg = 0.22;
     for (let i = 1; i < 3; i++) {
-      const target = this.scarf[i - 1].clone().addScaledVector(look, -seg).addScaledVector(spine, -0.05);
+      const target = this.v.target.copy(this.scarf[i - 1]).addScaledVector(look, -seg).addScaledVector(spine, -0.05);
       this.scarf[i].lerp(target, k);
-      const d = this.scarf[i].clone().sub(this.scarf[i - 1]);
+      const d = this.v.d.subVectors(this.scarf[i], this.scarf[i - 1]);
       if (d.length() > seg) this.scarf[i].copy(this.scarf[i - 1]).addScaledVector(d.normalize(), seg);
       if (!Number.isFinite(this.scarf[i].x) || this.scarf[i].distanceTo(knot) > 2) this.scarf[i].copy(target);
     }
-    if (this.tag) this.tag.position.copy(butt).add(new THREE.Vector3(0, 1.5, 0));
+    if (this.tag) this.tag.position.copy(butt).y += 1.5;
     this.scarfLimbs[0].set(this.scarf[0], this.scarf[1]);
     this.scarfLimbs[1].set(this.scarf[1], this.scarf[2]);
   }

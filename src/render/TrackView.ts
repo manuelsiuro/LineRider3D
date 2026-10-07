@@ -99,6 +99,8 @@ export class TrackView {
     const mesh = this.ribbonById.get(id);
     if (!mesh) return;
     mesh.geometry.dispose();
+    // Highlight clones belong to this ribbon only.
+    if (mesh.userData.highlighted) for (const m of mesh.material as THREE.Material[]) m.dispose();
     this.ribbons.remove(mesh);
     this.ribbonById.delete(id);
   }
@@ -151,10 +153,25 @@ export class TrackView {
     if (!obj) return;
     this.stars.remove(obj);
     this.starById.delete(id);
+    // The glow sprite's material is per star (geometry, star material and glow texture are shared).
+    obj.traverse((o) => {
+      if (o instanceof THREE.Sprite) o.material.dispose();
+    });
   }
 
   private rebuildFinish() {
-    for (const c of [...this.goals.children]) this.goals.remove(c);
+    for (const c of [...this.goals.children]) {
+      this.goals.remove(c);
+      // Everything in a finish gate is built for it alone.
+      c.traverse((o) => {
+        if (!(o instanceof THREE.Mesh)) return;
+        o.geometry.dispose();
+        for (const m of [o.material].flat() as THREE.MeshStandardMaterial[]) {
+          m.map?.dispose();
+          m.dispose();
+        }
+      });
+    }
     if (this.track.finish) this.goals.add(buildFinish(this.track.finish));
   }
 

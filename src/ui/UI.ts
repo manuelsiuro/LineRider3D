@@ -6,6 +6,16 @@ import type { Stats, Trick } from '../game/RunStats';
 import { GRADE_LABEL } from '../game/RunStats';
 import { icon } from './icons';
 
+/** Writes text only when it changed (the HUD updates every frame). */
+function setText(el: Element, text: string) {
+  if (el.textContent !== text) el.textContent = text;
+}
+
+/** Is a menu, card or screen covering the game? */
+export function overlayOpen() {
+  return document.querySelector('.modal, .screen, .summary, .title-screen') !== null;
+}
+
 export type TitleChoice = 'levels' | 'create' | 'new' | 'wardrobe' | 'garage';
 
 export interface UIHandlers {
@@ -141,6 +151,8 @@ export class UI {
   private touchPad: HTMLElement;
   private riderBtn: HTMLButtonElement;
   private vehicleBtn: HTMLButtonElement;
+  private sfxBtn!: HTMLButtonElement;
+  private musicBtn!: HTMLButtonElement;
   private hintTimer = 0;
   private playing = false;
 
@@ -192,12 +204,14 @@ export class UI {
     this.undoBtn.onclick = () => editor.history.undo();
     this.redoBtn = button('btn icon-btn', icon('redo'), 'Redo (Ctrl+Shift+Z)');
     this.redoBtn.onclick = () => editor.history.redo();
-    const focusBtn = button('btn icon-btn', icon('target'), 'Focus rider (F)');
+    const focusBtn = button('btn icon-btn focus-btn', icon('target'), 'Focus rider (F)');
     focusBtn.onclick = handlers.focusRider;
     this.camBtn = button('btn text-btn', `${icon('camera', 18)}<span>Cinema</span>`, 'Camera mode (C)');
     this.camBtn.onclick = () => this.cycleCamera();
     const sfxBtn = button('btn icon-btn', icon('sound'), 'Sound effects');
     const musicBtn = button('btn icon-btn', icon('music'), 'Music');
+    this.sfxBtn = sfxBtn;
+    this.musicBtn = musicBtn;
     sfxBtn.onclick = () => {
       const on = handlers.toggleSfx();
       sfxBtn.innerHTML = icon(on ? 'sound' : 'mute');
@@ -224,7 +238,7 @@ export class UI {
     this.playBtn.onclick = () => (this.playing ? handlers.pause() : handlers.play());
     const stopBtn = button('btn icon-btn flat', icon('stop', 18), 'Stop (Esc)');
     stopBtn.onclick = handlers.stop;
-    const slowBtn = button('btn icon-btn flat', icon('slow', 20), 'Slow motion');
+    const slowBtn = button('btn icon-btn flat slow-btn', icon('slow', 20), 'Slow motion');
     slowBtn.onclick = () => slowBtn.classList.toggle('active', handlers.toggleSlowMo());
     this.timeline = h('input', 'timeline') as HTMLInputElement;
     this.timeline.type = 'range';
@@ -458,13 +472,17 @@ export class UI {
     document.body.classList.toggle('is-playing', playing);
   }
 
+  private lastTime = '';
   setTime(frame: number, recorded: number, fps: number) {
     const max = Math.max(400, recorded + 40);
+    const key = `${frame}/${max}`;
+    if (key === this.lastTime) return;
+    this.lastTime = key;
     this.timeline.max = String(max);
     this.timeline.value = String(frame);
     this.timeline.style.setProperty('--progress', `${(frame / max) * 100}%`);
     const t = frame / fps;
-    this.timeLabel.textContent = `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
+    setText(this.timeLabel, `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`);
   }
 
   /** Live speed and airtime readout. */
@@ -472,12 +490,13 @@ export class UI {
     this.hud.classList.toggle('hidden', !visible);
     if (!visible) return;
     const kmh = stats.speed * KMH;
-    this.gaugeValue.textContent = String(Math.round(kmh));
+    setText(this.gaugeValue, String(Math.round(kmh)));
     const frac = Math.min(kmh / 110, 1);
-    this.gaugeArc.style.strokeDashoffset = String(1 - frac);
+    const dash = (1 - frac).toFixed(3);
+    if (this.gaugeArc.style.strokeDashoffset !== dash) this.gaugeArc.style.strokeDashoffset = dash;
     this.hud.classList.toggle('fast', kmh > 60);
     this.scoreChip.classList.toggle('hidden', stats.score === 0 && !document.body.classList.contains('rider-mode'));
-    this.scoreChip.querySelector('b')!.textContent = stats.score.toLocaleString();
+    setText(this.scoreChip.querySelector('b')!, stats.score.toLocaleString());
     this.starsChip.classList.toggle('hidden', starsTotal === 0);
     const starLabel = `${stats.stars}/${starsTotal}`;
     const sb = this.starsChip.querySelector('b')!;
@@ -503,7 +522,7 @@ export class UI {
     }
     const airborne = stats.air > 0.35 && !stats.crashed;
     this.airChip.classList.toggle('hidden', !airborne);
-    if (airborne) this.airChip.querySelector('b')!.textContent = `${stats.air.toFixed(1)}s`;
+    if (airborne) setText(this.airChip.querySelector('b')!, `${stats.air.toFixed(1)}s`);
   }
 
   setRiderMode(on: boolean) {
@@ -517,11 +536,18 @@ export class UI {
     this.touchPad.classList.toggle('with-spin', spin);
   }
 
-  /** Shows the current ride on the quick-switch button. */
-  setVehicle(id: string, name: string, locked: boolean) {
+  /** Shows the current ride on the quick-switch button; `lockedBy` explains why it can't change. */
+  setVehicle(id: string, name: string, lockedBy: string | null) {
     this.vehicleBtn.innerHTML = icon(id, 22);
-    this.vehicleBtn.title = locked ? `${name} (this level's ride)` : `Ride: ${name} (V to switch)`;
-    this.vehicleBtn.disabled = locked;
+    this.vehicleBtn.title = lockedBy ? `${name} (${lockedBy})` : `Ride: ${name} (V to switch)`;
+    this.vehicleBtn.disabled = lockedBy !== null;
+  }
+
+  /** Reflects the saved sound settings on the buttons. */
+  setSoundState(sfx: boolean, music: boolean) {
+    this.sfxBtn.innerHTML = icon(sfx ? 'sound' : 'mute');
+    this.sfxBtn.classList.toggle('off', !sfx);
+    this.musicBtn.classList.toggle('off', !music);
   }
 
   /** Trick callout with grade, points and combo. */
@@ -994,7 +1020,16 @@ export class UI {
 
   private bindKeys() {
     window.addEventListener('keydown', (e) => {
-      if (document.body.classList.contains('on-title')) return;
+      // Esc backs out of full screens (levels, garage, wardrobe).
+      if (e.key === 'Escape') {
+        const back = [...document.querySelectorAll('.screen [data-back]')].pop() as HTMLElement | undefined;
+        if (back) {
+          back.click();
+          return;
+        }
+      }
+      // Nothing reaches the game behind a menu, card or the title.
+      if (document.body.classList.contains('on-title') || overlayOpen()) return;
       if ((e.target as HTMLElement).tagName === 'INPUT' && (e.target as HTMLInputElement).type !== 'range') return;
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === 'z') {
