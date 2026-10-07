@@ -35,8 +35,12 @@ const PUSH_MAX_SPEED = 0.58;
 /** Fraction of speed removed per step while braking on a track. */
 const BRAKE = 0.035;
 /** Flip control in the air: angular acceleration and cap (rad/step). */
-const FLIP_ACCEL = 0.025;
+const FLIP_ACCEL = 0.03;
 const FLIP_MAX = 0.3;
+/** Spin kept per step after releasing the flip key. */
+const FLIP_SETTLE = 0.72;
+/** Landing while spinning faster than this (rad/step) is a crash. */
+const SPIN_CRASH = 0.14;
 
 /** One-off events of a step, for sound and effects. */
 export const EVENT = { ring: 1, bounce: 2 } as const;
@@ -162,14 +166,19 @@ export class Rider {
       this.prev[i].copy(this.pos[i]).addScaledVector(forward, -speed);
     });
     this.crashed = false;
+    this.spin = 0;
   }
 
   private ringRef = new THREE.Vector3();
   /** Strongest bouncy-line hit of this step, applied to the whole rider. */
   private bounce: { up: THREE.Vector3; speed: number } | null = null;
 
+  /** Player-driven spin (rad/step) while airborne. */
+  spin = 0;
+
   step(track: Track, input = 0) {
     if (input && !this.crashed) this.control(input);
+    this.applySpin(input);
     this.ringRef.copy(this.pos[P.butt]);
     this.bounce = null;
     this.events = 0;
@@ -212,7 +221,6 @@ export class Rider {
    */
   private control(input: number) {
     const sledDown = [P.tailL, P.tailR, P.noseL, P.noseR].some((i) => this.contact[i]);
-    const airborne = !this.contact.some((c) => c);
     const tailMid = tmp.addVectors(this.pos[P.tailL], this.pos[P.tailR]).multiplyScalar(0.5);
     const fwd = tmp2.addVectors(this.pos[P.noseL], this.pos[P.noseR]).multiplyScalar(0.5).sub(tailMid).normalize();
 
@@ -227,27 +235,36 @@ export class Rider {
           this.prev[i].add(vel);
         }
       }
+    }
+  }
+
+  /**
+   * Arcade flip control: holding a key spins Bosh around the sled's lateral
+   * axis, releasing it settles the spin. Positions and previous positions are
+   * rotated about their own centers, so the flight path is untouched.
+   */
+  private applySpin(input: number) {
+    const airborne = !this.contact.some((c) => c);
+    if (!airborne || this.crashed) {
+      // Touching down mid-flip throws Bosh off the sled.
+      if (!airborne && Math.abs(this.spin) > SPIN_CRASH) this.crashed = true;
+      this.spin = 0;
       return;
     }
-    if (!airborne) return;
-
-    // Rotate the whole rider around the sled's lateral axis.
-    const dir = input & INPUT.push ? -1 : input & INPUT.brake ? 1 : 0; // push = front flip
-    if (!dir) return;
+    if (input & INPUT.push) this.spin = Math.max(this.spin - FLIP_ACCEL, -FLIP_MAX);
+    else if (input & INPUT.brake) this.spin = Math.min(this.spin + FLIP_ACCEL, FLIP_MAX);
+    else this.spin *= FLIP_SETTLE;
+    if (Math.abs(this.spin) < 1e-4) {
+      this.spin = 0;
+      return;
+    }
     const axis = new THREE.Vector3().subVectors(this.pos[P.tailR], this.pos[P.tailL]).normalize();
-    const com = new THREE.Vector3();
-    for (const p of this.pos) com.add(p);
-    com.divideScalar(POINT_COUNT);
-    // Current spin, measured on the nose.
-    const r = new THREE.Vector3().subVectors(this.pos[P.string], com);
-    const v = new THREE.Vector3().subVectors(this.pos[P.string], this.prev[P.string]);
-    const omega = new THREE.Vector3().crossVectors(r, v).dot(axis) / Math.max(r.lengthSq(), 1e-6);
-    if (omega * dir >= FLIP_MAX) return;
-    const dv = new THREE.Vector3();
-    for (let i = 0; i < POINT_COUNT; i++) {
-      r.subVectors(this.pos[i], com);
-      dv.crossVectors(axis, r).multiplyScalar(dir * FLIP_ACCEL);
-      this.prev[i].sub(dv);
+    const q = new THREE.Quaternion().setFromAxisAngle(axis, this.spin);
+    for (const pts of [this.pos, this.prev]) {
+      const c = new THREE.Vector3();
+      for (const p of pts) c.add(p);
+      c.divideScalar(POINT_COUNT);
+      for (const p of pts) p.sub(c).applyQuaternion(q).add(c);
     }
   }
 
@@ -394,6 +411,7 @@ export class Rider {
     for (let i = 0; i < POINT_COUNT; i++) if (this.contact[i]) mask |= 1 << i;
     buf[POINT_COUNT * 6 + 1] = mask;
     buf[POINT_COUNT * 6 + 2] = this.events;
+    buf[POINT_COUNT * 6 + 3] = this.spin;
   }
 
   readState(buf: Float64Array) {
@@ -405,7 +423,8 @@ export class Rider {
     const mask = buf[POINT_COUNT * 6 + 1];
     for (let i = 0; i < POINT_COUNT; i++) this.contact[i] = (mask & (1 << i)) !== 0;
     this.events = buf[POINT_COUNT * 6 + 2];
+    this.spin = buf[POINT_COUNT * 6 + 3];
   }
 }
 
-export const STATE_SIZE = POINT_COUNT * 6 + 3;
+export const STATE_SIZE = POINT_COUNT * 6 + 4;

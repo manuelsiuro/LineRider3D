@@ -18,7 +18,7 @@ for (const [name, key, hold] of [['classic', 0, 0], ['backflip', INPUT.brake, 22
   for (let f = 0; f <= 600; f++) {
     sim.seek(f);
     stats.advance(sim, f, 40);
-    for (const tr of stats.takeTricks()) tricks.push(`${tr.name} +${tr.points}`);
+    for (const tr of stats.takeTricks()) tricks.push(`${tr.grade ?? ''} ${tr.name} +${tr.points}`);
     if (stats.stats.still > 1.2 && f > 60) { end = f; break; }
   }
   const s = stats.stats;

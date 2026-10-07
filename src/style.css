@@ -592,6 +592,59 @@ body.on-title .ui > * {
   min-width: 2ch;
 }
 
+.combo-chip {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 14px 12px;
+  border-radius: 14px;
+  color: white;
+  font-family: var(--font-display);
+  background: linear-gradient(180deg, #ff9f55, #f2742a);
+  box-shadow: 0 8px 20px -6px rgba(242, 116, 42, 0.8);
+  overflow: hidden;
+}
+
+.combo-chip span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.combo-chip b {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.combo-chip.bump {
+  animation: combo-bump 0.35s var(--spring);
+}
+
+@keyframes combo-bump {
+  40% {
+    transform: scale(1.25) rotate(-4deg);
+  }
+}
+
+.combo-chip i {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 5px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.combo-chip em {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: white;
+  transform-origin: left;
+}
+
 /* Rider mode toggle */
 .player .rider-btn.active {
   background: linear-gradient(180deg, #8f7bff, #6a52f0);
@@ -696,6 +749,53 @@ body.rider-mode.is-playing .hud {
   color: #b3a8ff;
   text-align: center;
   line-height: 1;
+}
+
+.popup.trick.perfect {
+  color: #ffe27a;
+}
+
+.popup.trick.sketchy {
+  color: #c9d3df;
+  font-size: clamp(28px, 5.5vw, 50px);
+}
+
+.popup .tags {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  -webkit-text-stroke: 0;
+}
+
+.popup .grade,
+.popup .tag {
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 999px;
+  text-shadow: none;
+  color: white;
+  background: rgba(14, 30, 52, 0.55);
+}
+
+.popup .grade.perfect {
+  color: #4a3500;
+  background: linear-gradient(180deg, #ffe08a, #ffc23d);
+  box-shadow: 0 0 20px rgba(255, 200, 60, 0.8);
+}
+
+.popup .grade.good {
+  background: linear-gradient(180deg, #4fd1a1, #22a874);
+}
+
+.popup .grade.sketchy {
+  background: rgba(90, 100, 115, 0.8);
+}
+
+.popup .tag.combo {
+  background: linear-gradient(180deg, #ff9f55, #f2742a);
 }
 
 .popup small {

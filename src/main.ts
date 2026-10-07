@@ -426,9 +426,11 @@ function handleRideEvents(events: number, justCrashed: boolean) {
     rig.shake(0.6);
   }
   for (const trick of runStats.takeTricks()) {
-    ui.trick(trick.name, trick.points, trick.bailed);
-    if (!trick.bailed && trick.points >= 1000) sound.success();
-    else if (!trick.bailed) sound.click(true);
+    ui.trick(trick);
+    if (trick.bailed) continue;
+    if (trick.grade === 'perfect') sound.perfect();
+    else if (trick.points >= 1000) sound.success();
+    else sound.click(true);
   }
 }
 

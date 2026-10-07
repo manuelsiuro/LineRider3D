@@ -277,6 +277,23 @@ export class Sound {
     });
   }
 
+  /** Sparkly rising arpeggio for a perfect landing. */
+  perfect() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [79, 83, 86, 91, 95].forEach((note, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = i % 2 ? 'sine' : 'triangle';
+      osc.frequency.value = midi(note);
+      const g = ctx.createGain();
+      this.env(g, t + i * 0.045, 0.14, 0.004, 0.8);
+      osc.connect(g).connect(this.sfx);
+      osc.start(t + i * 0.045);
+      osc.stop(t + i * 0.045 + 0.9);
+    });
+  }
+
   // ------------------------------------------------------------- music
 
   private scheduleMusic() {

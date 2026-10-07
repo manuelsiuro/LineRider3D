@@ -2,7 +2,8 @@ import type { Editor, Tool } from '../editor/Editor';
 import { DECOR_LABELS } from '../world/models';
 import type { DecorKind, LineType } from '../track/types';
 import { LINE_COLORS } from '../track/types';
-import type { Stats } from '../game/RunStats';
+import type { Stats, Trick } from '../game/RunStats';
+import { GRADE_LABEL } from '../game/RunStats';
 import { icon } from './icons';
 
 export type TitleChoice = 'continue' | 'demo' | 'new';
@@ -89,6 +90,7 @@ export class UI {
   private airChip: HTMLElement;
   private popups: HTMLElement;
   private scoreChip: HTMLElement;
+  private comboChip: HTMLElement;
   private touchPad: HTMLElement;
   private riderBtn: HTMLButtonElement;
   private hintTimer = 0;
@@ -198,6 +200,7 @@ export class UI {
       </div>
       <div class="hud-chips">
         <div class="score-chip hidden">${icon('trophy', 16)}<b>0</b></div>
+        <div class="combo-chip hidden"><span>COMBO</span><b>x1</b><i><em></em></i></div>
         <div class="air-chip hidden">AIR <b>0.0s</b></div>
       </div>`,
     );
@@ -205,6 +208,7 @@ export class UI {
     this.gaugeValue = this.hud.querySelector('.gauge-text b')!;
     this.airChip = this.hud.querySelector('.air-chip')!;
     this.scoreChip = this.hud.querySelector('.score-chip')!;
+    this.comboChip = this.hud.querySelector('.combo-chip')!;
 
     // On-screen controls for touch devices in rider mode.
     this.touchPad = h(
@@ -397,6 +401,19 @@ export class UI {
     this.hud.classList.toggle('fast', kmh > 60);
     this.scoreChip.classList.toggle('hidden', stats.score === 0 && !document.body.classList.contains('rider-mode'));
     this.scoreChip.querySelector('b')!.textContent = stats.score.toLocaleString();
+    const comboOn = stats.combo > 1 && !stats.crashed;
+    this.comboChip.classList.toggle('hidden', !comboOn);
+    if (comboOn) {
+      const b = this.comboChip.querySelector('b')!;
+      const label = `x${stats.combo % 1 ? stats.combo.toFixed(1) : stats.combo}`;
+      if (b.textContent !== label) {
+        b.textContent = label;
+        this.comboChip.classList.remove('bump');
+        void this.comboChip.offsetWidth;
+        this.comboChip.classList.add('bump');
+      }
+      (this.comboChip.querySelector('em') as HTMLElement).style.transform = `scaleX(${stats.comboLeft})`;
+    }
     const airborne = stats.air > 0.35 && !stats.crashed;
     this.airChip.classList.toggle('hidden', !airborne);
     if (airborne) this.airChip.querySelector('b')!.textContent = `${stats.air.toFixed(1)}s`;
@@ -412,11 +429,21 @@ export class UI {
     this.touchPad.classList.toggle('hidden', !visible);
   }
 
-  /** Trick callout with points. */
-  trick(name: string, points: number, bailed: boolean) {
-    const el = h('div', `popup ${bailed ? 'crash' : 'trick'}`, bailed ? name : `${name}<small>+${points.toLocaleString()}</small>`);
+  /** Trick callout with grade, points and combo. */
+  trick(t: Trick) {
+    if (t.bailed) {
+      this.popup(t.name, 'crash');
+      return;
+    }
+    const grade = t.grade ?? 'good';
+    const tags = [
+      `<span class="grade ${grade}">${GRADE_LABEL[grade]}</span>`,
+      t.combo && t.combo > 1 ? `<span class="tag combo">x${t.combo}</span>` : '',
+      t.repeat ? '<span class="tag">Repeat ½</span>' : '',
+    ].join('');
+    const el = h('div', `popup trick ${grade}`, `<div class="tags">${tags}</div>${t.name}<small>+${t.points.toLocaleString()}</small>`);
     this.popups.append(el);
-    setTimeout(() => el.remove(), 1600);
+    setTimeout(() => el.remove(), 1700);
   }
 
   /** Big animated callout in the middle of the screen. */
@@ -516,8 +543,8 @@ export class UI {
           <div><b>${fmt(stats.distance * METERS)}<small>m</small></b><span>Distance</span></div>
           <div><b>${fmt(stats.topSpeed * KMH)}<small>km/h</small></b><span>Top speed</span></div>
           <div><b>${fmt(stats.bestAir, 1)}<small>s</small></b><span>Best air</span></div>
-          <div><b>${stats.tricks}</b><span>Tricks</span></div>
-          <div><b>${stats.rings}</b><span>Rings</span></div>
+          <div><b>${stats.tricks}<small>${stats.perfects ? ` · ${stats.perfects}★` : ''}</small></b><span>Tricks</span></div>
+          <div><b>x${stats.bestCombo}</b><span>Best combo</span></div>
         </div>
         <div class="actions">
           <button class="big-btn ghost" data-a="edit">${icon('pencil', 18)} Edit</button>

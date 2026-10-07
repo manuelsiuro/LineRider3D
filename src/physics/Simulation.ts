@@ -17,7 +17,7 @@ export class Simulation {
   private inputs: number[] = [];
   private revision = -1;
 
-  constructor(private track: Track) {}
+  constructor(readonly track: Track) {}
 
   /** Number of frames already computed. */
   get recorded() {
@@ -105,6 +105,6 @@ export class Simulation {
 
   crashedAt(frame: number) {
     const s = this.history[frame];
-    return s ? s[STATE_SIZE - 3] === 1 : false;
+    return s ? s[STATE_SIZE - 4] === 1 : false;
   }
 }
