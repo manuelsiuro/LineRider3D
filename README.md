@@ -24,6 +24,13 @@ npm run test:physics   # headless physics runs (demo track + banked turn)
 - Tools: Pencil, Line, Eraser, Bank (drag to tilt a track), Decor (pines, snowmen, cabins…), Ring, Start flag, Camera.
 - Timeline scrubbing is exact: the simulation is deterministic at 40 steps/s and every frame is recorded.
 
+## Presentation
+
+- Title screen with a live demo run and cinematic camera behind it
+- Bloom, sky reflections, color grading, speed trail, snow particles, camera shake
+- Procedural WebAudio sound (wind, runners, snow, crash, rings, bounces) and ambient music
+- Live speed gauge, airtime, callouts and an end-of-run summary
+
 ## Code map
 
 | Path | Role |
@@ -33,6 +40,8 @@ npm run test:physics   # headless physics runs (demo track + banked turn)
 | `src/render/` | Ribbon meshes, track/decor sync, Bosh model, camera rig |
 | `src/editor/` | Drawing plane, snapping, tools, undo/redo |
 | `src/world/` | Sky, terrain, mountains, forest, snowfall, procedural decor models |
-| `src/ui/` | HTML overlay (toolbar, player, menus) |
+| `src/ui/` | HTML overlay: title, HUD, toolbar, dialogs, SVG icons |
+| `src/audio/` | Procedural sound effects and music |
+| `src/game/` | Run statistics derived from the recorded simulation |
 
 Tracks autosave to `localStorage`; use the ☰ menu to export/import JSON.

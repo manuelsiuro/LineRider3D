@@ -77,11 +77,11 @@ export class Environment {
 
   constructor(scene: THREE.Scene, private lowPower: boolean) {
     scene.background = new THREE.Color(FOG);
-    scene.fog = new THREE.Fog(FOG, 80, 420);
+    scene.fog = new THREE.Fog(FOG, 110, 520);
 
     scene.add(this.buildSky());
 
-    const hemi = new THREE.HemisphereLight(0xdcecff, 0xa9bcd6, 1.6);
+    const hemi = new THREE.HemisphereLight(0xdcecff, 0xa9bcd6, 1.15);
     scene.add(hemi);
 
     this.sun = new THREE.DirectionalLight(0xfff3e0, 2.2);
@@ -111,6 +111,16 @@ export class Environment {
     this.snowVel = new Float32Array(flakes);
     this.snow = this.buildSnowfall(flakes);
     scene.add(this.snow);
+  }
+
+  /** Bakes the sky into an environment map for soft reflections. */
+  bakeEnvironment(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
+    const envScene = new THREE.Scene();
+    envScene.add(this.buildSky());
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(envScene, 0.02).texture;
+    scene.environmentIntensity = 0.4;
+    pmrem.dispose();
   }
 
   private buildSky() {

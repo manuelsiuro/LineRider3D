@@ -23,6 +23,9 @@ const MIN_BOUNCE = 0.06;
 /** Velocity added (per step) when passing through a boost ring. */
 const RING_BOOST = 0.22;
 
+/** One-off events of a step, for sound and effects. */
+export const EVENT = { ring: 1, bounce: 2 } as const;
+
 export const P = {
   tailL: 0,
   tailR: 1,
@@ -129,6 +132,8 @@ export class Rider {
   pos: THREE.Vector3[] = POINTS.map(() => new THREE.Vector3());
   prev: THREE.Vector3[] = POINTS.map(() => new THREE.Vector3());
   crashed = false;
+  /** EVENT bitmask of the last step. */
+  events = 0;
   /** Contact flags of the last step (for effects). */
   contact: boolean[] = POINTS.map(() => false);
 
@@ -151,6 +156,7 @@ export class Rider {
   step(track: Track) {
     this.ringRef.copy(this.pos[P.butt]);
     this.bounce = null;
+    this.events = 0;
     // Integrate.
     for (let i = 0; i < POINT_COUNT; i++) {
       const p = this.pos[i];
@@ -180,6 +186,7 @@ export class Rider {
     avg /= POINT_COUNT;
     const delta = speed - avg;
     if (delta <= 0) return;
+    if (delta > 0.08) this.events |= EVENT.bounce;
     for (let i = 0; i < POINT_COUNT; i++) this.prev[i].addScaledVector(up, -delta);
   }
 
@@ -196,6 +203,7 @@ export class Rider {
       if (hit.length() > ring.radius) continue;
       // Push along the axis, in the direction the rider is travelling.
       const dir = d1 > d0 ? 1 : -1;
+      this.events |= EVENT.ring;
       for (let i = 0; i < POINT_COUNT; i++) this.prev[i].addScaledVector(ring.axis, -dir * RING_BOOST);
     }
   }
@@ -303,6 +311,7 @@ export class Rider {
     let mask = 0;
     for (let i = 0; i < POINT_COUNT; i++) if (this.contact[i]) mask |= 1 << i;
     buf[POINT_COUNT * 6 + 1] = mask;
+    buf[POINT_COUNT * 6 + 2] = this.events;
   }
 
   readState(buf: Float64Array) {
@@ -313,7 +322,8 @@ export class Rider {
     this.crashed = buf[POINT_COUNT * 6] === 1;
     const mask = buf[POINT_COUNT * 6 + 1];
     for (let i = 0; i < POINT_COUNT; i++) this.contact[i] = (mask & (1 << i)) !== 0;
+    this.events = buf[POINT_COUNT * 6 + 2];
   }
 }
 
-export const STATE_SIZE = POINT_COUNT * 6 + 2;
+export const STATE_SIZE = POINT_COUNT * 6 + 3;

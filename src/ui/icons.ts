@@ -1,0 +1,38 @@
+/** Minimal stroke icon set (24×24, currentColor). */
+const P: Record<string, string> = {
+  pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  line: '<path d="M5 19 19 5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/>',
+  eraser:
+    '<path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>',
+  bank: '<path d="M3 17c4-1 7-4 9-9"/><path d="M21 17c-4-1-7-4-9-9"/><path d="M4 21h16"/><path d="M12 3v2"/>',
+  tree: '<path d="M12 2 6.5 9.5H9L5 15h4.5L6 20h12l-3.5-5H19l-4-5.5h2.5Z"/><path d="M12 20v2"/>',
+  ring: '<ellipse cx="12" cy="12" rx="5" ry="9"/><path d="M2 12h7"/><path d="m15 12h7"/><path d="m19 9 3 3-3 3"/>',
+  flag: '<path d="M5 22V3"/><path d="M5 4h13l-2.5 4.5L18 13H5"/>',
+  move: '<path d="m5 9-3 3 3 3"/><path d="m9 5 3-3 3 3"/><path d="m15 19-3 3-3-3"/><path d="m19 9 3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/>',
+  play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.9l12-7.5a1 1 0 0 0 0-1.8l-12-7.5A1 1 0 0 0 7 4.5Z" fill="currentColor" stroke="none"/>',
+  pause:
+    '<rect x="5.5" y="4" width="4.5" height="16" rx="1.2" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4.5" height="16" rx="1.2" fill="currentColor" stroke="none"/>',
+  stop: '<rect x="5" y="5" width="14" height="14" rx="2.5" fill="currentColor" stroke="none"/>',
+  slow: '<path d="M12 14 15.5 9"/><path d="M3.5 18a9.5 9.5 0 1 1 17 0"/><path d="M7 18h10"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>',
+  target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/>',
+  camera: '<rect x="2" y="6" width="14" height="12" rx="2.5"/><path d="m16 10.5 6-3.5v10l-6-3.5"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  sound: '<path d="M11 5 6 9H2v6h4l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/>',
+  mute: '<path d="M11 5 6 9H2v6h4l5 4Z"/><path d="m22 9-6 6M16 9l6 6"/>',
+  music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  help: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  download: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
+  upload: '<path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/>',
+  sled: '<path d="M3 15h15a3 3 0 0 0 3-3"/><path d="M6 15v-3h9v3"/><path d="M2 19h17a3 3 0 0 0 3-3"/><path d="M8 19v-4M14 19v-4"/>',
+  home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  replay: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+  snowflake:
+    '<path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7"/><path d="m9 4 3 2 3-2M9 20l3-2 3 2M4 10.5l3.5-.2L6 7M20 13.5l-3.5.2L18 17M4 13.5l3.5.2L6 17M20 10.5l-3.5-.2L18 7"/>',
+};
+
+export function icon(name: keyof typeof P | string, size = 22): string {
+  return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] ?? ''}</svg>`;
+}

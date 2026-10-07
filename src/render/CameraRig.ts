@@ -4,9 +4,9 @@ import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js
 export type CameraMode = 'follow' | 'chase' | 'side';
 
 export const CAMERA_LABELS: Record<CameraMode, string> = {
-  follow: '🎥 Follow',
-  chase: '🏂 Chase',
-  side: '📐 Side',
+  follow: 'Follow',
+  chase: 'Chase',
+  side: 'Side',
 };
 
 /**

@@ -83,8 +83,13 @@ export class Simulation {
     }
   }
 
+  /** Raw recorded state of a frame (see Rider.writeState layout). */
+  stateAt(frame: number): Float64Array | undefined {
+    return this.history[frame];
+  }
+
   crashedAt(frame: number) {
     const s = this.history[frame];
-    return s ? s[STATE_SIZE - 2] === 1 : false;
+    return s ? s[STATE_SIZE - 3] === 1 : false;
   }
 }
