@@ -18,6 +18,7 @@ import { Sound } from './audio/Sound';
 import { RunStats } from './game/RunStats';
 import { buildDemoTrack } from './demoTrack';
 import { rateRun } from './game/rating';
+import { GhostRun, beats, encodeInputs, loadGhost, saveGhost } from './game/Ghost';
 
 const STORAGE_KEY = 'lr3d.track';
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency ?? 8) <= 4;
@@ -55,6 +56,10 @@ postfx.setSize(innerWidth, innerHeight);
 const track = new Track();
 const trackView = new TrackView(scene, track);
 const riderView = new RiderView(scene);
+const ghostView = new RiderView(scene, true);
+ghostView.visible = false;
+/** Best run replayed alongside the player. */
+let ghost: GhostRun | null = null;
 const sim = new Simulation(track);
 const rig = new CameraRig(camera, controls);
 const effects = new Effects(scene);
@@ -214,6 +219,10 @@ function play() {
   if (summaryShown) resetRun();
   // A fresh attempt (or a classic run) starts with no recorded input.
   if (frame === 0 && !replaying) sim.clearInputs();
+  if (frame === 0) {
+    const record = mode === 'game' ? loadGhost(trackKey()) : null;
+    ghost = record ? new GhostRun(track, record) : null;
+  }
   if (frame === 0) focusRider();
   else rig.snapTo(sim.rider.center(riderCenter));
   playing = true;
@@ -369,6 +378,7 @@ function startNewTrack() {
 // ------------------------------------------------------------------ title screen
 function enterTitle() {
   mode = 'title';
+  ghost = null;
   resetRun();
   sim.clearInputs();
   playing = true;
@@ -457,6 +467,11 @@ function handleRideEvents(events: number, justCrashed: boolean) {
     sound.finish();
     ui.popup('FINISH!', 'finish');
     flash = 0.25;
+    const best = ghost?.record.finishTime ?? 0;
+    if (best > 0 && !replaying) {
+      const delta = runStats.stats.finishTime - best;
+      setTimeout(() => ui.popup(`${delta <= 0 ? '−' : '+'}${Math.abs(delta).toFixed(2)}s vs best`, delta <= 0 ? 'boost' : 'crash'), 700);
+    }
   }
   if (justCrashed) {
     sound.crash();
@@ -485,11 +500,20 @@ function checkRunEnd(dt: number) {
   const wasReplay = replaying;
   replaying = false;
   const rating = rateRun(track, s);
+  // Save this run as the ghost to beat if it's the best so far.
+  let ghostSaved = false;
+  if (!wasReplay && riderMode) {
+    const key = trackKey();
+    if (beats(s.score, s.finishTime, loadGhost(key))) {
+      saveGhost(key, { rle: encodeInputs(sim.inputsUpTo(frame)), frames: frame, score: s.score, finishTime: s.finishTime });
+      ghostSaved = true;
+    }
+  }
   const best = wasReplay ? { best: recordBest(0, 0).best, newBest: false } : recordBest(s.score, rating.stars);
   if (rating.stars === 3) setTimeout(() => sound.perfect(), 700);
   ui.showSummary(
     { ...s },
-    { ...best, riderMode, goals: rating.goals, rating: rating.stars, starsTotal: track.stars.size },
+    { ...best, riderMode, goals: rating.goals, rating: rating.stars, starsTotal: track.stars.size, ghostSaved },
     () => {
       resetRun();
       play();
@@ -532,6 +556,16 @@ renderer.setAnimationLoop((time) => {
   sim.interpolated(alpha, riderView.pts);
   const rider = sim.rider;
   riderView.update(dt, rider.crashed);
+
+  // Ghost of the best run, in lockstep with the player.
+  const showGhost = !!ghost && mode === 'game' && !replaying && frame > 0 && frame <= ghost.record.frames + 40;
+  ghostView.visible = showGhost;
+  if (showGhost && ghost) {
+    ghost.sim.seek(frame + 1);
+    ghost.sim.seek(frame);
+    ghost.sim.interpolated(alpha, ghostView.pts);
+    ghostView.update(dt, ghost.sim.rider.crashed);
+  }
   riderCenter.copy(riderView.pts[P.butt]);
   rider.velocity(riderVel);
 
@@ -597,4 +631,4 @@ renderer.setAnimationLoop((time) => {
   }
 });
 
-if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, keys: (m: number) => (keyMask = m) } });
+if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, keys: (m: number) => (keyMask = m), ghostInfo: () => ({ visible: ghostView.root.visible, frame: ghost?.sim.frame, butt: ghost?.sim.rider.pos[P.butt].toArray(), me: sim.rider.pos[P.butt].toArray() }) } });

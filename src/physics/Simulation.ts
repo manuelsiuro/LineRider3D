@@ -98,6 +98,19 @@ export class Simulation {
     this.inputs = [];
   }
 
+  /** Recorded inputs up to `frames` (for saving a run). */
+  inputsUpTo(frames: number): number[] {
+    const out: number[] = [];
+    for (let f = 0; f < frames; f++) out.push(this.inputs[f] ?? 0);
+    return out;
+  }
+
+  /** Replaces all inputs (e.g. to replay a saved ghost run). */
+  loadInputs(inputs: number[]) {
+    this.inputs = inputs.slice();
+    this.history.length = Math.min(this.history.length, 1);
+  }
+
   /** Raw recorded state of a frame (see Rider.writeState layout). */
   stateAt(frame: number): Float64Array | undefined {
     return this.history[frame];

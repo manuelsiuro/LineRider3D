@@ -59,8 +59,10 @@ export class RiderView {
   private feet: THREE.Mesh[];
   private scarf: THREE.Vector3[] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
   private scarfLimbs: Limb[];
+  /** Label floating upright above the ghost. */
+  private tag: THREE.Sprite | null = null;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, ghost = false) {
     scene.add(this.root);
     this.buildSled();
     this.root.add(this.sled);
@@ -81,6 +83,43 @@ export class RiderView {
     this.hands.forEach((hnd) => hnd.scale.set(1.1, 1, 0.9));
     this.buildHead();
     this.root.add(this.head);
+    if (ghost) this.makeGhost();
+  }
+
+  /** Translucent, glowing look for the best-run ghost, with a "BEST" tag. */
+  private makeGhost() {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.38, depthWrite: false });
+    this.root.traverse((o) => {
+      if (o instanceof THREE.Mesh) {
+        o.material = mat;
+        o.castShadow = false;
+        o.renderOrder = 5;
+      }
+    });
+    const c = document.createElement('canvas');
+    c.width = 128;
+    c.height = 48;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = 'rgba(40,120,200,0.85)';
+    ctx.beginPath();
+    ctx.roundRect(4, 4, 120, 40, 20);
+    ctx.fill();
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 26px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('BEST', 64, 25);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+    tag.scale.set(1.0, 0.375, 1);
+    tag.renderOrder = 6;
+    this.tag = tag;
+    this.root.add(tag);
+  }
+
+  set visible(v: boolean) {
+    this.root.visible = v;
   }
 
   private buildSled() {
@@ -201,6 +240,7 @@ export class RiderView {
       if (d.length() > seg) this.scarf[i].copy(this.scarf[i - 1]).addScaledVector(d.normalize(), seg);
       if (!Number.isFinite(this.scarf[i].x) || this.scarf[i].distanceTo(knot) > 2) this.scarf[i].copy(target);
     }
+    if (this.tag) this.tag.position.copy(butt).add(new THREE.Vector3(0, 1.5, 0));
     this.scarfLimbs[0].set(this.scarf[0], this.scarf[1]);
     this.scarfLimbs[1].set(this.scarf[1], this.scarf[2]);
   }

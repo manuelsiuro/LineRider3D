@@ -35,6 +35,7 @@ export interface SummaryInfo {
   goals: { label: string; done: boolean }[];
   rating: number;
   starsTotal: number;
+  ghostSaved?: boolean;
 }
 
 const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
@@ -567,6 +568,7 @@ export class UI {
             ${info.newBest ? `<span class="new-best">${icon('trophy', 16)} New best!</span>` : info.best > 0 ? `<span class="best">Best ${info.best.toLocaleString()}</span>` : ''}
           </div>
           ${stats.bestTrick ? `<p class="best-trick">Best trick: <b>${stats.bestTrick}</b></p>` : ''}
+          ${info.ghostSaved ? `<span class="ghost-badge">${icon('eye', 14)} Saved as your ghost to beat</span>` : ''}
         </div>
         <ul class="goals">${info.goals.map((g) => `<li class="${g.done ? 'done' : ''}">${icon(g.done ? 'check' : 'circle', 16)}${g.label}</li>`).join('')}</ul>
         <div class="stats">
