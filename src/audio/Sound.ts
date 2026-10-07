@@ -277,6 +277,47 @@ export class Sound {
     });
   }
 
+  /** Coin-like pickup for a star. */
+  star() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [88, 95].forEach((note, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.value = midi(note);
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 3500;
+      const g = ctx.createGain();
+      this.env(g, t + i * 0.07, 0.08, 0.003, 0.25 + i * 0.2);
+      osc.connect(f).connect(g).connect(this.sfx);
+      osc.start(t + i * 0.07);
+      osc.stop(t + i * 0.07 + 0.6);
+    });
+  }
+
+  /** Crowd-ish cheer + fanfare at the finish line. */
+  finish() {
+    this.success();
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const n = ctx.createBufferSource();
+    n.buffer = this.noise;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = 1400;
+    f.Q.value = 0.6;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+    n.connect(f).connect(g).connect(this.sfx);
+    n.start(t);
+    n.stop(t + 2.3);
+  }
+
   /** Sparkly rising arpeggio for a perfect landing. */
   perfect() {
     const ctx = this.ctx;

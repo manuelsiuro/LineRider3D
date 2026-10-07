@@ -17,6 +17,7 @@ import { PostFX } from './render/PostFX';
 import { Sound } from './audio/Sound';
 import { RunStats } from './game/RunStats';
 import { buildDemoTrack } from './demoTrack';
+import { rateRun } from './game/rating';
 
 const STORAGE_KEY = 'lr3d.track';
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency ?? 8) <= 4;
@@ -71,6 +72,9 @@ let frame = 0;
 let acc = 0;
 let summaryShown = false;
 let crashClock = 0;
+let finishClock = 0;
+/** Stars already sparkled this run (so scrubbing doesn't repeat them). */
+const sparkled = new Set<number>();
 let flash = 0;
 
 // ------------------------------------------------------------------ rider mode input
@@ -198,6 +202,8 @@ function resetRun() {
   acc = 0;
   summaryShown = false;
   crashClock = 0;
+  finishClock = 0;
+  sparkled.clear();
   effects.reset();
   trail.reset();
   runStats.reset();
@@ -233,20 +239,35 @@ function trackKey() {
   return String(h >>> 0);
 }
 
-function recordBest(score: number): { best: number; newBest: boolean } {
+interface BestRecord {
+  score: number;
+  stars: number;
+}
+
+function loadBests(): Record<string, BestRecord> {
   try {
-    const all = JSON.parse(localStorage.getItem('lr3d.best') ?? '{}') as Record<string, number>;
-    const key = trackKey();
-    const best = all[key] ?? 0;
-    if (score > best) {
-      all[key] = score;
-      localStorage.setItem('lr3d.best', JSON.stringify(all));
-      return { best: score, newBest: best > 0 || score > 0 };
-    }
-    return { best, newBest: false };
+    const raw = JSON.parse(localStorage.getItem('lr3d.best') ?? '{}') as Record<string, BestRecord | number>;
+    const out: Record<string, BestRecord> = {};
+    for (const [k, v] of Object.entries(raw)) out[k] = typeof v === 'number' ? { score: v, stars: 0 } : v;
+    return out;
   } catch {
-    return { best: 0, newBest: false };
+    return {};
   }
+}
+
+/** Keeps the best score and star rating of the current track. */
+function recordBest(score: number, stars: number): { best: number; newBest: boolean } {
+  const all = loadBests();
+  const key = trackKey();
+  const prev = all[key] ?? { score: 0, stars: 0 };
+  const newBest = score > prev.score && score > 0;
+  all[key] = { score: Math.max(prev.score, score), stars: Math.max(prev.stars, stars) };
+  try {
+    localStorage.setItem('lr3d.best', JSON.stringify(all));
+  } catch {
+    /* storage unavailable */
+  }
+  return { best: all[key].score, newBest };
 }
 
 const cameraModes: CameraMode[] = ['follow', 'chase', 'side'];
@@ -420,6 +441,23 @@ function handleRideEvents(events: number, justCrashed: boolean) {
     sound.bounce();
     if (Math.random() < 0.5) ui.popup('BOING!', 'bounce');
   }
+  if (events & EVENT.star) {
+    sound.star();
+    // Sparkle where the collected star was.
+    const list = track.starList();
+    const mask = sim.rider.stars;
+    list.forEach((st, k) => {
+      if (Math.floor(mask / 2 ** k) % 2 === 1 && !sparkled.has(st.id)) {
+        sparkled.add(st.id);
+        effects.sparkle(st.position);
+      }
+    });
+  }
+  if (events & EVENT.finish) {
+    sound.finish();
+    ui.popup('FINISH!', 'finish');
+    flash = 0.25;
+  }
   if (justCrashed) {
     sound.crash();
     ui.popup('WIPEOUT!', 'crash');
@@ -438,17 +476,20 @@ function checkRunEnd(dt: number) {
   if (summaryShown || mode !== 'game') return;
   const s = runStats.stats;
   crashClock = s.crashed ? crashClock + dt : 0;
-  const ended = crashClock > 2.4 || (s.still > 1.2 && s.time > 1.5) || frame >= MAX_FRAME;
+  finishClock = s.finished ? finishClock + dt : 0;
+  const ended = crashClock > 2.4 || finishClock > 1.6 || (s.still > 1.2 && s.time > 1.5) || frame >= MAX_FRAME;
   if (!ended) return;
   summaryShown = true;
   pause();
   if (!s.crashed && s.tricks === 0) sound.success();
   const wasReplay = replaying;
   replaying = false;
-  const best = wasReplay ? { best: recordBest(0).best, newBest: false } : recordBest(s.score);
+  const rating = rateRun(track, s);
+  const best = wasReplay ? { best: recordBest(0, 0).best, newBest: false } : recordBest(s.score, rating.stars);
+  if (rating.stars === 3) setTimeout(() => sound.perfect(), 700);
   ui.showSummary(
     { ...s },
-    { ...best, riderMode },
+    { ...best, riderMode, goals: rating.goals, rating: rating.stars, starsTotal: track.stars.size },
     () => {
       resetRun();
       play();
@@ -541,10 +582,10 @@ renderer.setAnimationLoop((time) => {
   postfx.flash = flash;
 
   editor.update(!playing && mode === 'game');
-  trackView.update(t, riderCenter);
+  trackView.update(t, riderCenter, sim.rider.stars);
   env.update(dt, controls.target, t);
   ui.setTime(frame, sim.recorded, STEPS_PER_SECOND);
-  ui.setHud(mode === 'game' && (playing || frame > 0) && !summaryShown, stats);
+  ui.setHud(mode === 'game' && (playing || frame > 0) && !summaryShown, stats, track.stars.size);
   ui.setTouchPad(isTouch && riderMode && mode === 'game' && playing && !replaying);
   postfx.render(dt);
 

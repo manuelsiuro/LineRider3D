@@ -61,6 +61,18 @@ export function buildDemoTrack(track: Track) {
   profile(track, (x) => flat + 0.6 * Math.sin(((x - x0 - 10) / 16) * Math.PI) ** 2, x0 + 10, x0 + 26, 'ice');
   profile(track, (x) => flat * (0.5 + 0.5 * Math.cos((Math.PI * (x - x0 - 26)) / 40)), x0 + 26, x0 + 66);
 
+  // Goals: stars along the line (one at the top of the jump) and a finish gate.
+  const startSlope = (x: number) => 40 - 26 * (0.5 - 0.5 * Math.cos((Math.PI * x) / 40));
+  for (const x of [12, 24]) track.addStar({ position: new THREE.Vector3(x, startSlope(x) + 1.3, 0) });
+  // Jump apex, measured from the flight arc.
+  let apexX = 44;
+  for (let x = 44; x < 70; x += 0.5) if (arc(x) > arc(apexX)) apexX = x;
+  track.addStar({ position: new THREE.Vector3(apexX, arc(apexX) + 0.4, 0) });
+  track.addStar({ position: new THREE.Vector3(LAND_END + OUT * 0.5, runout(LAND_END + OUT * 0.5) + 1.3, 0) });
+  track.addStar({ position: new THREE.Vector3(x0 + 18, flat + 0.6 * Math.sin((8 / 16) * Math.PI) ** 2 + 1.3, 0) });
+  track.setFinish({ position: new THREE.Vector3(x0 + 40, flat * (0.5 + 0.5 * Math.cos((Math.PI * 14) / 40)), 0), axis: new THREE.Vector3(1, 0, 0), halfWidth: 2.3 });
+  track.targetScore = 5000;
+
   // Decor around the run.
   const scatter: [DecorKind, number, number, number][] = [
     ['pine', -6, -5, 1.2],

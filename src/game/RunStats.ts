@@ -28,6 +28,11 @@ export interface Stats {
   bestCombo: number;
   /** Remaining combo window, 0..1. */
   comboLeft: number;
+  /** Stars collected this run. */
+  stars: number;
+  finished: boolean;
+  /** Seconds to reach the finish (0 if not finished). */
+  finishTime: number;
 }
 
 export type Grade = 'perfect' | 'good' | 'sketchy';
@@ -46,6 +51,16 @@ const CRASH = POINT_COUNT * 6;
 const CONTACT = POINT_COUNT * 6 + 1;
 const EVENTS = POINT_COUNT * 6 + 2;
 const SPIN = POINT_COUNT * 6 + 3;
+const STARS = POINT_COUNT * 6 + 4;
+
+function countBits(mask: number) {
+  let n = 0;
+  while (mask > 0) {
+    if (mask % 2 === 1) n++;
+    mask = Math.floor(mask / 2);
+  }
+  return n;
+}
 const TAIL_L = P.tailL * 6;
 const TAIL_R = P.tailR * 6;
 const NOSE_L = P.noseL * 6;
@@ -151,6 +166,9 @@ export class RunStats {
       combo: 1,
       bestCombo: 1,
       comboLeft: 0,
+      stars: 0,
+      finished: false,
+      finishTime: 0,
     };
   }
 
@@ -293,6 +311,14 @@ export class RunStats {
         }
       }
       if (ev & EVENT.bounce) s.bounces++;
+      if (ev & EVENT.star) {
+        s.stars = countBits(b[STARS]);
+        if (!s.crashed) this.bump(f);
+      }
+      if (ev & EVENT.finish && !s.finished) {
+        s.finished = true;
+        s.finishTime = f / fps;
+      }
       events |= ev;
       s.crashed = b[CRASH] === 1;
 

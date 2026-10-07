@@ -1,4 +1,4 @@
-import type { Editor, Tool } from '../editor/Editor';
+import type { Editor, ItemKind, Tool } from '../editor/Editor';
 import { DECOR_LABELS } from '../world/models';
 import type { DecorKind, LineType } from '../track/types';
 import { LINE_COLORS } from '../track/types';
@@ -32,6 +32,9 @@ export interface SummaryInfo {
   best: number;
   newBest: boolean;
   riderMode: boolean;
+  goals: { label: string; done: boolean }[];
+  rating: number;
+  starsTotal: number;
 }
 
 const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
@@ -39,7 +42,7 @@ const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
   { id: 'line', icon: 'line', label: 'Line', key: 'W' },
   { id: 'eraser', icon: 'eraser', label: 'Eraser', key: 'E' },
   { id: 'bank', icon: 'bank', label: 'Bank', key: 'B' },
-  { id: 'ring', icon: 'ring', label: 'Ring', key: 'R' },
+  { id: 'item', icon: 'star', label: 'Items', key: 'R' },
   { id: 'decor', icon: 'tree', label: 'Decor', key: 'D' },
   { id: 'start', icon: 'flag', label: 'Start', key: 'S' },
   { id: 'hand', icon: 'move', label: 'Camera', key: 'H' },
@@ -91,6 +94,7 @@ export class UI {
   private popups: HTMLElement;
   private scoreChip: HTMLElement;
   private comboChip: HTMLElement;
+  private starsChip: HTMLElement;
   private touchPad: HTMLElement;
   private riderBtn: HTMLButtonElement;
   private hintTimer = 0;
@@ -200,6 +204,7 @@ export class UI {
       </div>
       <div class="hud-chips">
         <div class="score-chip hidden">${icon('trophy', 16)}<b>0</b></div>
+        <div class="stars-chip hidden">${icon('star', 16)}<b>0/0</b></div>
         <div class="combo-chip hidden"><span>COMBO</span><b>x1</b><i><em></em></i></div>
         <div class="air-chip hidden">AIR <b>0.0s</b></div>
       </div>`,
@@ -209,6 +214,7 @@ export class UI {
     this.airChip = this.hud.querySelector('.air-chip')!;
     this.scoreChip = this.hud.querySelector('.score-chip')!;
     this.comboChip = this.hud.querySelector('.combo-chip')!;
+    this.starsChip = this.hud.querySelector('.stars-chip')!;
 
     // On-screen controls for touch devices in rider mode.
     this.touchPad = h(
@@ -348,6 +354,20 @@ export class UI {
       slider(r2, 'Width', 1, 6, 0.2, s.width, '', (v) => (s.width = v));
       slider(r2, 'Bank', -90, 90, 5, s.bank, '°', (v) => (s.bank = v));
       if (s.mode === 'path') slider(r2, 'Descent', 0, 60, 1, s.grade, '%', (v) => (s.grade = v));
+    } else if (tool === 'item') {
+      seg(
+        row(),
+        [
+          { id: 'star' as ItemKind, label: '★ Star' },
+          { id: 'ring' as ItemKind, label: '◎ Boost ring' },
+          { id: 'finish' as ItemKind, label: '🏁 Finish gate' },
+        ],
+        s.item,
+        (v) => (s.item = v),
+      );
+      const r2 = row();
+      slider(r2, '3rd star target', 500, 30000, 500, this.editor.targetScore, ' pts', (v) => (this.editor.targetScore = v));
+      r2.append(h('span', 'tip', s.item === 'star' ? 'Tap a track to float a star over it.' : s.item === 'ring' ? 'Tap a track to hang a ring over it.' : 'Tap a track to place the finish gate.'));
     } else if (tool === 'decor') {
       seg(
         row(),
@@ -360,7 +380,6 @@ export class UI {
         eraser: 'Tap or drag over a track, ring or decoration to remove it.',
         bank: 'Drag a track left or right to tilt it. Snaps every 15°.',
         start: 'Tap a track or the drawing plane to move the start flag.',
-        ring: 'Tap a track to hang a boost ring over it, or tap the drawing plane.',
         hand: 'Drag to orbit · two fingers or right-drag to pan · pinch or wheel to zoom.',
       };
       row().append(h('span', 'tip', tips[tool] ?? ''));
@@ -391,7 +410,7 @@ export class UI {
   }
 
   /** Live speed and airtime readout. */
-  setHud(visible: boolean, stats: Stats) {
+  setHud(visible: boolean, stats: Stats, starsTotal = 0) {
     this.hud.classList.toggle('hidden', !visible);
     if (!visible) return;
     const kmh = stats.speed * KMH;
@@ -401,6 +420,16 @@ export class UI {
     this.hud.classList.toggle('fast', kmh > 60);
     this.scoreChip.classList.toggle('hidden', stats.score === 0 && !document.body.classList.contains('rider-mode'));
     this.scoreChip.querySelector('b')!.textContent = stats.score.toLocaleString();
+    this.starsChip.classList.toggle('hidden', starsTotal === 0);
+    const starLabel = `${stats.stars}/${starsTotal}`;
+    const sb = this.starsChip.querySelector('b')!;
+    if (sb.textContent !== starLabel) {
+      sb.textContent = starLabel;
+      this.starsChip.classList.remove('bump');
+      void this.starsChip.offsetWidth;
+      this.starsChip.classList.add('bump');
+    }
+    this.starsChip.classList.toggle('complete', starsTotal > 0 && stats.stars >= starsTotal);
     const comboOn = stats.combo > 1 && !stats.crashed;
     this.comboChip.classList.toggle('hidden', !comboOn);
     if (comboOn) {
@@ -447,7 +476,7 @@ export class UI {
   }
 
   /** Big animated callout in the middle of the screen. */
-  popup(text: string, kind: 'boost' | 'bounce' | 'air' | 'crash' = 'boost') {
+  popup(text: string, kind: 'boost' | 'bounce' | 'air' | 'crash' | 'finish' = 'boost') {
     const el = h('div', `popup ${kind}`, text);
     this.popups.append(el);
     setTimeout(() => el.remove(), 1400);
@@ -530,21 +559,23 @@ export class UI {
       'summary',
       `<div class="card">
         <div class="summary-head ${clean ? 'clean' : 'wipeout'}">
-          <span class="badge">${clean ? 'Clean run' : 'Wipeout'}</span>
-          <h2>${clean ? 'Nice ride!' : 'Ouch, Bosh!'}</h2>
+          <span class="badge">${stats.finished ? `Finished · ${stats.finishTime.toFixed(2)}s` : clean ? 'Clean run' : 'Wipeout'}</span>
+          <div class="rating">${[0, 1, 2].map((i) => `<span class="rstar ${i < info.rating ? 'on' : ''}" style="animation-delay:${0.25 + i * 0.18}s">${icon('star', 44)}</span>`).join('')}</div>
+          <h2>${info.rating === 3 ? 'Legendary!' : stats.finished ? 'Finished!' : clean ? 'Nice ride!' : 'Ouch, Bosh!'}</h2>
           <div class="score-line">
             <div class="score-big">${stats.score.toLocaleString()}<small>pts</small></div>
             ${info.newBest ? `<span class="new-best">${icon('trophy', 16)} New best!</span>` : info.best > 0 ? `<span class="best">Best ${info.best.toLocaleString()}</span>` : ''}
           </div>
           ${stats.bestTrick ? `<p class="best-trick">Best trick: <b>${stats.bestTrick}</b></p>` : ''}
         </div>
+        <ul class="goals">${info.goals.map((g) => `<li class="${g.done ? 'done' : ''}">${icon(g.done ? 'check' : 'circle', 16)}${g.label}</li>`).join('')}</ul>
         <div class="stats">
           <div><b>${fmt(stats.time, 1)}<small>s</small></b><span>Time</span></div>
           <div><b>${fmt(stats.distance * METERS)}<small>m</small></b><span>Distance</span></div>
           <div><b>${fmt(stats.topSpeed * KMH)}<small>km/h</small></b><span>Top speed</span></div>
           <div><b>${fmt(stats.bestAir, 1)}<small>s</small></b><span>Best air</span></div>
-          <div><b>${stats.tricks}<small>${stats.perfects ? ` · ${stats.perfects}★` : ''}</small></b><span>Tricks</span></div>
-          <div><b>x${stats.bestCombo}</b><span>Best combo</span></div>
+          <div><b>${stats.tricks}<small>${stats.perfects ? ` · ${stats.perfects} perfect` : ''}</small></b><span>Tricks</span></div>
+          <div><b>${info.starsTotal ? `${stats.stars}/${info.starsTotal}` : `x${stats.bestCombo}`}</b><span>${info.starsTotal ? 'Stars' : 'Best combo'}</span></div>
         </div>
         <div class="actions">
           <button class="big-btn ghost" data-a="edit">${icon('pencil', 18)} Edit</button>
@@ -579,7 +610,7 @@ export class UI {
         <div class="help-grid">
           <div>${icon('pencil')}<p><b>Draw</b> tracks on the grid plane. <b>Profile</b> draws like classic Line Rider; orbit the camera to turn the plane. <b>Path</b> draws winding descents from above, auto-banked like a bobsled run.</p></div>
           <div>${icon('line')}<p>Start a stroke on the <b>end of another track</b> (orange ring) to connect them. The <b>colored side</b> is solid: draw left → right for a floor.</p></div>
-          <div>${icon('ring')}<p><b>Boost</b> speeds up, <b>Ice</b> has no grip, <b>Bouncy</b> is a trampoline. <b>Rings</b> launch Bosh through them.</p></div>
+          <div>${icon('ring')}<p><b>Boost</b> speeds up, <b>Ice</b> has no grip, <b>Bouncy</b> is a trampoline. With <b>Items</b>, add <b>stars</b> to collect, <b>rings</b> that launch Bosh and a <b>finish gate</b>.</p></div>
           <div>${icon('play')}<p>Press <b>Play</b> and watch Bosh ride. Scrub the timeline, try slow-mo and switch cameras.</p></div>
           <div>${icon('gamepad')}<p><b>Rider mode</b>: <b>→</b> pushes and <b>←</b> brakes on the track. In the air they <b>flip</b> Bosh forward or backward. Land clean to score!</p></div>
         </div>

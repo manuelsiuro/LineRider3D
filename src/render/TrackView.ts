@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Track } from '../track/Track';
-import type { Decor, Ring } from '../track/types';
+import type { Decor, Ring, Star } from '../track/types';
+import { animateStar, buildFinish, buildStar } from './goalModels';
 import { animateRing, buildRing } from './ringModel';
 import { buildDecor, M } from '../world/models';
 import { buildRibbonMesh } from './ribbon';
@@ -11,6 +12,9 @@ export class TrackView {
   readonly ribbons = new THREE.Group();
   readonly decor = new THREE.Group();
   readonly rings = new THREE.Group();
+  readonly stars = new THREE.Group();
+  readonly goals = new THREE.Group();
+  private starById = new Map<number, THREE.Object3D>();
   /** Decorative wooden scaffolding under tracks. */
   readonly supports = new THREE.Group();
   readonly startMarker: THREE.Group;
@@ -20,7 +24,7 @@ export class TrackView {
   private ringById = new Map<number, THREE.Object3D>();
 
   constructor(scene: THREE.Scene, private track: Track) {
-    scene.add(this.ribbons, this.decor, this.supports, this.rings);
+    scene.add(this.ribbons, this.decor, this.supports, this.rings, this.stars, this.goals);
     this.startMarker = this.buildStartMarker();
     scene.add(this.startMarker);
 
@@ -46,6 +50,15 @@ export class TrackView {
         case 'ringRemoved':
           this.removeRing(e.ring.id);
           break;
+        case 'starAdded':
+          this.addStar(e.star);
+          break;
+        case 'starRemoved':
+          this.removeStar(e.star.id);
+          break;
+        case 'finishChanged':
+          this.rebuildFinish();
+          break;
         case 'startChanged':
           this.startMarker.position.copy(track.start);
           break;
@@ -53,6 +66,8 @@ export class TrackView {
           for (const id of [...this.ribbonById.keys()]) this.removeRibbon(id);
           for (const id of [...this.decorById.keys()]) this.removeDecor(id);
           for (const id of [...this.ringById.keys()]) this.removeRing(id);
+          for (const id of [...this.starById.keys()]) this.removeStar(id);
+          this.rebuildFinish();
           break;
       }
     });
@@ -125,9 +140,31 @@ export class TrackView {
     this.ringById.delete(id);
   }
 
-  /** Per-frame animation of interactive props. */
-  update(time: number, rider: THREE.Vector3) {
+  private addStar(st: Star) {
+    const obj = buildStar(st);
+    this.starById.set(st.id, obj);
+    this.stars.add(obj);
+  }
+
+  private removeStar(id: number) {
+    const obj = this.starById.get(id);
+    if (!obj) return;
+    this.stars.remove(obj);
+    this.starById.delete(id);
+  }
+
+  private rebuildFinish() {
+    for (const c of [...this.goals.children]) this.goals.remove(c);
+    if (this.track.finish) this.goals.add(buildFinish(this.track.finish));
+  }
+
+  /** Per-frame animation of interactive props; `collected` is the star bit mask. */
+  update(time: number, rider: THREE.Vector3, collected = 0) {
     for (const obj of this.ringById.values()) animateRing(obj, time, obj.position.distanceTo(rider));
+    this.track.starList().forEach((st, k) => {
+      const obj = this.starById.get(st.id);
+      if (obj) animateStar(obj, time, k * 1.3, Math.floor(collected / 2 ** k) % 2 === 1);
+    });
   }
 
   /** Highlights a ribbon (eraser / bank hover). */

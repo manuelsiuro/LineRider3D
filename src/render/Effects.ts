@@ -17,6 +17,7 @@ export class Effects {
   private maxLife = new Float32Array(MAX);
   private size = new Float32Array(MAX);
   private alpha = new Float32Array(MAX);
+  private color = new Float32Array(MAX * 3).fill(1);
   private next = 0;
   private wasCrashed = false;
   private lastFrame = -1;
@@ -26,24 +27,26 @@ export class Effects {
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
     geo.setAttribute('size', new THREE.BufferAttribute(this.size, 1));
     geo.setAttribute('alpha', new THREE.BufferAttribute(this.alpha, 1));
+    geo.setAttribute('color', new THREE.BufferAttribute(this.color, 3));
     const mat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
       uniforms: { scale: { value: 400 } },
       vertexShader: `
-        attribute float size; attribute float alpha; varying float vAlpha; uniform float scale;
+        attribute float size; attribute float alpha; attribute vec3 color; varying float vAlpha; varying vec3 vColor; uniform float scale;
         void main() {
           vAlpha = alpha;
+          vColor = color;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_PointSize = size * scale / -mv.z;
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
-        varying float vAlpha;
+        varying float vAlpha; varying vec3 vColor;
         void main() {
           float d = length(gl_PointCoord - 0.5);
           if (d > 0.5) discard;
-          gl_FragColor = vec4(vec3(0.97, 0.99, 1.0), vAlpha * smoothstep(0.5, 0.15, d));
+          gl_FragColor = vec4(vColor * vec3(0.97, 0.99, 1.0), vAlpha * smoothstep(0.5, 0.15, d));
         }`,
     });
     this.points = new THREE.Points(geo, mat);
@@ -55,8 +58,11 @@ export class Effects {
     (this.points.material as THREE.ShaderMaterial).uniforms.scale.value = h * 0.5;
   }
 
-  private emit(p: THREE.Vector3, v: THREE.Vector3, size: number, life: number) {
+  private emit(p: THREE.Vector3, v: THREE.Vector3, size: number, life: number, color?: THREE.Color) {
     const i = this.next;
+    this.color[i * 3] = color ? color.r : 1;
+    this.color[i * 3 + 1] = color ? color.g : 1;
+    this.color[i * 3 + 2] = color ? color.b : 1;
     this.next = (this.next + 1) % MAX;
     this.pos.set([p.x, p.y, p.z], i * 3);
     this.vel.set([v.x, v.y, v.z], i * 3);
@@ -70,6 +76,16 @@ export class Effects {
     for (let k = 0; k < count; k++) {
       v.set(Math.random() - 0.5, Math.random() * 0.9 + 0.2, Math.random() - 0.5).normalize().multiplyScalar(speed * (0.4 + Math.random()));
       this.emit(at, v, 0.25 + Math.random() * 0.35, 0.6 + Math.random() * 0.8);
+    }
+  }
+
+  /** Golden sparkles, e.g. when a star is collected. */
+  sparkle(at: THREE.Vector3, count = 40) {
+    const v = new THREE.Vector3();
+    const gold = new THREE.Color(1.6, 1.25, 0.4);
+    for (let k = 0; k < count; k++) {
+      v.set(Math.random() - 0.5, Math.random() - 0.3, Math.random() - 0.5).normalize().multiplyScalar(2 + Math.random() * 4);
+      this.emit(at, v, 0.12 + Math.random() * 0.15, 0.5 + Math.random() * 0.6, gold);
     }
   }
 
@@ -155,5 +171,6 @@ export class Effects {
     geo.attributes.position.needsUpdate = true;
     geo.attributes.alpha.needsUpdate = true;
     geo.attributes.size.needsUpdate = true;
+    geo.attributes.color.needsUpdate = true;
   }
 }

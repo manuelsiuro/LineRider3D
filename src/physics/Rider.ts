@@ -43,7 +43,11 @@ const FLIP_SETTLE = 0.72;
 const SPIN_CRASH = 0.14;
 
 /** One-off events of a step, for sound and effects. */
-export const EVENT = { ring: 1, bounce: 2 } as const;
+export const EVENT = { ring: 1, bounce: 2, star: 4, finish: 8 } as const;
+
+/** Max number of stars per track (one bit each in the recorded state). */
+export const MAX_STARS = 48;
+const STAR_RADIUS = 1.3;
 
 export const P = {
   tailL: 0,
@@ -167,6 +171,8 @@ export class Rider {
     });
     this.crashed = false;
     this.spin = 0;
+    this.stars = 0;
+    this.finished = false;
   }
 
   private ringRef = new THREE.Vector3();
@@ -175,6 +181,9 @@ export class Rider {
 
   /** Player-driven spin (rad/step) while airborne. */
   spin = 0;
+  /** Bit mask of collected stars (by Track.starList order). */
+  stars = 0;
+  finished = false;
 
   step(track: Track, input = 0) {
     if (input && !this.crashed) this.control(input);
@@ -197,6 +206,38 @@ export class Rider {
     }
     this.applyBounce();
     this.passRings(track, this.ringRef, this.pos[P.butt]);
+    this.collectStars(track);
+    this.checkFinish(track, this.ringRef, this.pos[P.butt]);
+  }
+
+  /** Picks up stars near the body or sled. */
+  private collectStars(track: Track) {
+    if (track.stars.size === 0 || this.crashed) return;
+    const list = track.starList();
+    const probes = [this.pos[P.butt], this.pos[P.shoulder], this.pos[P.string]];
+    for (let k = 0; k < list.length && k < MAX_STARS; k++) {
+      const bit = 2 ** k;
+      if (Math.floor(this.stars / bit) % 2 === 1) continue;
+      if (probes.some((p) => p.distanceToSquared(list[k].position) < STAR_RADIUS * STAR_RADIUS)) {
+        this.stars += bit;
+        this.events |= EVENT.star;
+      }
+    }
+  }
+
+  /** Crossing the finish gate's plane inside the gate ends the run. */
+  private checkFinish(track: Track, from: THREE.Vector3, to: THREE.Vector3) {
+    const fin = track.finish;
+    if (!fin || this.finished || this.crashed) return;
+    const d0 = tmp.subVectors(from, fin.position).dot(fin.axis);
+    const d1 = tmp.subVectors(to, fin.position).dot(fin.axis);
+    if (!(d0 < 0 && d1 >= 0)) return;
+    const t = d0 / (d0 - d1);
+    const hit = tmp.lerpVectors(from, to, t).sub(fin.position);
+    hit.addScaledVector(fin.axis, -hit.dot(fin.axis));
+    if (Math.abs(hit.y) > 5 || hit.length() > fin.halfWidth + 2) return;
+    this.finished = true;
+    this.events |= EVENT.finish;
   }
 
   /**
@@ -412,6 +453,8 @@ export class Rider {
     buf[POINT_COUNT * 6 + 1] = mask;
     buf[POINT_COUNT * 6 + 2] = this.events;
     buf[POINT_COUNT * 6 + 3] = this.spin;
+    buf[POINT_COUNT * 6 + 4] = this.stars;
+    buf[POINT_COUNT * 6 + 5] = this.finished ? 1 : 0;
   }
 
   readState(buf: Float64Array) {
@@ -424,7 +467,9 @@ export class Rider {
     for (let i = 0; i < POINT_COUNT; i++) this.contact[i] = (mask & (1 << i)) !== 0;
     this.events = buf[POINT_COUNT * 6 + 2];
     this.spin = buf[POINT_COUNT * 6 + 3];
+    this.stars = buf[POINT_COUNT * 6 + 4];
+    this.finished = buf[POINT_COUNT * 6 + 5] === 1;
   }
 }
 
-export const STATE_SIZE = POINT_COUNT * 6 + 4;
+export const STATE_SIZE = POINT_COUNT * 6 + 6;

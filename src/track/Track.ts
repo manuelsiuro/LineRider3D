@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { segmentFrame } from './frames';
-import type { Decor, DecorKind, DrawMode, LineType, Ring, Segment, Stroke } from './types';
+import type { Decor, DecorKind, DrawMode, Finish, LineType, Ring, Segment, Star, Stroke } from './types';
 
 const CELL = 4;
 
@@ -12,6 +12,10 @@ export type TrackEvent =
   | { kind: 'decorRemoved'; decor: Decor }
   | { kind: 'ringAdded'; ring: Ring }
   | { kind: 'ringRemoved'; ring: Ring }
+  | { kind: 'starAdded'; star: Star }
+  | { kind: 'starRemoved'; star: Star }
+  | { kind: 'finishChanged' }
+  | { kind: 'goalsChanged' }
   | { kind: 'startChanged' }
   | { kind: 'cleared' };
 
@@ -29,12 +33,20 @@ interface SerializedTrack {
   }[];
   decor: { kind: DecorKind; position: number[]; rotation: number; scale: number }[];
   rings?: { position: number[]; axis: number[]; radius: number }[];
+  stars?: number[][];
+  finish?: { position: number[]; axis: number[]; halfWidth: number } | null;
+  targetScore?: number;
+  name?: string;
 }
 
 export class Track {
   strokes = new Map<number, Stroke>();
   decor = new Map<number, Decor>();
   rings = new Map<number, Ring>();
+  stars = new Map<number, Star>();
+  finish: Finish | null = null;
+  /** Score needed for the third star. */
+  targetScore = 2000;
   start = new THREE.Vector3(0, 12, 0);
 
   private nextId = 1;
@@ -49,7 +61,7 @@ export class Track {
   }
 
   private emit(e: TrackEvent) {
-    if (e.kind !== 'decorAdded' && e.kind !== 'decorRemoved') this.revision++;
+    if (e.kind !== 'decorAdded' && e.kind !== 'decorRemoved' && e.kind !== 'goalsChanged') this.revision++;
     for (const l of this.listeners) l(e);
   }
 
@@ -102,6 +114,34 @@ export class Track {
     this.emit({ kind: 'ringRemoved', ring });
   }
 
+  addStar(st: Omit<Star, 'id'> & { id?: number }): Star {
+    const star: Star = { ...st, id: st.id ?? this.nextId++ };
+    this.nextId = Math.max(this.nextId, star.id + 1);
+    this.stars.set(star.id, star);
+    this.emit({ kind: 'starAdded', star });
+    return star;
+  }
+
+  removeStar(star: Star) {
+    if (!this.stars.delete(star.id)) return;
+    this.emit({ kind: 'starRemoved', star });
+  }
+
+  /** Stars in a stable order (their bit in the collected mask). */
+  starList(): Star[] {
+    return [...this.stars.values()].sort((a, b) => a.id - b.id);
+  }
+
+  setFinish(f: Finish | null) {
+    this.finish = f;
+    this.emit({ kind: 'finishChanged' });
+  }
+
+  setTargetScore(v: number) {
+    this.targetScore = v;
+    this.emit({ kind: 'goalsChanged' });
+  }
+
   setStart(p: THREE.Vector3) {
     this.start.copy(p);
     this.emit({ kind: 'startChanged' });
@@ -111,6 +151,9 @@ export class Track {
     this.strokes.clear();
     this.decor.clear();
     this.rings.clear();
+    this.stars.clear();
+    this.finish = null;
+    this.targetScore = 2000;
     this.grid.clear();
     this.segmentsByStroke.clear();
     this.emit({ kind: 'cleared' });
@@ -216,6 +259,11 @@ export class Track {
         axis: g.axis.toArray().map(r),
         radius: r(g.radius),
       })),
+      stars: this.starList().map((st) => st.position.toArray().map(r)),
+      finish: this.finish
+        ? { position: this.finish.position.toArray().map(r), axis: this.finish.axis.toArray().map(r), halfWidth: this.finish.halfWidth }
+        : null,
+      targetScore: this.targetScore,
     };
   }
 
@@ -250,6 +298,15 @@ export class Track {
         radius: g.radius,
       });
     }
+    for (const p of data.stars ?? []) this.addStar({ position: new THREE.Vector3().fromArray(p) });
+    if (data.finish) {
+      this.setFinish({
+        position: new THREE.Vector3().fromArray(data.finish.position),
+        axis: new THREE.Vector3().fromArray(data.finish.axis).normalize(),
+        halfWidth: data.finish.halfWidth,
+      });
+    }
+    this.targetScore = data.targetScore ?? 2000;
     this.emit({ kind: 'startChanged' });
   }
 }

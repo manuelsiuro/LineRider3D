@@ -36,6 +36,20 @@ export interface Ring {
   radius: number;
 }
 
+/** Collectible star. */
+export interface Star {
+  id: number;
+  position: THREE.Vector3;
+}
+
+/** Finish gate: crossing its plane within its half-width ends the run. */
+export interface Finish {
+  position: THREE.Vector3;
+  /** Unit vector: the riding direction through the gate. */
+  axis: THREE.Vector3;
+  halfWidth: number;
+}
+
 export interface Decor {
   id: number;
   kind: DecorKind;

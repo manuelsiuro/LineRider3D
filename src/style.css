@@ -645,6 +645,45 @@ body.on-title .ui > * {
   transform-origin: left;
 }
 
+.stars-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: rgba(14, 30, 52, 0.55);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+}
+
+.stars-chip .ic {
+  color: var(--gold);
+  fill: var(--gold);
+}
+
+.stars-chip b {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stars-chip.bump {
+  animation: combo-bump 0.4s var(--spring);
+}
+
+.stars-chip.complete {
+  background: linear-gradient(180deg, #ffd34d, #f2a51f);
+  color: #4a3500;
+}
+
+.stars-chip.complete .ic {
+  color: #4a3500;
+  fill: #4a3500;
+}
+
 /* Rider mode toggle */
 .player .rider-btn.active {
   background: linear-gradient(180deg, #8f7bff, #6a52f0);
@@ -743,6 +782,13 @@ body.rider-mode.is-playing .hud {
 
 .popup.crash {
   color: #ff6b5e;
+}
+
+.popup.finish {
+  color: #ffffff;
+  background: linear-gradient(90deg, transparent, rgba(20, 30, 50, 0.55) 20%, rgba(20, 30, 50, 0.55) 80%, transparent);
+  padding: 8px 80px;
+  letter-spacing: 0.12em;
 }
 
 .popup.trick {
@@ -1213,6 +1259,77 @@ body.is-playing .bottom > * {
 .summary-head h2 {
   margin: 8px 0 0;
   font-size: 34px;
+}
+
+.rating {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.rstar {
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.rstar .ic {
+  fill: rgba(255, 255, 255, 0.15);
+}
+
+.rstar.on {
+  color: #ffd34d;
+  animation: star-pop 0.55s var(--spring) backwards;
+}
+
+.rstar.on .ic {
+  fill: #ffd34d;
+  filter: drop-shadow(0 0 10px rgba(255, 211, 77, 0.9));
+}
+
+@keyframes star-pop {
+  from {
+    transform: scale(0) rotate(-90deg);
+    opacity: 0;
+  }
+}
+
+.goals {
+  list-style: none;
+  margin: 0;
+  padding: 14px 22px 4px;
+  display: grid;
+  gap: 8px;
+  background: white;
+}
+
+.goals li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.goals li .ic {
+  color: var(--muted);
+}
+
+.goals li.done {
+  color: var(--ink);
+}
+
+.goals li.done .ic {
+  color: white;
+  background: var(--ok);
+  border-radius: 50%;
+  padding: 2px;
+}
+
+.summary .stats {
+  border-top: 1px solid var(--line);
+  margin-top: 10px;
 }
 
 .score-line {
