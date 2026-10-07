@@ -363,7 +363,7 @@ function recordBest(score: number, stars: number): { best: number; newBest: bool
   return { best: all[key].score, newBest };
 }
 
-const cameraModes: CameraMode[] = ['follow', 'chase', 'side'];
+const cameraModes: CameraMode[] = ['cinematic', 'chase', 'side', 'follow'];
 
 const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), { className: 'ui' })), editor, {
   play,
@@ -875,7 +875,7 @@ function loop(time: number) {
     rig.settle(dt);
     controls.update();
   } else if (playing) {
-    rig.update(dt, riderCenter, riderVel, STEPS_PER_SECOND);
+    rig.update(dt, riderCenter, riderVel, STEPS_PER_SECOND, !rider.contact.some((c) => c) && !rider.crashed);
     if (rig.mode === 'follow') controls.update();
   } else {
     rig.settle(dt);

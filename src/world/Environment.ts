@@ -10,10 +10,12 @@ function rng(seed: number) {
   };
 }
 
-const SKY_TOP = new THREE.Color(0x6fa8dc);
-const SKY_HORIZON = new THREE.Color(0xe6f0fa);
-const FOG = 0xdde9f5;
-const SUN_OFFSET = new THREE.Vector3(-40, 70, 50);
+// Golden hour: deep blue zenith, warm peach horizon, low warm sun, cool shadows.
+const SKY_TOP = new THREE.Color(0x2f6fc4);
+const SKY_MID = new THREE.Color(0x8fbbe8);
+const SKY_HORIZON = new THREE.Color(0xffe0c2);
+const FOG = 0xf1e6dc;
+const SUN_OFFSET = new THREE.Vector3(-70, 42, 46);
 
 /** Smooth value noise in [0,1], tileable over `period`. */
 function valueNoise(size: number, period: number, seed: number): Float32Array {
@@ -81,10 +83,11 @@ export class Environment {
 
     scene.add(this.buildSky());
 
-    const hemi = new THREE.HemisphereLight(0xdcecff, 0xa9bcd6, 1.15);
+    // Sky light from above (cool, for blue shadows), warm bounce from the snow.
+    const hemi = new THREE.HemisphereLight(0xc4dcff, 0xd8c2c0, 1.05);
     scene.add(hemi);
 
-    this.sun = new THREE.DirectionalLight(0xfff3e0, 2.2);
+    this.sun = new THREE.DirectionalLight(0xffd8a8, 2.7);
     this.sun.position.copy(SUN_OFFSET);
     this.sun.castShadow = true;
     const size = lowPower ? 1024 : 2048;
@@ -131,16 +134,23 @@ export class Environment {
       fog: false,
       uniforms: {
         top: { value: SKY_TOP },
+        mid: { value: SKY_MID },
         horizon: { value: SKY_HORIZON },
+        fogCol: { value: new THREE.Color(FOG) },
         sunDir: { value: SUN_OFFSET.clone().normalize() },
       },
       vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `uniform vec3 top; uniform vec3 horizon; uniform vec3 sunDir; varying vec3 vPos;
+      fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 horizon; uniform vec3 fogCol; uniform vec3 sunDir; varying vec3 vPos;
         void main(){
           vec3 d = normalize(vPos);
-          vec3 col = mix(horizon, top, smoothstep(0.0, 0.5, d.y));
           float s = max(dot(d, sunDir), 0.0);
-          col += vec3(1.0, 0.93, 0.8) * (pow(s, 900.0) * 1.5 + pow(s, 40.0) * 0.25 + pow(s, 6.0) * 0.08);
+          // Horizon glows warmer toward the sun.
+          vec3 hor = mix(horizon, vec3(1.0, 0.78, 0.55), pow(s, 3.0) * 0.6);
+          vec3 col = mix(hor, mid, smoothstep(0.0, 0.18, d.y));
+          col = mix(col, top, smoothstep(0.15, 0.7, d.y));
+          col = mix(fogCol, col, smoothstep(-0.08, 0.02, d.y));
+          // Sun disc, halo and wide glow.
+          col += vec3(1.0, 0.86, 0.62) * (pow(s, 1400.0) * 3.0 + pow(s, 60.0) * 0.35 + pow(s, 8.0) * 0.16);
           gl_FragColor = vec4(col, 1.0);
         }`,
     });

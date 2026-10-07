@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { terrainHeight } from '../world/terrain';
 
-export type CameraMode = 'follow' | 'chase' | 'side';
+export type CameraMode = 'cinematic' | 'chase' | 'side' | 'follow';
 
 export const CAMERA_LABELS: Record<CameraMode, string> = {
-  follow: 'Follow',
+  cinematic: 'Cinema',
   chase: 'Chase',
   side: 'Side',
+  follow: 'Free',
 };
 
 /**
@@ -14,7 +16,11 @@ export const CAMERA_LABELS: Record<CameraMode, string> = {
  * orbit freely; the orbit target simply tracks the rider.
  */
 export class CameraRig {
-  mode: CameraMode = 'follow';
+  mode: CameraMode = 'cinematic';
+  /** Extra distance in the air, eased (shows the whole jump). */
+  private airPull = 0;
+  /** Player preference: multiplies the chase distances. */
+  distanceScale = 1;
   private smoothed = new THREE.Vector3();
   private heading = new THREE.Vector3(1, 0, 0);
   private shakeAmount = 0;
@@ -58,8 +64,10 @@ export class CameraRig {
     this.smoothed.copy(target);
   }
 
-  update(dt: number, target: THREE.Vector3, velocity: THREE.Vector3, stepsPerSecond: number) {
-    this.settle(dt, velocity.length() * stepsPerSecond);
+  update(dt: number, target: THREE.Vector3, velocity: THREE.Vector3, stepsPerSecond: number, airborne = false) {
+    const speed = velocity.length() * stepsPerSecond;
+    this.settle(dt, speed);
+    this.airPull += ((airborne ? 1 : 0) - this.airPull) * (1 - Math.exp(-dt * (airborne ? 1.2 : 2.5)));
     const k = 1 - Math.exp(-dt * 6);
     const prev = this.smoothed.clone();
     this.smoothed.lerp(target, k);
@@ -68,6 +76,23 @@ export class CameraRig {
     if (flat.lengthSq() > 1e-5) this.heading.lerp(flat.normalize(), 1 - Math.exp(-dt * 2.5)).normalize();
 
     switch (this.mode) {
+      case 'cinematic': {
+        // 3/4 chase: behind and a little to the side, pulling back with speed
+        // and in the air, looking ahead of the rider.
+        const dist = (6 + THREE.MathUtils.clamp(speed * 0.09, 0, 4.5) + this.airPull * 3) * this.distanceScale;
+        const side = new THREE.Vector3(-this.heading.z, 0, this.heading.x);
+        const desired = this.smoothed
+          .clone()
+          .addScaledVector(this.heading, -dist)
+          .addScaledVector(side, -dist * 0.42)
+          .add(new THREE.Vector3(0, 1.6 + dist * 0.22 + this.airPull * 1.5, 0));
+        // Never dip under the snow.
+        desired.y = Math.max(desired.y, terrainHeight(desired.x, desired.z) + 1.2);
+        this.camera.position.lerp(desired, 1 - Math.exp(-dt * 3.2));
+        const look = this.smoothed.clone().addScaledVector(this.heading, 1.5 + Math.min(speed * 0.06, 3));
+        this.controls.target.lerp(look, 1 - Math.exp(-dt * 8));
+        break;
+      }
       case 'follow': {
         const delta = this.smoothed.clone().sub(prev);
         this.camera.position.add(delta);
@@ -75,7 +100,7 @@ export class CameraRig {
         break;
       }
       case 'chase': {
-        const desired = this.smoothed.clone().addScaledVector(this.heading, -7).add(new THREE.Vector3(0, 3, 0));
+        const desired = this.smoothed.clone().addScaledVector(this.heading, -7 * this.distanceScale).add(new THREE.Vector3(0, 3, 0));
         this.camera.position.lerp(desired, 1 - Math.exp(-dt * 4));
         this.controls.target.copy(this.smoothed).addScaledVector(this.heading, 3);
         break;

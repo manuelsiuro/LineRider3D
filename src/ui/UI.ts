@@ -194,7 +194,7 @@ export class UI {
     this.redoBtn.onclick = () => editor.history.redo();
     const focusBtn = button('btn icon-btn', icon('target'), 'Focus rider (F)');
     focusBtn.onclick = handlers.focusRider;
-    this.camBtn = button('btn text-btn', `${icon('camera', 18)}<span>Follow</span>`, 'Camera mode (C)');
+    this.camBtn = button('btn text-btn', `${icon('camera', 18)}<span>Cinema</span>`, 'Camera mode (C)');
     this.camBtn.onclick = () => this.cycleCamera();
     const sfxBtn = button('btn icon-btn', icon('sound'), 'Sound effects');
     const musicBtn = button('btn icon-btn', icon('music'), 'Music');
