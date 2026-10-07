@@ -6,7 +6,7 @@ import type { Stats, Trick } from '../game/RunStats';
 import { GRADE_LABEL } from '../game/RunStats';
 import { icon } from './icons';
 
-export type TitleChoice = 'levels' | 'create' | 'new' | 'wardrobe';
+export type TitleChoice = 'levels' | 'create' | 'new' | 'wardrobe' | 'garage';
 
 export interface UIHandlers {
   play(): void;
@@ -26,6 +26,8 @@ export interface UIHandlers {
   toggleSfx(): boolean;
   toggleMusic(): boolean;
   toggleRiderMode(): boolean;
+  /** Next ride (editor quick switch). */
+  cycleVehicle(): void;
   /** Touch pad input: bit mask from the on-screen buttons. */
   touchInput(mask: number): void;
   click(): void;
@@ -43,6 +45,24 @@ export interface SummaryInfo {
   level?: { number: number; name: string; nextUnlocked: boolean; hasNext: boolean };
   /** Score to beat from a friend's challenge link. */
   challenge?: number;
+  /** Name of the ride used. */
+  vehicle?: string;
+}
+
+export interface VehicleCard {
+  id: string;
+  name: string;
+  blurb: string;
+  stats: { speed: number; grip: number; air: number; toughness: number };
+}
+
+/** Ride choice shown on a level intro. */
+export interface RidePicker {
+  options: { id: string; name: string }[];
+  selected: string;
+  /** Level made for one ride: no choice. */
+  locked: boolean;
+  onPick(id: string): string;
 }
 
 export interface LevelCard {
@@ -120,6 +140,7 @@ export class UI {
   private starsChip: HTMLElement;
   private touchPad: HTMLElement;
   private riderBtn: HTMLButtonElement;
+  private vehicleBtn: HTMLButtonElement;
   private hintTimer = 0;
   private playing = false;
 
@@ -220,7 +241,12 @@ export class UI {
       this.setRiderMode(on);
       this.flash(on ? 'Rider mode: → push · ← brake · flip in the air' : 'Classic mode');
     };
-    player.append(this.playBtn, stopBtn, slowBtn, this.riderBtn, this.timeline, this.timeLabel);
+    this.vehicleBtn = button('btn icon-btn flat vehicle-btn', icon('sled', 22), 'Ride');
+    this.vehicleBtn.onclick = () => {
+      handlers.click();
+      handlers.cycleVehicle();
+    };
+    player.append(this.playBtn, stopBtn, slowBtn, this.riderBtn, this.vehicleBtn, this.timeline, this.timeLabel);
 
     // ------------------------------------------------------------ HUD
     this.hud = h(
@@ -252,6 +278,7 @@ export class UI {
       'div',
       'touch-pad hidden',
       `<button class="pad pad-brake" data-bit="2" aria-label="Brake / backflip">${icon('chevronLeft', 34)}<span>Brake</span></button>
+       <button class="pad pad-spin" data-bit="4" aria-label="Spin">${icon('replay', 30)}<span>Spin</span></button>
        <button class="pad pad-push" data-bit="1" aria-label="Push / frontflip">${icon('chevronRight', 34)}<span>Push</span></button>`,
     );
     let mask = 0;
@@ -484,9 +511,17 @@ export class UI {
     document.body.classList.toggle('rider-mode', on);
   }
 
-  /** Shows the on-screen push/brake buttons (touch devices, rider mode, riding). */
-  setTouchPad(visible: boolean) {
+  /** Shows the on-screen push/brake (and spin) buttons (touch devices, rider mode, riding). */
+  setTouchPad(visible: boolean, spin = false) {
     this.touchPad.classList.toggle('hidden', !visible);
+    this.touchPad.classList.toggle('with-spin', spin);
+  }
+
+  /** Shows the current ride on the quick-switch button. */
+  setVehicle(id: string, name: string, locked: boolean) {
+    this.vehicleBtn.innerHTML = icon(id, 22);
+    this.vehicleBtn.title = locked ? `${name} (this level's ride)` : `Ride: ${name} (V to switch)`;
+    this.vehicleBtn.disabled = locked;
   }
 
   /** Trick callout with grade, points and combo. */
@@ -563,6 +598,7 @@ export class UI {
             <button class="big-btn primary" data-c="levels">${icon('play', 20)} Play <span class="pill">${icon('star', 14)} ${stars}/${maxStars}</span></button>
             <button class="big-btn secondary" data-c="${hasSave ? 'create' : 'new'}">${icon('pencil', 20)} ${hasSave ? 'Continue my track' : 'Create a track'}</button>
             <div class="title-row">
+              <button class="big-btn ghost" data-c="garage">${icon('garage', 18)} Garage</button>
               <button class="big-btn ghost" data-c="wardrobe">${icon('sled', 18)} Wardrobe</button>
               ${hasSave ? `<button class="big-btn ghost" data-c="new">${icon('plus', 18)} New track</button>` : ''}
             </div>
@@ -575,7 +611,7 @@ export class UI {
         if (!c) return;
         this.handlers.click();
         overlay.classList.add('leaving');
-        if (c !== 'levels' && c !== 'wardrobe') document.body.classList.remove('on-title');
+        if (c !== 'levels' && c !== 'wardrobe' && c !== 'garage') document.body.classList.remove('on-title');
         setTimeout(() => overlay.remove(), 450);
         resolve(c);
       };
@@ -676,6 +712,79 @@ export class UI {
     });
   }
 
+  /** Ride picker with stats; the ride is previewed live behind the screen. */
+  showGarage(cards: VehicleCard[], selected: string, onPick: (id: string) => void): Promise<void> {
+    return new Promise((resolve) => {
+      const bars = (label: string, v: number) =>
+        `<span class="stat"><span class="stat-label">${label}</span><span class="stat-bar">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= v ? 'on' : ''}"></i>`).join('')}</span></span>`;
+      const render = (sel: string) =>
+        cards
+          .map(
+            (c, i) => `<button class="ride-card ${c.id === sel ? 'active' : ''}" data-id="${c.id}" style="animation-delay:${i * 0.04}s">
+              <span class="ride-icon">${icon(c.id, 40)}</span>
+              <span class="ride-name">${c.name}${c.id === sel ? `<span class="ride-tag">${icon('check', 13)} Riding</span>` : ''}</span>
+              <span class="ride-blurb">${c.blurb}</span>
+              <span class="ride-stats">${bars('Speed', c.stats.speed)}${bars('Grip', c.stats.grip)}${bars('Air', c.stats.air)}${bars('Tough', c.stats.toughness)}</span>
+            </button>`,
+          )
+          .join('');
+      const overlay = h(
+        'div',
+        'screen garage',
+        `<div class="screen-inner">
+          <div class="screen-head">
+            <button class="btn icon-btn" data-back>${icon('chevronLeft')}</button>
+            <h2>Garage</h2>
+          </div>
+          <p class="screen-sub">Pick your ride. Every level works with every ride, and each one keeps its own best run.</p>
+          <div class="ride-grid">${render(selected)}</div>
+        </div>`,
+      );
+      overlay.onclick = (e) => {
+        const btn = (e.target as HTMLElement).closest('button');
+        if (!btn) return;
+        this.handlers.click();
+        if (btn.dataset.back !== undefined) {
+          overlay.classList.add('leaving');
+          setTimeout(() => overlay.remove(), 250);
+          resolve();
+          return;
+        }
+        const id = btn.dataset.id;
+        if (!id) return;
+        onPick(id);
+        overlay.querySelector('.ride-grid')!.innerHTML = render(id);
+      };
+      document.body.append(overlay);
+    });
+  }
+
+  /** Row of ride chips for an intro card (or the level's fixed ride). */
+  private ridePicker(card: HTMLElement, ride: RidePicker | undefined, keysEl: HTMLElement | null) {
+    const slot = card.querySelector('.ride-pick') as HTMLElement | null;
+    if (!slot || !ride) return;
+    const render = (sel: string) => {
+      if (ride.locked) {
+        const o = ride.options.find((x) => x.id === sel)!;
+        slot.innerHTML = `<span class="ride-chip active locked">${icon(o.id, 20)}<span>${o.name}</span></span><span class="ride-note">${icon('lock', 13)} This level's ride</span>`;
+        return;
+      }
+      slot.innerHTML = ride.options
+        .map((o) => `<button class="ride-chip ${o.id === sel ? 'active' : ''}" data-ride="${o.id}" title="${o.name}">${icon(o.id, 20)}<span>${o.name}</span></button>`)
+        .join('');
+    };
+    render(ride.selected);
+    slot.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('[data-ride]') as HTMLElement | null;
+      if (!b) return;
+      e.stopPropagation();
+      this.handlers.click();
+      const keys = ride.onPick(b.dataset.ride!);
+      if (keysEl) keysEl.innerHTML = `${icon('gamepad', 14)} ${keys}`;
+      render(b.dataset.ride!);
+    });
+  }
+
   /** Shows a link to copy by hand (when the clipboard isn't available). */
   showLink(url: string, challenge: number) {
     const overlay = h(
@@ -717,7 +826,7 @@ export class UI {
   }
 
   /** Intro for a track opened from a share link. */
-  showSharedIntro(challenge: number, goals: string[]): Promise<void> {
+  showSharedIntro(challenge: number, goals: string[], keys: string, ride?: RidePicker): Promise<void> {
     return new Promise((resolve) => {
       const overlay = h(
         'div',
@@ -727,7 +836,8 @@ export class UI {
           <h2>${challenge ? `Beat ${challenge.toLocaleString()} points!` : 'A friend shared a track'}</h2>
           <p>${challenge ? 'Your friend set this score on this track. Can you top it?' : 'Ride it, then edit it or make it your own.'}</p>
           <ul class="intro-goals">${goals.map((g) => `<li>${icon('star', 18)}${g}</li>`).join('')}</ul>
-          <p class="keys">${icon('gamepad', 14)} → push · ← brake · in the air: flip, release to land</p>
+          <div class="ride-pick"></div>
+          <p class="keys">${icon('gamepad', 14)} ${keys}</p>
           <div class="actions"><button class="big-btn primary">${icon('play', 18)} Ride!</button></div>
         </div>`,
       );
@@ -738,12 +848,13 @@ export class UI {
         setTimeout(() => overlay.remove(), 200);
         resolve();
       };
+      this.ridePicker(overlay, ride, overlay.querySelector('.keys'));
       document.body.append(overlay);
     });
   }
 
   /** Level intro card with its goals. */
-  showLevelIntro(number: number, name: string, tip: string, goals: string[], stars: number): Promise<void> {
+  showLevelIntro(number: number, name: string, tip: string, goals: string[], stars: number, keys: string, ride?: RidePicker): Promise<void> {
     return new Promise((resolve) => {
       const overlay = h(
         'div',
@@ -753,7 +864,8 @@ export class UI {
           <h2>${name}</h2>
           <p>${tip}</p>
           <ul class="intro-goals">${goals.map((g, i) => `<li class="${i < stars ? 'done' : ''}">${icon('star', 18)}${g}</li>`).join('')}</ul>
-          <p class="keys">${icon('gamepad', 14)} → push · ← brake · in the air: flip, release to land</p>
+          <div class="ride-pick"></div>
+          <p class="keys">${icon('gamepad', 14)} ${keys}</p>
           <div class="actions"><button class="big-btn primary">${icon('play', 18)} Ride!</button></div>
         </div>`,
       );
@@ -764,6 +876,7 @@ export class UI {
         setTimeout(() => overlay.remove(), 200);
         resolve();
       };
+      this.ridePicker(overlay, ride, overlay.querySelector('.keys'));
       document.body.append(overlay);
     });
   }
@@ -786,7 +899,7 @@ export class UI {
       'summary',
       `<div class="card">
         <div class="summary-head ${clean ? 'clean' : 'wipeout'}">
-          ${info.level ? `<span class="badge">Level ${info.level.number} · ${info.level.name}</span> ` : ''}<span class="badge">${stats.finished ? `Finished · ${stats.finishTime.toFixed(2)}s` : clean ? 'Clean run' : 'Wipeout'}</span>
+          ${info.level ? `<span class="badge">Level ${info.level.number} · ${info.level.name}</span> ` : ''}<span class="badge">${stats.finished ? `Finished · ${stats.finishTime.toFixed(2)}s` : clean ? 'Clean run' : 'Wipeout'}</span>${info.vehicle ? ` <span class="badge">${info.vehicle}</span>` : ''}
           <div class="rating">${[0, 1, 2].map((i) => `<span class="rstar ${i < info.rating ? 'on' : ''}" style="animation-delay:${0.25 + i * 0.18}s">${icon('star', 44)}</span>`).join('')}</div>
           <h2>${info.rating === 3 ? 'Legendary!' : stats.finished ? 'Finished!' : clean ? 'Nice ride!' : 'Ouch, Bosh!'}</h2>
           <div class="score-line">

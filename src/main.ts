@@ -7,6 +7,7 @@ import { RiderView } from './render/RiderView';
 import { CameraRig, CAMERA_LABELS, type CameraMode } from './render/CameraRig';
 import { Simulation, STEPS_PER_SECOND } from './physics/Simulation';
 import { EVENT, INPUT, P } from './physics/Rider';
+import { VEHICLES, vehicleById, type VehicleDef } from './physics/vehicles';
 import { Environment } from './world/Environment';
 import { terrainHeight } from './world/terrain';
 import { Editor } from './editor/Editor';
@@ -21,7 +22,7 @@ import { readSharedLink, shareLink } from './game/share';
 import { rateRun } from './game/rating';
 import { GhostRun, beats, encodeInputs, loadGhost, saveGhost } from './game/Ghost';
 import { LEVELS } from './levels/levels';
-import { OUTFITS, isUnlocked, loadProgress, saveLevelResult, selectOutfit, selectedOutfit, totalStars } from './game/progress';
+import { OUTFITS, isUnlocked, loadProgress, saveLevelResult, selectOutfit, selectVehicle, selectedOutfit, selectedVehicleId, totalStars } from './game/progress';
 import { applyOutfit } from './render/RiderView';
 
 const STORAGE_KEY = 'lr3d.track';
@@ -115,7 +116,7 @@ const isTouch = matchMedia('(pointer: coarse)').matches;
 
 const KEY_BITS: Record<string, number> = {
   ArrowRight: INPUT.push,
-  ArrowUp: INPUT.push,
+  ArrowUp: INPUT.spin,
   ArrowLeft: INPUT.brake,
   ArrowDown: INPUT.brake,
 };
@@ -130,6 +131,62 @@ addEventListener('keyup', (e) => {
   if (bit) keyMask &= ~bit;
 });
 addEventListener('blur', () => (keyMask = 0));
+addEventListener('keydown', (e) => {
+  // V: next ride while editing (levels and challenges pick theirs on the intro).
+  if ((e.key === 'v' || e.key === 'V') && mode === 'game' && currentLevel === null && challengeScore === 0 && !(e.target instanceof HTMLInputElement)) {
+    cycleVehicle();
+  }
+});
+
+// ------------------------------------------------------------------ rides
+/** The ride in use (the player's choice, or the one a level or challenge sets). */
+let vehicle: VehicleDef = vehicleById(selectedVehicleId());
+/** Set when the current level or challenge decides the ride. */
+let lockedVehicle: VehicleDef | null = null;
+
+function applyVehicle(def: VehicleDef) {
+  vehicle = def;
+  sim.setVehicle(def);
+  riderView.setVehicle(def);
+  sound.setRide(def.sound);
+  ui.setVehicle(def.id, def.name, lockedVehicle !== null);
+  ghost = null;
+  resetRun();
+}
+
+/** Picks a ride as the player's choice (persisted). */
+function chooseVehicle(id: string) {
+  selectVehicle(id);
+  applyVehicle(vehicleById(id));
+}
+
+function cycleVehicle() {
+  if (lockedVehicle) return;
+  const next = VEHICLES[(VEHICLES.indexOf(vehicle) + 1) % VEHICLES.length];
+  stop();
+  chooseVehicle(next.id);
+  ui.flash(`Ride: ${next.name}`);
+}
+
+/** Control hints for a ride. */
+function keysFor(def: VehicleDef) {
+  const flips = def.handling.flipSign > 0 ? '←/→ flip' : '→ backflip · ← frontflip';
+  const push = { sled: 'push', skis: 'skate', snowboard: 'push', bike: 'pedal', moto: 'throttle', buggy: 'gas' }[def.id];
+  return `→ ${push} · ← brake · in the air: ${flips}${def.handling.yaw ? ' · ↑ spin' : ''}, release to land`;
+}
+
+/** Intro ride picker: free choice, or the level's own ride. */
+function ridePicker() {
+  return {
+    options: VEHICLES.map((v) => ({ id: v.id, name: v.name })),
+    selected: vehicle.id,
+    locked: lockedVehicle !== null,
+    onPick: (id: string) => {
+      chooseVehicle(id);
+      return keysFor(vehicle);
+    },
+  };
+}
 
 // ------------------------------------------------------------------ saving
 
@@ -241,8 +298,9 @@ function play() {
   // A fresh attempt (or a classic run) starts with no recorded input.
   if (frame === 0 && !replaying) sim.clearInputs();
   if (frame === 0) {
-    const record = mode === 'game' ? loadGhost(trackKey()) : null;
-    ghost = record ? new GhostRun(track, record) : null;
+    const record = mode === 'game' ? loadGhost(ghostKey()) : null;
+    ghost = record ? new GhostRun(track, record, vehicle) : null;
+    ghostView.setVehicle(vehicle);
   }
   if (frame === 0) focusRider();
   else rig.snapTo(sim.rider.center(riderCenter));
@@ -267,6 +325,11 @@ function trackKey() {
   let h = 5381;
   for (let i = 0; i < json.length; i++) h = ((h << 5) + h + json.charCodeAt(i)) | 0;
   return String(h >>> 0);
+}
+
+/** Ghosts are per ride (the sled keeps the original keys). */
+function ghostKey() {
+  return vehicle.id === 'sled' ? trackKey() : `${trackKey()}:${vehicle.id}`;
 }
 
 interface BestRecord {
@@ -373,7 +436,7 @@ applyOutfit(selectedOutfit());
   },
   focusRider,
   async share(score = 0) {
-    const url = await shareLink(track.serialize(), score);
+    const url = await shareLink(track.serialize(), score, vehicle.id);
     const text = score > 0 ? `I scored ${score.toLocaleString()} on this Line Rider 3D track. Can you beat it?` : 'Ride my Line Rider 3D track!';
     // Phones: the native share sheet. Elsewhere: a dialog with a copy button.
     if (navigator.share && isTouch) {
@@ -406,8 +469,10 @@ applyOutfit(selectedOutfit());
   touchInput(mask) {
     touchMask = mask;
   },
+  cycleVehicle,
   click: () => sound.click(),
 }, riderMode);
+applyVehicle(vehicle);
 
 function startNewTrack() {
   challengeScore = 0;
@@ -458,6 +523,23 @@ async function titleFlow() {
         (id) => {
           selectOutfit(id);
           applyOutfit(selectedOutfit());
+        },
+      );
+      closeUp = false;
+      playing = true;
+      continue;
+    }
+    if (choice === 'garage') {
+      // Bosh waits at the start on his ride for a close look.
+      closeUp = true;
+      playing = false;
+      resetRun();
+      await ui.showGarage(
+        VEHICLES.map((v) => ({ id: v.id, name: v.name, blurb: v.blurb, stats: v.stats })),
+        vehicle.id,
+        (id) => {
+          chooseVehicle(id);
+          playing = false;
         },
       );
       closeUp = false;
@@ -518,6 +600,12 @@ function leaveTitle() {
 /** Level mode: no editing, rider controls on, nothing is autosaved. */
 function setLevel(index: number | null) {
   currentLevel = index;
+  // Levels made for one ride use it; elsewhere the player's choice applies.
+  const fixed = index !== null ? LEVELS[index].vehicle : undefined;
+  lockedVehicle = fixed ? vehicleById(fixed) : null;
+  const want = lockedVehicle ?? vehicleById(selectedVehicleId());
+  if (want !== vehicle) applyVehicle(want);
+  else ui.setVehicle(vehicle.id, vehicle.name, lockedVehicle !== null);
   editor.enabled = index === null;
   document.body.classList.toggle('level-mode', index !== null);
   ui.setRiderMode(index !== null ? true : riderMode);
@@ -539,7 +627,7 @@ async function startLevel(index: number) {
   flyTo(v.pos, v.target, 1.3);
   const best = loadProgress()[level.id]?.stars ?? 0;
   const goals = rateRun(track, runStats.stats).goals.map((g) => g.label);
-  await ui.showLevelIntro(index + 1, level.name, level.tip, goals, best);
+  await ui.showLevelIntro(index + 1, level.name, level.tip, goals, best, keysFor(vehicle), ridePicker());
   play();
 }
 
@@ -665,7 +753,7 @@ function checkRunEnd(dt: number) {
   // Save this run as the ghost to beat if it's the best so far.
   let ghostSaved = false;
   if (!wasReplay && riderOn()) {
-    const key = trackKey();
+    const key = ghostKey();
     if (beats(s.score, s.finishTime, loadGhost(key))) {
       saveGhost(key, { rle: encodeInputs(sim.inputsUpTo(frame)), frames: frame, score: s.score, finishTime: s.finishTime });
       ghostSaved = true;
@@ -684,6 +772,7 @@ function checkRunEnd(dt: number) {
       ghostSaved,
       level: levelInfo,
       challenge: challengeScore,
+      vehicle: vehicle.name,
     },
     () => {
       resetRun();
@@ -703,9 +792,9 @@ function checkRunEnd(dt: number) {
   );
 }
 
-renderer.setAnimationLoop((time) => {
+function loop(time: number) {
   timer.update(time);
-  const dt = Math.min(timer.getDelta(), 0.1);
+  const dt = THREE.MathUtils.clamp(timer.getDelta(), 0, 0.1);
   const t = timer.getElapsed();
 
   // Ease the time scale toward the current slow-motion target.
@@ -772,7 +861,8 @@ renderer.setAnimationLoop((time) => {
     if (p.y - terrainHeight(p.x, p.z) < 0.05) onSnow = true;
     else onTrack = true;
   }
-  sound.ride(playing && mode === 'game', stats.speed, onTrack, onSnow);
+  const throttle = ((replaying ? sim.inputAt(frame) : keyMask | touchMask) & INPUT.push) !== 0 && riderOn() && !rider.crashed;
+  sound.ride(playing && mode === 'game', stats.speed, onTrack, onSnow, throttle, !rider.contact.some((c) => c));
 
   // Camera.
   if (mode === 'title') {
@@ -803,7 +893,7 @@ renderer.setAnimationLoop((time) => {
   env.update(dt, controls.target, t);
   ui.setTime(frame, sim.recorded, STEPS_PER_SECOND);
   ui.setHud(mode === 'game' && (playing || frame > 0) && !summaryShown, stats, track.stars.size);
-  ui.setTouchPad(isTouch && riderOn() && mode === 'game' && playing && !replaying);
+  ui.setTouchPad(isTouch && riderOn() && mode === 'game' && playing && !replaying, vehicle.handling.yaw !== null);
   postfx.render(dt);
 
   if (!booted) {
@@ -812,18 +902,24 @@ renderer.setAnimationLoop((time) => {
     setTimeout(() => document.getElementById('boot')?.remove(), 700);
     // A share link opens its track directly; otherwise show the title.
     readSharedLink()
-      .then((shared) => (shared ? enterShared(shared.data, shared.challenge) : enterTitle()))
+      .then((shared) => (shared ? enterShared(shared.data, shared.challenge, shared.vehicle) : enterTitle()))
       .catch(() => {
         ui.flash('That share link looks broken');
         enterTitle();
       });
   }
-});
+}
+renderer.setAnimationLoop(loop);
 
 /** Opens a track from a share link, with an intro (and the challenge score). */
-async function enterShared(data: SerializedTrack, challenge: number) {
+async function enterShared(data: SerializedTrack, challenge: number, vehicleId: string | null) {
   leaveTitle();
   setLevel(null);
+  // A challenge is ridden on the challenger's ride.
+  if (challenge > 0 && vehicleId) {
+    lockedVehicle = vehicleById(vehicleId);
+    applyVehicle(lockedVehicle);
+  }
   loadInto(() => track.load(data));
   pristine = true;
   challengeScore = challenge;
@@ -834,8 +930,15 @@ async function enterShared(data: SerializedTrack, challenge: number) {
   }
   const v = startView();
   flyTo(v.pos, v.target, 1.3);
-  await ui.showSharedIntro(challenge, rateRun(track, runStats.stats).goals.map((g) => g.label));
+  await ui.showSharedIntro(challenge, rateRun(track, runStats.stats).goals.map((g) => g.label), keysFor(vehicle), ridePicker());
   play();
 }
 
-if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, keys: (m: number) => (keyMask = m), fx: () => ({ timeScale, impact, fov: camera.fov }), ghostInfo: () => ({ visible: ghostView.root.visible, frame: ghost?.sim.frame, butt: ghost?.sim.rider.pos[P.butt].toArray(), me: sim.rider.pos[P.butt].toArray() }) } });
+let devClock = performance.now();
+if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, keys: (m: number) => (keyMask = m),
+    /** Dev: advance the game loop by hand (hidden tabs get no animation frames). */
+    tick: (n = 1, ms = 1000 / 60) => {
+      timer.disconnect();
+      for (let k = 0; k < n; k++) loop((devClock += ms));
+    },
+    chooseVehicle, fx: () => ({ timeScale, impact, fov: camera.fov }), ghostInfo: () => ({ visible: ghostView.root.visible, frame: ghost?.sim.frame, butt: ghost?.sim.rider.pos[P.butt].toArray(), me: sim.rider.pos[P.butt].toArray() }) } });

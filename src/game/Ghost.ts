@@ -1,5 +1,6 @@
 import type { Track } from '../track/Track';
 import { Simulation } from '../physics/Simulation';
+import { SLED, type VehicleDef } from '../physics/vehicles';
 
 /** A saved best run: the inputs that produced it, and how it went. */
 export interface GhostRecord {
@@ -63,8 +64,9 @@ export class GhostRun {
   constructor(
     track: Track,
     readonly record: GhostRecord,
+    vehicle: VehicleDef = SLED,
   ) {
-    this.sim = new Simulation(track);
+    this.sim = new Simulation(track, vehicle);
     this.sim.loadInputs(decodeInputs(record.rle));
   }
 }

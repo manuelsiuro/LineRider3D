@@ -3,7 +3,7 @@ import type { SerializedTrack } from '../track/Track';
 /**
  * Track share links: the whole track lives in the URL hash, compressed with
  * deflate (when the browser supports it) and base64url-encoded.
- *   #t=<code>[&c=<score to beat>]
+ *   #t=<code>[&c=<score to beat>][&v=<ride id>]
  */
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -51,17 +51,17 @@ export async function decodeTrack(code: string): Promise<SerializedTrack> {
   return data;
 }
 
-export async function shareLink(data: SerializedTrack, challenge = 0): Promise<string> {
+export async function shareLink(data: SerializedTrack, challenge = 0, vehicle = 'sled'): Promise<string> {
   const code = await encodeTrack(data);
   const base = `${location.origin}${location.pathname}`;
-  return `${base}#t=${code}${challenge > 0 ? `&c=${challenge}` : ''}`;
+  return `${base}#t=${code}${challenge > 0 ? `&c=${challenge}` : ''}${vehicle !== 'sled' ? `&v=${vehicle}` : ''}`;
 }
 
 /** Reads a shared track from the current URL, if any. */
-export async function readSharedLink(): Promise<{ data: SerializedTrack; challenge: number } | null> {
+export async function readSharedLink(): Promise<{ data: SerializedTrack; challenge: number; vehicle: string | null } | null> {
   const params = new URLSearchParams(location.hash.slice(1));
   const code = params.get('t');
   if (!code) return null;
   const data = await decodeTrack(code);
-  return { data, challenge: Number(params.get('c') ?? 0) || 0 };
+  return { data, challenge: Number(params.get('c') ?? 0) || 0, vehicle: params.get('v') };
 }

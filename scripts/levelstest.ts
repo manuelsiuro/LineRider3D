@@ -4,6 +4,7 @@ import { INPUT } from '../src/physics/Rider';
 import { RunStats } from '../src/game/RunStats';
 import { rateRun } from '../src/game/rating';
 import { LEVELS } from '../src/levels/levels';
+import { vehicleById } from '../src/physics/vehicles';
 
 /** Each level must be finishable, with all stars, in a classic (no input) run. */
 let failed = false;
@@ -12,7 +13,7 @@ for (const level of LEVELS) {
   const t0 = performance.now();
   level.build(t);
   const buildMs = performance.now() - t0;
-  const sim = new Simulation(t);
+  const sim = new Simulation(t, level.vehicle ? vehicleById(level.vehicle) : undefined);
   const stats = new RunStats();
   let f = 0;
   for (; f <= 1600; f++) {

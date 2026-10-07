@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Track } from '../track/Track';
 import { buildDemoTrack } from '../demoTrack';
+import { vehicleById, type VehicleDef, type VehicleId } from '../physics/vehicles';
 import { cosine, finish, forest, measureArc, path, profile, riderLine, star } from './builders';
 
 export interface LevelDef {
@@ -8,6 +9,8 @@ export interface LevelDef {
   name: string;
   /** What the level teaches, shown on its card and intro. */
   tip: string;
+  /** Levels made for one ride. */
+  vehicle?: VehicleId;
   build(track: Track): void;
 }
 
@@ -21,8 +24,8 @@ function start(track: Track, x: number, y: number, z = 0) {
  * point is chosen high enough that the curve-out stays gentle and never dips
  * below the floor.
  */
-function landing(track: Track, fromX: number, fromY: number, drop: number, floorY: number, type: 'normal' | 'ice' = 'normal') {
-  const arc = measureArc(track, fromX);
+function landing(track: Track, fromX: number, fromY: number, drop: number, floorY: number, type: 'normal' | 'ice' = 'normal', vehicle?: VehicleDef, width = 2.4) {
+  const arc = measureArc(track, fromX, vehicle);
   const landY = (x: number) => arc(x) - 0.9;
   const slopeAt = (x: number) => (landY(x + 0.25) - landY(x - 0.25)) / 0.5;
   let top = fromX;
@@ -32,7 +35,7 @@ function landing(track: Track, fromX: number, fromY: number, drop: number, floor
   while (landY(x1) > fromY - drop && x1 < top + 120) x1 += 0.25;
   while (x1 > top + 3 && landY(x1) - floorY < 9 * Math.abs(slopeAt(x1))) x1 -= 0.25;
   const x0 = Math.max(top + 2, x1 - 10);
-  profile(track, landY, x0, x1, type);
+  profile(track, landY, x0, x1, type, 0, width);
   const y1 = landY(x1);
   const slope = Math.min(-0.02, slopeAt(x1));
   const L = Math.max(26, (2.5 * (y1 - floorY)) / -slope);
@@ -43,7 +46,7 @@ function landing(track: Track, fromX: number, fromY: number, drop: number, floor
     const h01 = -2 * t ** 3 + 3 * t ** 2;
     return y1 * h00 + L * slope * h10 + floorY * h01;
   };
-  profile(track, runout, x1, x1 + L, type);
+  profile(track, runout, x1, x1 + L, type, 0, width);
   return { arc, runout, end: x1 + L, flat: floorY, top };
 }
 
@@ -267,6 +270,167 @@ export const LEVELS: LevelDef[] = [
       finish(t, l2.end + 18, l2.flat);
       t.targetScore = 12000;
       forest(t, -6, l2.end + 30, 8, ['pine', 'pine', 'cabin', 'lamp', 'snowman', 'rock']);
+    },
+  },
+  // ---------------------------------------------------------------- ride levels
+  {
+    id: 'pump-track',
+    name: 'Pump Track',
+    vehicle: 'bike',
+    tip: 'BMX time! Pedal (→) over the rollers, then throw a backflip (→ in the air) over each double.',
+    build(t) {
+      t.clear();
+      const V = vehicleById('bike');
+      const h = cosine(26, 6, -2, 40);
+      profile(t, h, -2, 40);
+      start(t, 0, h(0));
+      // Rollers: four smooth bumps.
+      const roll = (x: number) => 6 + 0.5 * Math.sin((Math.PI * (x - 40)) / 10) ** 2;
+      profile(t, roll, 40, 70);
+      for (const x of [45, 65]) star(t, x, roll(x) + 1.3);
+      // First double.
+      profile(t, (x) => 6 + 0.06 * (x - 70) ** 2, 70, 78);
+      const l1 = landing(t, 78, 9.84, 4, 4, 'normal', V);
+      star(t, l1.top, l1.arc(l1.top) + 0.3);
+      // Second double.
+      const k2 = l1.end + 6;
+      profile(t, () => l1.flat, l1.end, k2);
+      profile(t, (x) => l1.flat + 0.06 * (x - k2) ** 2, k2, k2 + 7);
+      const l2 = landing(t, k2 + 7, l1.flat + 2.94, 3, 2, 'normal', V);
+      star(t, l2.top, l2.arc(l2.top) + 0.3);
+      profile(t, () => l2.flat, l2.end, l2.end + 30);
+      finish(t, l2.end + 20, l2.flat);
+      t.targetScore = 4000;
+      forest(t, -6, l2.end + 34, 9, ['pine', 'lamp', 'pine', 'rock', 'flag']);
+    },
+  },
+  {
+    id: 'slalom',
+    name: 'Slalom',
+    vehicle: 'skis',
+    tip: 'Skis on! Carve the banked gates, grab the rings and spin a 360 (↑) off the final kicker.',
+    build(t) {
+      t.clear();
+      const V = vehicleById('skis');
+      const pts: THREE.Vector3[] = [];
+      let y = 26;
+      let prev = new THREE.Vector3(0, y, 0);
+      for (let s = 0; s <= 150; s += 1) {
+        // Curves fade in at the top and out at the bottom, so the road ends straight.
+        const p = new THREE.Vector3(s, 0, 5 * Math.sin((s / 60) * Math.PI * 2) * Math.min(1, s / 25, (150 - s) / 25));
+        if (s > 0) y -= p.distanceTo(new THREE.Vector3(prev.x, p.y, prev.z)) * 0.08;
+        p.y = y;
+        pts.push(p);
+        prev = p;
+      }
+      path(t, pts, 'normal', 4);
+      start(t, pts[1].x, pts[1].y);
+      // Gates: flags on both sides at each turn.
+      for (let s = 15; s < 140; s += 30) {
+        const c = pts[s];
+        for (const side of [-2.6, 2.6]) t.addDecor({ kind: 'flag', position: new THREE.Vector3(c.x, 0, c.z + side), rotation: 0, scale: 1 });
+      }
+      for (const s of [60]) {
+        const dir = pts[s + 1].clone().sub(pts[s - 1]).normalize();
+        t.addRing({ position: pts[s].clone().add(new THREE.Vector3(0, 1.3, 0)), axis: dir, radius: 1.7 });
+      }
+      for (const p of riderLine(t, [30, 90, 120], V)) star(t, p.x, p.y + 0.4, p.z);
+      // Straight finish with a kicker.
+      const end = pts[pts.length - 1];
+      const fy = end.y;
+      const S = 24;
+      profile(t, (x) => fy - (x - end.x) * 0.08, end.x, end.x + S, 'normal', 0, 4);
+      const ky = fy - 0.08 * S;
+      profile(t, (x) => ky + 0.1 * (x - end.x - S) ** 2, end.x + S, end.x + S + 4, 'normal', 0, 4);
+      const l = landing(t, end.x + S + 4, ky + 1.6, 2, Math.max(2, ky - 8), 'normal', V, 5);
+      star(t, l.top, l.arc(l.top) + 0.3);
+      profile(t, () => l.flat, l.end, l.end + 26, 'normal', 0, 5);
+      finish(t, l.end + 18, l.flat);
+      t.targetScore = 12000;
+      forest(t, -10, l.end + 30, 10, ['pine', 'pine', 'pine', 'cabin', 'snowman']);
+    },
+  },
+  {
+    id: 'big-air',
+    name: 'Big Air Park',
+    vehicle: 'snowboard',
+    tip: 'Snowboard park: a monster kicker. Hold ↑ to spin, add ←/→ for flips. Land a 720 for the crowd!',
+    build(t) {
+      t.clear();
+      const V = vehicleById('snowboard');
+      const h = cosine(46, 18, -2, 44);
+      profile(t, h, -2, 44);
+      start(t, 0, h(0));
+      for (const x of [14, 30]) star(t, x, h(x) + 1.3);
+      profile(t, (x) => 18 + 0.09 * (x - 44) ** 2, 44, 49);
+      const l1 = landing(t, 49, 20.25, 4, 8, 'normal', V);
+      star(t, l1.top, l1.arc(l1.top) + 0.3);
+      // Step-down second kicker.
+      const k2 = l1.end + 8;
+      profile(t, () => l1.flat, l1.end, k2);
+      profile(t, (x) => l1.flat + 0.1 * (x - k2) ** 2, k2, k2 + 4);
+      const l2 = landing(t, k2 + 4, l1.flat + 1.6, 2, 2, 'normal', V);
+      star(t, l2.top, l2.arc(l2.top) + 0.3);
+      profile(t, () => l2.flat, l2.end, l2.end + 30);
+      finish(t, l2.end + 20, l2.flat);
+      t.targetScore = 18000;
+      forest(t, -6, l2.end + 34, 11, ['pine', 'flag', 'lamp', 'pine', 'gift']);
+    },
+  },
+  {
+    id: 'canyon-jump',
+    name: 'Canyon Jump',
+    vehicle: 'moto',
+    tip: 'Motorbike: full throttle (→) down the boost lane and send it across the canyon. Brake (←) tips the nose for the landing.',
+    build(t) {
+      t.clear();
+      const V = vehicleById('moto');
+      const h = cosine(30, 10, -2, 40);
+      profile(t, h, -2, 40);
+      start(t, 0, h(0));
+      star(t, 20, h(20) + 1.3);
+      profile(t, () => 10, 40, 44);
+      profile(t, () => 10, 44, 54, 'accel');
+      star(t, 50, 11.3);
+      // A long, gentle kicker: at this speed a tight lip would fold the rider.
+      profile(t, () => 10, 54, 58);
+      profile(t, (x) => 10 + 0.035 * (x - 58) ** 2, 58, 68);
+      const l = landing(t, 68, 13.5, 3, 4, 'normal', V);
+      const top = apex(l.arc, 68, l.end);
+      star(t, top.x, top.y + 0.3);
+      t.addRing({ position: new THREE.Vector3(l.end + 10, l.flat + 1.3, 0), axis: new THREE.Vector3(1, 0, 0), radius: 1.7 });
+      profile(t, () => l.flat, l.end, l.end + 40);
+      star(t, l.end + 24, l.flat + 1.3);
+      finish(t, l.end + 32, l.flat);
+      t.targetScore = 6000;
+      forest(t, -8, l.end + 44, 12, ['rock', 'rock', 'pine', 'cabin']);
+    },
+  },
+  {
+    id: 'quarry-run',
+    name: 'Quarry Run',
+    vehicle: 'buggy',
+    tip: 'Buggy: let the suspension eat the whoops, hit the boost and fly off the quarry ramp. Keep it off the roof!',
+    build(t) {
+      t.clear();
+      const V = vehicleById('buggy');
+      const h = cosine(20, 8, -2, 30);
+      profile(t, h, -2, 30);
+      start(t, 0, h(0));
+      // Whoops: a row of short sharp bumps on a gentle descent.
+      const whoop = (x: number) => 8 - (x - 30) * 0.05 + 0.45 * Math.sin((Math.PI * (x - 30)) / 6) ** 2;
+      profile(t, whoop, 30, 72);
+      for (const x of [39, 57]) star(t, x, whoop(x) + 1.3);
+      const by = whoop(72);
+      profile(t, () => by, 72, 80, 'accel');
+      profile(t, (x) => by + 0.05 * (x - 80) ** 2, 80, 90);
+      const l = landing(t, 90, by + 5, 4, 2, 'normal', V);
+      star(t, l.top, l.arc(l.top) + 0.3);
+      profile(t, () => l.flat, l.end, l.end + 30);
+      star(t, l.end + 10, l.flat + 1.3);
+      finish(t, l.end + 22, l.flat);
+      t.targetScore = 3500;
+      forest(t, -8, l.end + 34, 13, ['rock', 'rock', 'pine', 'lamp']);
     },
   },
 ];

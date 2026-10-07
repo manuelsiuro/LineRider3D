@@ -41,6 +41,12 @@ const P: Record<string, string> = {
   share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
   home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/>',
   replay: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+  skis: '<path d="M3 16.5 16.5 3.5c1.3-1.1 3.2.3 2.4 1.8"/><path d="M6.5 20.5 20 7.5c1.3-1.1 3.2.3 2.4 1.8"/><path d="M8.5 9.5l3 3M12 13l3 3"/>',
+  snowboard: '<rect x="1.5" y="8.8" width="21" height="6.4" rx="3.2" transform="rotate(-28 12 12)"/><path d="M8.3 11.6l1.2 2.2M14.5 8.3l1.2 2.2"/>',
+  bike: '<circle cx="5.5" cy="16.5" r="3.5"/><circle cx="18.5" cy="16.5" r="3.5"/><path d="M5.5 16.5 9 9.5h6.5l3 7M9 9.5l3 7h-6.5"/><path d="M15.5 9.5 14.5 6.5h2.5M8 7h2.5"/>',
+  moto: '<circle cx="5" cy="17" r="3.2"/><circle cx="19" cy="17" r="3.2"/><path d="M5 17l3.5-5.5h5l2.5 3h3"/><path d="M13.5 11.5l2.5-4.5h2.5"/><path d="M9 11.5l1.2 3.5h4"/>',
+  buggy: '<circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M3 15v-3.5l3-1 3.5-5h6l2.5 5h3V15"/><path d="M9 17h6M9.5 5.5 9 10.5M15.5 5.5l1 5"/>',
+  garage: '<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8"/><path d="M7 16h10"/>',
   snowflake:
     '<path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7"/><path d="m9 4 3 2 3-2M9 20l3-2 3 2M4 10.5l3.5-.2L6 7M20 13.5l-3.5.2L18 17M4 13.5l3.5.2L6 17M20 10.5l-3.5-.2L18 7"/>',
 };

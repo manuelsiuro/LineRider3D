@@ -18,6 +18,8 @@ for (const v of VEHICLES) {
   if (only && v.id !== only) continue;
   const row: string[] = [];
   for (const level of tracks) {
+    // Ride levels are only played with their own ride.
+    if ('vehicle' in level && level.vehicle && level.vehicle !== v.id) continue;
     const t = new Track();
     level.build(t);
     const sim = new Simulation(t, v);
@@ -38,7 +40,7 @@ for (const v of VEHICLES) {
     const s = stats.stats;
     const r = rateRun(t, s);
     const ok = s.finished && s.stars === t.stars.size && !s.crashed;
-    if (bad) failed = true;
+    if (bad || !ok) failed = true;
     row.push(`${level.name.slice(0, 12).padEnd(12)} ${bad || (ok ? 'ok ' : s.crashed ? `X@${(f / 40).toFixed(1)}` : s.finished ? `☆${s.stars}/${t.stars.size}` : 'stop')} ${'★'.repeat(r.stars)}`);
   }
   console.log(`${v.name.padEnd(10)} ${row.join(' | ')}`);

@@ -78,3 +78,22 @@ export function selectOutfit(id: string) {
     /* storage unavailable */
   }
 }
+
+const VEHICLE_KEY = 'lr3d.vehicle';
+
+/** The player's chosen ride (all rides are available from the start). */
+export function selectedVehicleId(): string {
+  try {
+    return localStorage.getItem(VEHICLE_KEY) ?? 'sled';
+  } catch {
+    return 'sled';
+  }
+}
+
+export function selectVehicle(id: string) {
+  try {
+    localStorage.setItem(VEHICLE_KEY, id);
+  } catch {
+    /* storage unavailable */
+  }
+}

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Track } from '../track/Track';
 import type { DecorKind, LineType } from '../track/types';
 import { Simulation } from '../physics/Simulation';
+import type { VehicleDef } from '../physics/vehicles';
 import { P } from '../physics/Rider';
 
 /** Profile stroke along +X (z = 0) from a height function. */
@@ -25,8 +26,8 @@ export function path(track: Track, pts: THREE.Vector3[], type: LineType = 'norma
  * Flight path (butt height by x) of an untouched run on the track so far,
  * measured with the real physics, so landings can follow it exactly.
  */
-export function measureArc(track: Track, fromX: number): (x: number) => number {
-  const sim = new Simulation(track);
+export function measureArc(track: Track, fromX: number, vehicle?: VehicleDef): (x: number) => number {
+  const sim = new Simulation(track, vehicle);
   const arc: [number, number][] = [];
   for (let f = 0; f < 800; f++) {
     sim.seek(f);
@@ -50,8 +51,8 @@ export function measureArc(track: Track, fromX: number): (x: number) => number {
  * Where the rider actually passes, measured with an untouched run: returns
  * the body position the first time the run reaches each requested x.
  */
-export function riderLine(track: Track, xs: number[]): THREE.Vector3[] {
-  const sim = new Simulation(track);
+export function riderLine(track: Track, xs: number[], vehicle?: VehicleDef): THREE.Vector3[] {
+  const sim = new Simulation(track, vehicle);
   const out: (THREE.Vector3 | null)[] = xs.map(() => null);
   for (let f = 0; f < 1200 && out.some((p) => !p); f++) {
     sim.seek(f);

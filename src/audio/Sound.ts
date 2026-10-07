@@ -1,6 +1,7 @@
 /**
  * Procedural audio: every sound is synthesized with WebAudio, no assets.
- * - Continuous ride layers (wind, runner scrape, snow plow) driven by speed.
+ * - Continuous ride layers (wind, runner scrape, snow plow) driven by speed,
+ *   plus engines (motorbike, buggy) and freewheel ticks (BMX) per vehicle.
  * - One-shots (crash, ring chime, bounce, UI click).
  * - A soft generative ambient pad with bells for music.
  */
@@ -19,6 +20,16 @@ interface Layer {
   filter: BiquadFilterNode;
 }
 
+export type RideSound = 'sled' | 'skis' | 'board' | 'pedal' | 'engine' | 'motor';
+
+interface Engine {
+  gain: GainNode;
+  filter: BiquadFilterNode;
+  oscs: OscillatorNode[];
+  /** Amplitude "putt" of the cylinders. */
+  lfo: OscillatorNode;
+}
+
 export class Sound {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
@@ -30,6 +41,10 @@ export class Sound {
   private wind!: Layer;
   private scrape!: Layer;
   private snow!: Layer;
+  private engine: Engine | null = null;
+  private rideKind: RideSound = 'sled';
+  private tickClock = 0;
+  private lastRide = 0;
   private chordIndex = 0;
   private musicTimer = 0;
   private bellTimer = 0;
@@ -178,16 +193,119 @@ export class Sound {
   }
 
   /** Updates ride layers. Speed in units/second. */
-  ride(playing: boolean, speed: number, onTrack: boolean, onSnow: boolean) {
+  /** Which ride is playing (changes the runner sound and the engine). */
+  setRide(kind: RideSound) {
+    this.rideKind = kind;
+  }
+
+  /**
+   * Continuous ride sound. `throttle` is the push key (pedalling, gas) and
+   * `airborne` free-revs the engines.
+   */
+  ride(playing: boolean, speed: number, onTrack: boolean, onSnow: boolean, throttle = false, airborne = false) {
     const ctx = this.ctx;
     if (!ctx) return;
     const t = ctx.currentTime;
+    const dt = Math.min(0.1, t - this.lastRide);
+    this.lastRide = t;
     const s = playing ? Math.min(speed / 30, 1.3) : 0;
+    const kind = this.rideKind;
+    const wheels = kind === 'pedal' || kind === 'engine' || kind === 'motor';
     this.wind.gain.gain.setTargetAtTime(0.025 + s * 0.16, t, 0.15);
     this.wind.filter.frequency.setTargetAtTime(350 + s * 1600, t, 0.2);
-    this.scrape.gain.gain.setTargetAtTime(onTrack && playing ? Math.min(0.05 + s * 0.12, 0.16) : 0, t, 0.04);
-    this.scrape.filter.frequency.setTargetAtTime(2200 + s * 2500, t, 0.1);
+    // Runners scrape, skis and boards hiss lower, tyres hum.
+    const scrapeFreq = kind === 'sled' ? 2200 + s * 2500 : wheels ? 300 + s * 500 : 1100 + s * 1400;
+    const scrapeGain = kind === 'sled' ? Math.min(0.05 + s * 0.12, 0.16) : wheels ? Math.min(0.03 + s * 0.08, 0.1) : Math.min(0.06 + s * 0.14, 0.2);
+    this.scrape.gain.gain.setTargetAtTime(onTrack && playing ? scrapeGain : 0, t, 0.04);
+    this.scrape.filter.frequency.setTargetAtTime(scrapeFreq, t, 0.1);
     this.snow.gain.gain.setTargetAtTime(onSnow && playing && speed > 1 ? Math.min(0.1 + s * 0.4, 0.45) : 0, t, 0.05);
+    this.updateEngine(playing, speed, throttle, airborne);
+    // BMX freewheel: ticks while coasting, faster with speed.
+    if (kind === 'pedal' && playing && !throttle && speed > 2 && (onTrack || onSnow)) {
+      this.tickClock += dt * Math.min(4 + speed * 0.9, 26);
+      if (this.tickClock >= 1) {
+        this.tickClock %= 1;
+        this.tick();
+      }
+    }
+  }
+
+  private tick() {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const n = ctx.createBufferSource();
+    n.buffer = this.noise;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = 5200;
+    f.Q.value = 6;
+    const g = ctx.createGain();
+    this.env(g, t, 0.12, 0.001, 0.025);
+    n.connect(f).connect(g).connect(this.sfx);
+    n.start(t, Math.random());
+    n.stop(t + 0.04);
+  }
+
+  /** Motorbike (snarling twin) and buggy (deep rumble) engines with gear shifts. */
+  private updateEngine(playing: boolean, speed: number, throttle: boolean, airborne: boolean) {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const kind = this.rideKind;
+    const motor = kind === 'engine' || kind === 'motor';
+    if (!motor) {
+      if (this.engine) this.engine.gain.gain.setTargetAtTime(0, t, 0.08);
+      return;
+    }
+    if (!this.engine) this.engine = this.makeEngine();
+    const e = this.engine;
+    const moto = kind === 'engine';
+    // Rev through gears: rpm climbs with speed, drops at each shift.
+    const gearSpan = moto ? 9 : 11;
+    const inGear = (speed % gearSpan) / gearSpan;
+    const gear = Math.min(5, Math.floor(speed / gearSpan));
+    let rpm = 0.18 + inGear * 0.62 + gear * 0.04;
+    if (airborne && throttle) rpm = 1;
+    else if (throttle) rpm += 0.12;
+    const idle = moto ? 48 : 34;
+    const top = moto ? 210 : 120;
+    const f = idle + (top - idle) * Math.min(rpm, 1);
+    e.oscs[0].frequency.setTargetAtTime(f, t, 0.05);
+    e.oscs[1].frequency.setTargetAtTime(f * 0.5, t, 0.05);
+    e.oscs[2].frequency.setTargetAtTime(f * 1.01, t, 0.05);
+    e.lfo.frequency.setTargetAtTime(f * 0.5, t, 0.05);
+    e.filter.frequency.setTargetAtTime((moto ? 700 : 420) + rpm * (moto ? 2200 : 900) + (throttle ? 500 : 0), t, 0.06);
+    const vol = playing ? (moto ? 0.09 : 0.11) * (0.6 + rpm * 0.5 + (throttle ? 0.25 : 0)) : 0.0;
+    e.gain.gain.setTargetAtTime(vol, t, 0.06);
+  }
+
+  private makeEngine(): Engine {
+    const ctx = this.ctx!;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.Q.value = 3;
+    const putt = ctx.createGain();
+    putt.gain.value = 0.6;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    const types: OscillatorType[] = ['sawtooth', 'square', 'sawtooth'];
+    const oscs = types.map((type) => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = 50;
+      o.connect(filter);
+      o.start();
+      return o;
+    });
+    // Cylinder firing: amplitude modulation at half the engine pitch.
+    const lfo = ctx.createOscillator();
+    lfo.type = 'square';
+    lfo.frequency.value = 25;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.4;
+    lfo.connect(depth).connect(putt.gain);
+    lfo.start();
+    filter.connect(putt).connect(gain).connect(this.sfx);
+    return { gain, filter, oscs, lfo };
   }
 
   private env(node: GainNode, t: number, peak: number, attack: number, decay: number) {

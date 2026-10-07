@@ -123,6 +123,10 @@ export class Simulation {
     return out;
   }
 
+  inputAt(frame: number): number {
+    return this.inputs[frame] ?? 0;
+  }
+
   /** Replaces all inputs (e.g. to replay a saved ghost run). */
   loadInputs(inputs: number[]) {
     this.inputs = inputs.slice();

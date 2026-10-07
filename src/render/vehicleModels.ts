@@ -57,6 +57,42 @@ class Roller {
   }
 }
 
+/**
+ * Visual suspension: a damped spring driven by the chassis's vertical
+ * acceleration, so landings squat the body toward the wheels and it rebounds.
+ */
+class Suspension {
+  x = 0;
+  private v = 0;
+  private lastPos = new THREE.Vector3();
+  private lastVel = 0;
+  private has = false;
+  constructor(
+    private travel: number,
+    private stiffness = 260,
+    private damping = 16,
+  ) {}
+  update(pos: THREE.Vector3, up: THREE.Vector3, dt: number) {
+    if (dt <= 0) return this.x;
+    if (!this.has || pos.distanceToSquared(this.lastPos) > 4) {
+      this.lastPos.copy(pos);
+      this.has = true;
+      return this.x;
+    }
+    const vel = new THREE.Vector3().subVectors(pos, this.lastPos).dot(up) / dt;
+    this.lastPos.copy(pos);
+    const accel = (vel - this.lastVel) / dt;
+    this.lastVel = vel;
+    // A sudden stop of a fall (accel up) compresses the spring.
+    const h = Math.min(dt, 1 / 30);
+    this.v += (-this.stiffness * this.x - this.damping * this.v + THREE.MathUtils.clamp(accel, -60, 400) * 0.8) * h;
+    this.x += this.v * h;
+    if (this.x < -this.travel * 0.4) (this.x = -this.travel * 0.4), (this.v = 0);
+    if (this.x > this.travel) (this.x = this.travel), (this.v = Math.min(this.v, 0));
+    return this.x;
+  }
+}
+
 /** A wheel spinning around its local z axis. */
 function makeWheel(R: number, thick: number, width: number, style: 'bmx' | 'moto' | 'buggy'): THREE.Group {
   const g = new THREE.Group();
@@ -188,7 +224,8 @@ function snowboardModel(world: THREE.Object3D): VehicleModel {
   part(group, new THREE.BoxGeometry(1.0, 0.004, 0.05), MAT.accent, 0.75, 0.032, 0.08);
   for (const x of [0.42, 1.08]) {
     part(group, new THREE.BoxGeometry(0.16, 0.05, 0.3), MAT.dark, x, 0.055, 0);
-    part(group, new THREE.BoxGeometry(0.03, 0.16, 0.26), MAT.dark, x - 0.1, 0.12, 0, [0, 0, 0.2]);
+    // Highback along the heel edge.
+    part(group, new THREE.BoxGeometry(0.15, 0.17, 0.025), MAT.dark, x, 0.13, -0.135, [-0.2, 0, 0]);
   }
   world.add(group);
   return {
@@ -302,15 +339,18 @@ function motoModel(world: THREE.Object3D, def: VehicleDef): VehicleModel {
   fender.castShadow = true;
   world.add(fender);
   const roller = new Roller(R);
+  const susp = new Suspension(0.16);
   const hubR = new THREE.Vector3();
   const hubF = new THREE.Vector3();
   const v = new THREE.Vector3();
   const w = new THREE.Vector3();
   return {
     group,
-    update(p) {
+    update(p, _b, dt) {
       const right = new THREE.Vector3().subVectors(p[P.tailR], p[P.tailL]);
       const b = basisFrom(p[12], p[13], right);
+      // The frame squats on the suspension; wheels stay on the ground.
+      b.origin.addScaledVector(b.up, -susp.update(p[12], b.up, dt));
       pose(group, b.origin, b.fwd, b.up, b.right);
       // Wheels sit above their contact points (they move with the suspension).
       hubR.addVectors(p[P.tailL], p[P.tailR]).multiplyScalar(0.5).addScaledVector(b.up, R);
@@ -374,6 +414,7 @@ function buggyModel(world: THREE.Object3D, def: VehicleDef): VehicleModel {
   const arms = [0, 1, 2, 3].map(() => new Limb(0.028, MAT.metal, world));
   const shocks = [0, 1, 2, 3].map(() => new Limb(0.04, MAT.accent, world, 0.03));
   const roller = new Roller(R);
+  const susp = new Suspension(0.2, 200, 13);
   const contacts = [P.tailL, P.tailR, P.noseL, P.noseR];
   const mounts: [number, number][] = [
     [0, -1],
@@ -385,10 +426,11 @@ function buggyModel(world: THREE.Object3D, def: VehicleDef): VehicleModel {
   const v = new THREE.Vector3();
   return {
     group,
-    update(p) {
+    update(p, _b, dt) {
       const rear = new THREE.Vector3().addVectors(p[12], p[13]).multiplyScalar(0.5);
       const front = new THREE.Vector3().addVectors(p[14], p[15]).multiplyScalar(0.5);
       const b = basisFrom(rear, front, new THREE.Vector3().subVectors(p[13], p[12]));
+      b.origin.addScaledVector(b.up, -susp.update(rear, b.up, dt));
       pose(group, b.origin, b.fwd, b.up, b.right);
       const a = roller.roll(rear, b.fwd);
       contacts.forEach((ci, k) => {
