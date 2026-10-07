@@ -248,6 +248,9 @@ export class Rider {
       this.prev[i].toArray(buf, i * 6 + 3);
     }
     buf[POINT_COUNT * 6] = this.crashed ? 1 : 0;
+    let mask = 0;
+    for (let i = 0; i < POINT_COUNT; i++) if (this.contact[i]) mask |= 1 << i;
+    buf[POINT_COUNT * 6 + 1] = mask;
   }
 
   readState(buf: Float64Array) {
@@ -256,7 +259,9 @@ export class Rider {
       this.prev[i].fromArray(buf, i * 6 + 3);
     }
     this.crashed = buf[POINT_COUNT * 6] === 1;
+    const mask = buf[POINT_COUNT * 6 + 1];
+    for (let i = 0; i < POINT_COUNT; i++) this.contact[i] = (mask & (1 << i)) !== 0;
   }
 }
 
-export const STATE_SIZE = POINT_COUNT * 6 + 1;
+export const STATE_SIZE = POINT_COUNT * 6 + 2;

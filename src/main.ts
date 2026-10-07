@@ -9,6 +9,7 @@ import { Simulation, STEPS_PER_SECOND } from './physics/Simulation';
 import { Environment } from './world/Environment';
 import { Editor } from './editor/Editor';
 import { UI } from './ui/UI';
+import { Effects } from './render/Effects';
 import { buildDemoTrack } from './demoTrack';
 
 const STORAGE_KEY = 'lr3d.track';
@@ -48,6 +49,8 @@ const trackView = new TrackView(scene, track);
 const riderView = new RiderView(scene);
 const sim = new Simulation(track);
 const rig = new CameraRig(camera, controls);
+const effects = new Effects(scene);
+effects.setViewportHeight(innerHeight * renderer.getPixelRatio());
 const ground = scene.getObjectByName('ground')!;
 const editor = new Editor(renderer.domElement, camera, scene, controls, track, trackView, ground);
 
@@ -110,6 +113,7 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
   },
   stop() {
     playing = false;
+    effects.reset();
     frame = 0;
     acc = 0;
     ui.setPlaying(false);
@@ -170,6 +174,7 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  effects.setViewportHeight(innerHeight * renderer.getPixelRatio());
 });
 
 const timer = new THREE.Timer();
@@ -204,11 +209,16 @@ renderer.setAnimationLoop((time) => {
   if (playing) {
     riderCenter.copy(riderView.pts[6]);
     sim.rider.velocity(riderVel);
-    rig.update(dt, riderCenter, riderVel);
+    const r = sim.rider;
+    if (effects.fromRider(frame, r.pos, r.contact, r.crashed, riderVel, STEPS_PER_SECOND)) rig.shake(0.6);
+    rig.update(dt, riderCenter, riderVel, STEPS_PER_SECOND);
     if (rig.mode === 'follow') controls.update();
   } else {
+    rig.settle(dt);
     controls.update();
   }
+  rig.applyShake(dt);
+  effects.update(dt);
 
   editor.update(!playing);
   env.update(dt, controls.target, timer.getElapsed());

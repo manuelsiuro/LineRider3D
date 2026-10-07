@@ -85,6 +85,6 @@ export class Simulation {
 
   crashedAt(frame: number) {
     const s = this.history[frame];
-    return s ? s[STATE_SIZE - 1] === 1 : false;
+    return s ? s[STATE_SIZE - 2] === 1 : false;
   }
 }

@@ -4,55 +4,84 @@ import { LINE_COLORS, type LineType, type Stroke } from '../track/types';
 
 const THICKNESS = 0.18;
 
+const TEX = 128;
+
 function makeTexture(type: LineType): THREE.CanvasTexture {
   const c = document.createElement('canvas');
-  c.width = 64;
-  c.height = 64;
+  c.width = c.height = TEX;
   const ctx = c.getContext('2d')!;
   const base = new THREE.Color(LINE_COLORS[type]);
-  ctx.fillStyle = `#${base.getHexString()}`;
-  ctx.fillRect(0, 0, 64, 64);
+  // Subtle vertical gradient across the width gives the ribbon a rounded look.
+  const grad = ctx.createLinearGradient(0, 0, TEX, 0);
+  const dark = base.clone().multiplyScalar(0.78).getStyle();
+  grad.addColorStop(0, dark);
+  grad.addColorStop(0.5, base.getStyle());
+  grad.addColorStop(1, dark);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, TEX, TEX);
+  // Frosty speckles.
+  let seed = 11;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  for (let i = 0; i < 260; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${0.04 + rand() * 0.1})`;
+    ctx.fillRect(rand() * TEX, rand() * TEX, 1 + rand() * 2, 1 + rand() * 2);
+  }
   // Bright edges so the ribbon reads well from far away.
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.fillRect(0, 0, 5, 64);
-  ctx.fillRect(59, 0, 5, 64);
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillRect(0, 0, 8, TEX);
+  ctx.fillRect(TEX - 8, 0, 8, TEX);
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.fillRect(8, 0, 3, TEX);
+  ctx.fillRect(TEX - 11, 0, 3, TEX);
   if (type === 'accel') {
     // Chevrons pointing along the drawing direction (+v).
-    ctx.strokeStyle = 'rgba(255,240,200,0.9)';
-    ctx.lineWidth = 7;
+    ctx.strokeStyle = 'rgba(255,236,190,0.95)';
+    ctx.lineWidth = 12;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(14, 18);
-    ctx.lineTo(32, 46);
-    ctx.lineTo(50, 18);
+    ctx.moveTo(32, 36);
+    ctx.lineTo(64, 88);
+    ctx.lineTo(96, 36);
     ctx.stroke();
   } else if (type === 'normal') {
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.fillRect(10, 0, 44, 6);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fillRect(20, 0, TEX - 40, 6);
   } else {
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    for (let i = 0; i < 4; i++) ctx.fillRect(12 + i * 11, 8 + (i % 2) * 24, 6, 6);
+    // Garland of little lights for scenery.
+    const colors = ['#ffd84a', '#ff6b6b', '#ffffff', '#7fe0ff'];
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = colors[i];
+      ctx.beginPath();
+      ctx.arc(28 + i * 24, 20 + (i % 2) * 60, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   return tex;
 }
 
 const textures = new Map<LineType, THREE.CanvasTexture>();
-const topMaterials = new Map<LineType, THREE.MeshStandardMaterial>();
+const topMaterials = new Map<LineType, THREE.MeshPhysicalMaterial>();
 
 export function topMaterial(type: LineType) {
   let m = topMaterials.get(type);
   if (!m) {
     let tex = textures.get(type);
     if (!tex) textures.set(type, (tex = makeTexture(type)));
-    m = new THREE.MeshStandardMaterial({
+    // Glossy, icy finish.
+    m = new THREE.MeshPhysicalMaterial({
       map: tex,
-      roughness: type === 'normal' ? 0.35 : 0.6,
-      metalness: 0.05,
+      roughness: 0.45,
+      metalness: 0,
+      clearcoat: type === 'scenery' ? 0 : 0.9,
+      clearcoatRoughness: 0.25,
       transparent: type === 'scenery',
-      opacity: type === 'scenery' ? 0.75 : 1,
+      opacity: type === 'scenery' ? 0.8 : 1,
+      emissive: type === 'scenery' ? new THREE.Color(0x1d5a2e) : new THREE.Color(0x000000),
+      emissiveIntensity: 0.4,
     });
     topMaterials.set(type, m);
   }
@@ -60,7 +89,7 @@ export function topMaterial(type: LineType) {
 }
 
 /** Underside / sides: neutral so the solid top face is always obvious. */
-export const underMaterial = new THREE.MeshStandardMaterial({ color: 0x8a96a6, roughness: 0.8 });
+export const underMaterial = new THREE.MeshStandardMaterial({ color: 0x9aa5b4, roughness: 0.75 });
 
 /**
  * Builds the ribbon mesh of a stroke: a thin slab whose top face is the

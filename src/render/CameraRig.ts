@@ -17,14 +17,41 @@ export class CameraRig {
   mode: CameraMode = 'follow';
   private smoothed = new THREE.Vector3();
   private heading = new THREE.Vector3(1, 0, 0);
+  private shakeAmount = 0;
+  private shakeOffset = new THREE.Vector3();
+  readonly baseFov: number;
 
-  constructor(private camera: THREE.PerspectiveCamera, private controls: OrbitControls) {}
+  constructor(private camera: THREE.PerspectiveCamera, private controls: OrbitControls) {
+    this.baseFov = camera.fov;
+  }
+
+  shake(amount: number) {
+    this.shakeAmount = Math.max(this.shakeAmount, amount);
+  }
+
+  /** Removes the shake offset so it never accumulates into the real position. */
+  private clearShake() {
+    this.camera.position.sub(this.shakeOffset);
+    this.shakeOffset.set(0, 0, 0);
+  }
+
+  /** Eases the field of view toward the base value (speed widens it). */
+  settle(dt: number, speedPerSecond = 0) {
+    this.clearShake();
+    const target = this.baseFov + THREE.MathUtils.clamp((speedPerSecond - 10) * 0.45, 0, 14);
+    const fov = THREE.MathUtils.lerp(this.camera.fov, target, 1 - Math.exp(-dt * 3));
+    if (Math.abs(fov - this.camera.fov) > 0.01) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
+  }
 
   snapTo(target: THREE.Vector3) {
     this.smoothed.copy(target);
   }
 
-  update(dt: number, target: THREE.Vector3, velocity: THREE.Vector3) {
+  update(dt: number, target: THREE.Vector3, velocity: THREE.Vector3, stepsPerSecond: number) {
+    this.settle(dt, velocity.length() * stepsPerSecond);
     const k = 1 - Math.exp(-dt * 6);
     const prev = this.smoothed.clone();
     this.smoothed.lerp(target, k);
@@ -54,5 +81,13 @@ export class CameraRig {
       }
     }
     this.camera.lookAt(this.controls.target);
+  }
+
+  /** Applies shake after the controls have positioned the camera. */
+  applyShake(dt: number) {
+    if (this.shakeAmount < 0.002) return;
+    this.shakeOffset.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(this.shakeAmount);
+    this.camera.position.add(this.shakeOffset);
+    this.shakeAmount *= Math.exp(-dt * 6);
   }
 }

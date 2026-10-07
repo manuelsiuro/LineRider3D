@@ -17,14 +17,23 @@ const MAT = {
 
 const UP = new THREE.Vector3(0, 1, 0);
 
-/** A cylinder that can be stretched between two points. */
+/** A capsule (cylinder + rounded ends) that can be stretched between two points. */
 class Limb {
   mesh: THREE.Mesh;
-  constructor(radius: number, material: THREE.Material, parent: THREE.Object3D) {
-    const geo = new THREE.CylinderGeometry(radius, radius, 1, 8);
+  private capA: THREE.Mesh;
+  private capB: THREE.Mesh;
+  constructor(radius: number, material: THREE.Material, parent: THREE.Object3D, radiusEnd = radius) {
+    const geo = new THREE.CylinderGeometry(radiusEnd, radius, 1, 10, 1, true);
     this.mesh = new THREE.Mesh(geo, material);
-    this.mesh.castShadow = true;
-    parent.add(this.mesh);
+    this.capA = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 8), material);
+    this.capB = new THREE.Mesh(new THREE.SphereGeometry(radiusEnd, 10, 8), material);
+    for (const m of [this.mesh, this.capA, this.capB]) {
+      m.castShadow = true;
+      parent.add(m);
+    }
+  }
+  set visible(v: boolean) {
+    this.mesh.visible = this.capA.visible = this.capB.visible = v;
   }
   set(a: THREE.Vector3, b: THREE.Vector3) {
     const d = new THREE.Vector3().subVectors(b, a);
@@ -32,6 +41,8 @@ class Limb {
     this.mesh.position.addVectors(a, b).multiplyScalar(0.5);
     if (len > 1e-6) this.mesh.quaternion.setFromUnitVectors(UP, d.divideScalar(len));
     this.mesh.scale.set(1, Math.max(len, 1e-3), 1);
+    this.capA.position.copy(a);
+    this.capB.position.copy(b);
   }
 }
 
@@ -53,7 +64,7 @@ export class RiderView {
     scene.add(this.root);
     this.buildSled();
     this.root.add(this.sled);
-    this.torso = new Limb(0.12, MAT.jacket, this.root);
+    this.torso = new Limb(0.13, MAT.jacket, this.root, 0.11);
     this.arms = [new Limb(0.045, MAT.jacket, this.root), new Limb(0.045, MAT.jacket, this.root)];
     this.legs = [new Limb(0.06, MAT.pants, this.root), new Limb(0.06, MAT.pants, this.root)];
     this.ropes = [new Limb(0.012, MAT.rope, this.root), new Limb(0.012, MAT.rope, this.root)];
@@ -66,6 +77,8 @@ export class RiderView {
     };
     this.hands = [sphere(0.06, MAT.scarf), sphere(0.06, MAT.scarf)];
     this.feet = [sphere(0.075, MAT.boot), sphere(0.075, MAT.boot)];
+    for (const f of this.feet) f.scale.set(1.7, 0.9, 1);
+    this.hands.forEach((hnd) => hnd.scale.set(1.1, 1, 0.9));
     this.buildHead();
     this.root.add(this.head);
   }
@@ -107,6 +120,16 @@ export class RiderView {
       eye.position.set(0.145, 0.0, z);
       this.head.add(eye);
     }
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), mat(0xf0a080));
+    nose.position.set(0.16, -0.03, 0);
+    const blush = new THREE.MeshBasicMaterial({ color: 0xff9a9a, transparent: true, opacity: 0.6 });
+    for (const z of [-0.09, 0.09]) {
+      const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), blush);
+      cheek.position.set(0.125, -0.05, z);
+      cheek.scale.set(0.4, 0.7, 1);
+      this.head.add(cheek);
+    }
+    this.head.add(nose);
     const neckScarf = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.045, 6, 14), MAT.scarf);
     neckScarf.rotation.x = Math.PI / 2;
     neckScarf.position.y = -0.17;
@@ -139,11 +162,18 @@ export class RiderView {
     this.hands[1].position.copy(p[P.rHand]);
     this.feet[0].position.copy(p[P.lFoot]);
     this.feet[1].position.copy(p[P.rFoot]);
+    // Boots point along the leg's forward direction.
+    for (let k = 0; k < 2; k++) {
+      const leg = new THREE.Vector3().subVectors(this.feet[k].position, butt);
+      leg.y = Math.min(leg.y, 0);
+      const toe = leg.lengthSq() > 1e-6 ? leg.normalize() : fwd;
+      this.feet[k].quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), toe);
+    }
     const ropeAnchor = p[P.string];
     if (crashed) {
-      this.ropes.forEach((r) => (r.mesh.visible = false));
+      this.ropes.forEach((r) => (r.visible = false));
     } else {
-      this.ropes.forEach((r) => (r.mesh.visible = true));
+      this.ropes.forEach((r) => (r.visible = true));
       this.ropes[0].set(p[P.lHand], ropeAnchor);
       this.ropes[1].set(p[P.rHand], ropeAnchor);
     }

@@ -3,17 +3,21 @@ import type { Track } from '../track/Track';
 import type { Decor } from '../track/types';
 import { buildDecor, M } from '../world/models';
 import { buildRibbonMesh } from './ribbon';
+import { buildSupports, supportMaterial } from './supports';
 
 /** Keeps Three.js objects in sync with the track data. */
 export class TrackView {
   readonly ribbons = new THREE.Group();
   readonly decor = new THREE.Group();
+  /** Decorative wooden scaffolding under tracks. */
+  readonly supports = new THREE.Group();
   readonly startMarker: THREE.Group;
   private ribbonById = new Map<number, THREE.Mesh>();
+  private supportById = new Map<number, THREE.Mesh>();
   private decorById = new Map<number, THREE.Object3D>();
 
   constructor(scene: THREE.Scene, private track: Track) {
-    scene.add(this.ribbons, this.decor);
+    scene.add(this.ribbons, this.decor, this.supports);
     this.startMarker = this.buildStartMarker();
     scene.add(this.startMarker);
 
@@ -50,9 +54,23 @@ export class TrackView {
     const mesh = buildRibbonMesh(stroke);
     this.ribbonById.set(id, mesh);
     this.ribbons.add(mesh);
+    const geo = buildSupports(stroke);
+    if (geo) {
+      const sup = new THREE.Mesh(geo, supportMaterial);
+      sup.castShadow = true;
+      sup.receiveShadow = true;
+      this.supportById.set(id, sup);
+      this.supports.add(sup);
+    }
   }
 
   private removeRibbon(id: number) {
+    const sup = this.supportById.get(id);
+    if (sup) {
+      sup.geometry.dispose();
+      this.supports.remove(sup);
+      this.supportById.delete(id);
+    }
     const mesh = this.ribbonById.get(id);
     if (!mesh) return;
     mesh.geometry.dispose();

@@ -13,12 +13,67 @@ function rng(seed: number) {
 const SKY_TOP = new THREE.Color(0x6fa8dc);
 const SKY_HORIZON = new THREE.Color(0xe6f0fa);
 const FOG = 0xdde9f5;
+const SUN_OFFSET = new THREE.Vector3(-40, 70, 50);
+
+/** Smooth value noise in [0,1], tileable over `period`. */
+function valueNoise(size: number, period: number, seed: number): Float32Array {
+  const rand = rng(seed);
+  const grid = Array.from({ length: period * period }, () => rand());
+  const at = (x: number, y: number) => grid[((y % period) + period) % period * period + (((x % period) + period) % period)];
+  const out = new Float32Array(size * size);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const fx = (x / size) * period;
+      const fy = (y / size) * period;
+      const ix = Math.floor(fx);
+      const iy = Math.floor(fy);
+      const tx = fx - ix;
+      const ty = fy - iy;
+      const sx = tx * tx * (3 - 2 * tx);
+      const sy = ty * ty * (3 - 2 * ty);
+      const a = at(ix, iy) + (at(ix + 1, iy) - at(ix, iy)) * sx;
+      const b = at(ix, iy + 1) + (at(ix + 1, iy + 1) - at(ix, iy + 1)) * sx;
+      out[y * size + x] = a + (b - a) * sy;
+    }
+  return out;
+}
+
+/** Normal map of soft wind-blown snow ripples. */
+function snowNormalMap(): THREE.DataTexture {
+  const size = 256;
+  const n1 = valueNoise(size, 8, 5);
+  const n2 = valueNoise(size, 32, 9);
+  const h = (x: number, y: number) => {
+    const i = ((y + size) % size) * size + ((x + size) % size);
+    return n1[i] * 0.8 + n2[i] * 0.35;
+  };
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const dx = (h(x + 1, y) - h(x - 1, y)) * 3;
+      const dy = (h(x, y + 1) - h(x, y - 1)) * 3;
+      const n = new THREE.Vector3(-dx, -dy, 1).normalize();
+      const i = (y * size + x) * 4;
+      data[i] = (n.x * 0.5 + 0.5) * 255;
+      data[i + 1] = (n.y * 0.5 + 0.5) * 255;
+      data[i + 2] = (n.z * 0.5 + 0.5) * 255;
+      data[i + 3] = 255;
+    }
+  const tex = new THREE.DataTexture(data, size, size);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
 
 export class Environment {
   readonly sun: THREE.DirectionalLight;
   private snow: THREE.Points;
   private snowVel: Float32Array;
   private readonly snowBox = 70;
+  private clouds: THREE.Group;
+  private glints: THREE.Points;
 
   constructor(scene: THREE.Scene, private lowPower: boolean) {
     scene.background = new THREE.Color(FOG);
@@ -26,11 +81,11 @@ export class Environment {
 
     scene.add(this.buildSky());
 
-    const hemi = new THREE.HemisphereLight(0xdfefff, 0xb8c6d8, 1.6);
+    const hemi = new THREE.HemisphereLight(0xdcecff, 0xa9bcd6, 1.6);
     scene.add(hemi);
 
     this.sun = new THREE.DirectionalLight(0xfff3e0, 2.2);
-    this.sun.position.set(-40, 70, 50);
+    this.sun.position.copy(SUN_OFFSET);
     this.sun.castShadow = true;
     const size = lowPower ? 1024 : 2048;
     this.sun.shadow.mapSize.set(size, size);
@@ -46,6 +101,11 @@ export class Environment {
     scene.add(this.buildGround());
     scene.add(this.buildMountains());
     scene.add(this.buildForest());
+    scene.add(this.buildMounds());
+    this.clouds = this.buildClouds();
+    scene.add(this.clouds);
+    this.glints = this.buildGlints();
+    scene.add(this.glints);
 
     const flakes = lowPower ? 1200 : 3000;
     this.snowVel = new Float32Array(flakes);
@@ -59,13 +119,24 @@ export class Environment {
       side: THREE.BackSide,
       depthWrite: false,
       fog: false,
-      uniforms: { top: { value: SKY_TOP }, horizon: { value: SKY_HORIZON } },
+      uniforms: {
+        top: { value: SKY_TOP },
+        horizon: { value: SKY_HORIZON },
+        sunDir: { value: SUN_OFFSET.clone().normalize() },
+      },
       vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `uniform vec3 top; uniform vec3 horizon; varying vec3 vPos;
-        void main(){ float h = normalize(vPos).y; gl_FragColor = vec4(mix(horizon, top, smoothstep(0.0, 0.5, h)), 1.0); }`,
+      fragmentShader: `uniform vec3 top; uniform vec3 horizon; uniform vec3 sunDir; varying vec3 vPos;
+        void main(){
+          vec3 d = normalize(vPos);
+          vec3 col = mix(horizon, top, smoothstep(0.0, 0.5, d.y));
+          float s = max(dot(d, sunDir), 0.0);
+          col += vec3(1.0, 0.93, 0.8) * (pow(s, 900.0) * 1.5 + pow(s, 40.0) * 0.25 + pow(s, 6.0) * 0.08);
+          gl_FragColor = vec4(col, 1.0);
+        }`,
     });
     const sky = new THREE.Mesh(geo, mat);
     sky.renderOrder = -1;
+    sky.frustumCulled = false;
     return sky;
   }
 
@@ -78,7 +149,15 @@ export class Environment {
       pos.setY(i, terrainHeight(pos.getX(i), pos.getZ(i)));
     }
     geo.computeVertexNormals();
-    const ground = new THREE.Mesh(geo, M.snow);
+    const normalMap = snowNormalMap();
+    normalMap.repeat.set(180, 180);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xf3f7fd,
+      roughness: 0.92,
+      normalMap,
+      normalScale: new THREE.Vector2(0.55, 0.55),
+    });
+    const ground = new THREE.Mesh(geo, material);
     ground.receiveShadow = true;
     ground.name = 'ground';
     return ground;
@@ -150,6 +229,107 @@ export class Environment {
     return forest;
   }
 
+  /** Soft snow drifts scattered around the play area. */
+  private buildMounds() {
+    const geo = new THREE.IcosahedronGeometry(1, 2);
+    const count = this.lowPower ? 80 : 160;
+    const mounds = new THREE.InstancedMesh(geo, M.snow, count);
+    mounds.receiveShadow = true;
+    const rand = rng(21);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    for (let i = 0; i < count; i++) {
+      const angle = rand() * Math.PI * 2;
+      const r = 12 + rand() * 150;
+      const x = Math.cos(angle) * r;
+      const z = Math.sin(angle) * r;
+      const w = 1.5 + rand() * 4;
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI);
+      m.compose(new THREE.Vector3(x, terrainHeight(x, z) - 0.15, z), q, new THREE.Vector3(w, 0.25 + rand() * 0.6, w * (0.5 + rand() * 0.5)));
+      mounds.setMatrixAt(i, m);
+    }
+    return mounds;
+  }
+
+  /** Puffy low-poly clouds drifting high above. */
+  private buildClouds() {
+    const group = new THREE.Group();
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xc8d8ec,
+      emissiveIntensity: 0.35,
+      flatShading: true,
+      roughness: 1,
+      fog: false,
+      transparent: true,
+      opacity: 0.95,
+    });
+    const rand = rng(77);
+    for (let i = 0; i < 16; i++) {
+      const cloud = new THREE.Group();
+      const puffs = 4 + Math.floor(rand() * 4);
+      for (let k = 0; k < puffs; k++) {
+        const r = 8 + rand() * 10;
+        const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), material);
+        puff.position.set((k - puffs / 2) * 11 + rand() * 6, rand() * 6 - (Math.abs(k - puffs / 2) * 2), rand() * 10 - 5);
+        puff.scale.y = 0.6;
+        cloud.add(puff);
+      }
+      const angle = rand() * Math.PI * 2;
+      const dist = 250 + rand() * 350;
+      cloud.position.set(Math.cos(angle) * dist, 110 + rand() * 90, Math.sin(angle) * dist);
+      cloud.rotation.y = rand() * Math.PI;
+      group.add(cloud);
+    }
+    return group;
+  }
+
+  /** Tiny sparkles on the snow that twinkle around the camera focus. */
+  private buildGlints() {
+    const count = this.lowPower ? 300 : 700;
+    const positions = new Float32Array(count * 3);
+    const phase = new Float32Array(count);
+    const rand = rng(13);
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = (rand() - 0.5) * 80;
+      positions[i * 3 + 2] = (rand() - 0.5) * 80;
+      phase[i] = rand() * 100;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('phase', new THREE.BufferAttribute(phase, 1));
+    const mat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: { time: { value: 0 }, focus: { value: new THREE.Vector3() } },
+      vertexShader: `
+        attribute float phase; uniform float time; uniform vec3 focus; varying float vA;
+        void main() {
+          // Wrap the sparkle field around the focus point.
+          vec3 p = position;
+          p.xz = focus.xz + mod(p.xz - focus.xz + 40.0, 80.0) - 40.0;
+          p.y = 0.03;
+          float t = sin(time * 2.0 + phase) * 0.5 + 0.5;
+          vA = pow(t, 12.0);
+          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          gl_PointSize = 40.0 * vA / -mv.z;
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        varying float vA;
+        void main() {
+          vec2 c = gl_PointCoord - 0.5;
+          float star = max(0.0, 1.0 - abs(c.x) * 12.0) + max(0.0, 1.0 - abs(c.y) * 12.0);
+          star *= 1.0 - length(c) * 2.0;
+          gl_FragColor = vec4(1.0, 1.0, 1.0, clamp(star, 0.0, 1.0) * vA);
+        }`,
+    });
+    const points = new THREE.Points(geo, mat);
+    points.frustumCulled = false;
+    return points;
+  }
+
   private buildSnowfall(count: number) {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 32;
@@ -203,6 +383,10 @@ export class Environment {
     pos.needsUpdate = true;
 
     this.sun.target.position.copy(focus);
-    this.sun.position.copy(focus).add(new THREE.Vector3(-40, 70, 50));
+    this.sun.position.copy(focus).add(SUN_OFFSET);
+    this.clouds.rotation.y = time * 0.004;
+    const gm = this.glints.material as THREE.ShaderMaterial;
+    gm.uniforms.time.value = time;
+    gm.uniforms.focus.value.copy(focus);
   }
 }
