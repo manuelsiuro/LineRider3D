@@ -15,7 +15,7 @@ function setText(el: Element, text: string) {
 
 /** Is a menu, card or screen covering the game? */
 export function overlayOpen() {
-  return document.querySelector('.modal, .screen, .summary, .title-screen') !== null;
+  return document.querySelector('.modal, .screen, .summary, .title-screen, .photo-bar') !== null;
 }
 
 export type TitleChoice = 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies';
@@ -43,6 +43,8 @@ export interface UIHandlers {
   settings(): void;
   /** Esc: pause menu while riding, otherwise stop. */
   escape(): void;
+  /** Enters photo mode. */
+  photo(): void;
   /** Next ride (editor quick switch). */
   cycleVehicle(): void;
   /** Touch pad input: bit mask from the on-screen buttons. */
@@ -261,7 +263,12 @@ export class UI {
       handlers.click();
       handlers.share();
     };
-    right.append(group1, shareBtn, focusBtn, this.camBtn, group2);
+    const photoBtn = button('btn icon-btn photo-btn', icon('aperture'), 'Photo mode (P)');
+    photoBtn.onclick = () => {
+      handlers.click();
+      handlers.photo();
+    };
+    right.append(group1, shareBtn, photoBtn, focusBtn, this.camBtn, group2);
     top.append(left, right);
     editor.history.onChange = () => this.refreshHistory();
     this.refreshHistory();
@@ -369,7 +376,8 @@ export class UI {
     bottom.append(this.panel, toolbar);
 
     this.hint = h('div', 'hint hidden');
-    root.append(top, player, this.hud, this.popups, this.touchPad, bottom, this.hint);
+    const replayTag = h('div', 'replay-tag', '<i></i>REPLAY');
+    root.append(h('div', 'letterbox'), top, player, this.hud, this.popups, this.touchPad, bottom, this.hint, replayTag);
     this.setRiderMode(riderMode);
     editor.onHint = (t) => this.flash(t);
 
@@ -945,6 +953,47 @@ export class UI {
     });
   }
 
+  /** Photo mode bar: field of view, snap and exit. Resolves on exit. */
+  showPhotoMode(fov: number, onFov: (fov: number) => void, onSnap: () => void): Promise<void> {
+    return new Promise((resolve) => {
+      const bar = h(
+        'div',
+        'photo-bar',
+        `<span class="photo-hint">Drag to orbit · scroll to zoom</span>
+         <label class="photo-fov">${icon('camera', 16)}<input type="range" min="20" max="90" value="${Math.round(fov)}" aria-label="Field of view"></label>
+         <button class="big-btn primary" data-a="snap">${icon('aperture', 18)} Snap</button>
+         <button class="big-btn ghost" data-a="exit">Done</button>`,
+      );
+      const exit = () => {
+        window.removeEventListener('keydown', onKey, true);
+        bar.classList.add('leaving');
+        setTimeout(() => bar.remove(), 200);
+        resolve();
+      };
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
+          e.stopImmediatePropagation();
+          exit();
+        } else if (e.code === 'Space') {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          onSnap();
+        }
+      };
+      window.addEventListener('keydown', onKey, true);
+      bar.querySelector('input')!.addEventListener('input', (e) => onFov(Number((e.target as HTMLInputElement).value)));
+      bar.onclick = (e) => {
+        const a = ((e.target as HTMLElement).closest('[data-a]') as HTMLElement | null)?.dataset.a;
+        if (a === 'snap') onSnap();
+        else if (a === 'exit') {
+          this.handlers.click();
+          exit();
+        }
+      };
+      document.body.append(bar);
+    });
+  }
+
   /** Pause menu; resolves with the choice. */
   showPause(title: string, canLevels: boolean): Promise<PauseChoice> {
     return new Promise((resolve) => {
@@ -972,7 +1021,7 @@ export class UI {
       };
       const onKey = (e: KeyboardEvent) => {
         if (e.key !== 'Escape') return;
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         close('resume');
       };
       window.addEventListener('keydown', onKey, true);
@@ -1313,6 +1362,7 @@ export class UI {
       if (e.key === 'Escape') return this.handlers.escape();
       if (e.key.toLowerCase() === 'c') return this.cycleCamera();
       if (e.key.toLowerCase() === 'f') return this.handlers.focusRider();
+      if (e.key.toLowerCase() === 'p') return this.handlers.photo();
       const tool = TOOLS.find((t) => t.key === e.key.toUpperCase());
       if (tool) this.selectTool(tool.id);
     });

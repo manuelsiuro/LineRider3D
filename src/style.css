@@ -2587,3 +2587,133 @@ body.rider-mode .touch-pad:not(.hidden) ~ .hud {
   filter: grayscale(0.7) brightness(0.8);
   cursor: help;
 }
+
+/* ------------------------------------------------------------ replay */
+.letterbox::before,
+.letterbox::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: #05070c;
+  transition: height 0.6s var(--ease);
+}
+
+.letterbox {
+  position: absolute;
+  inset: 0;
+  pointer-events: none !important;
+}
+
+.letterbox::before {
+  top: 0;
+}
+
+.letterbox::after {
+  bottom: 0;
+}
+
+body.replaying .letterbox::before,
+body.replaying .letterbox::after {
+  height: 8vh;
+}
+
+.replay-tag {
+  position: absolute;
+  top: calc(4vh - 14px);
+  left: 50%;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font: 700 13px var(--font-display);
+  letter-spacing: 0.2em;
+  color: white;
+  background: rgba(5, 7, 12, 0.55);
+  transform: translateX(-50%);
+  pointer-events: none !important;
+}
+
+.replay-tag i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: rec-blink 1s steps(2, start) infinite;
+}
+
+@keyframes rec-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+body.replaying .replay-tag {
+  display: flex;
+}
+
+/* Replays are for watching: tools and the touch pad step aside. */
+body.replaying .bottom,
+body.replaying .touch-pad {
+  display: none;
+}
+
+/* ------------------------------------------------------------ photo mode */
+body.photo .ui {
+  opacity: 0;
+}
+
+body.photo .ui * {
+  pointer-events: none !important;
+}
+
+.photo-bar {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 8px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 12px 10px 18px;
+  max-width: calc(100vw - 32px);
+  border-radius: 22px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+  animation: fade-up 0.35s var(--ease);
+}
+
+.photo-bar.leaving {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.photo-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.photo-fov {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+}
+
+.photo-fov input {
+  width: 140px;
+  accent-color: var(--accent);
+}
+
+@media (max-width: 480px) {
+  .photo-hint {
+    display: none;
+  }
+}

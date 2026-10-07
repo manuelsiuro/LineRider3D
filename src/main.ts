@@ -357,8 +357,23 @@ function pause() {
 
 function stop() {
   pause();
-  replaying = false;
+  setReplay(false);
   resetRun();
+}
+
+/** Replays use the TV director camera and a letterboxed look. */
+let modeBeforeReplay: CameraMode | null = null;
+function setReplay(on: boolean) {
+  replaying = on;
+  document.body.classList.toggle('replaying', on);
+  if (on && modeBeforeReplay === null) {
+    modeBeforeReplay = rig.mode;
+    rig.mode = 'director';
+    rig.startDirector();
+  } else if (!on && modeBeforeReplay !== null) {
+    rig.mode = modeBeforeReplay;
+    modeBeforeReplay = null;
+  }
 }
 
 /** Best score per track, keyed by a hash of its content. */
@@ -406,6 +421,7 @@ function recordBest(score: number, stars: number): { best: number; newBest: bool
 }
 
 const cameraModes: CameraMode[] = ['cinematic', 'chase', 'side', 'follow'];
+
 
 const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), { className: 'ui' })), editor, {
   play,
@@ -484,6 +500,7 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
     if (mode === 'game' && playing) openPause();
     else stop();
   },
+  photo: () => openPhoto(),
   async share(score = 0) {
     const url = await shareLink(track.serialize(), score, vehicle.id);
     const text = score > 0 ? `I scored ${score.toLocaleString()} on this Line Rider 3D track. Can you beat it?` : 'Ride my Line Rider 3D track!';
@@ -725,6 +742,47 @@ function attractCamera(time: number, dt: number) {
   camera.lookAt(controls.target);
 }
 
+// ------------------------------------------------------------------ photo mode
+let photoOn = false;
+
+/** Freezes the moment, hides the UI and lets the player frame a shot. */
+async function openPhoto() {
+  if (mode !== 'game' || photoOn || summaryShown) return;
+  photoOn = true;
+  const wasPlaying = playing;
+  pause();
+  const prevMode = rig.mode;
+  rig.mode = 'follow';
+  controls.target.copy(riderCenter);
+  document.body.classList.add('photo');
+  await ui.showPhotoMode(
+    camera.fov,
+    (fov) => {
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    },
+    () => {
+      // Render and grab the frame in the same task (the buffer isn't preserved).
+      postfx.flash = 0;
+      postfx.render(0);
+      renderer.domElement.toBlob((blob) => {
+        if (!blob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `linerider3d-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      }, 'image/png');
+      flash = 0.6;
+      sound.click(true);
+    },
+  );
+  document.body.classList.remove('photo');
+  rig.mode = prevMode;
+  photoOn = false;
+  if (wasPlaying) play();
+}
+
 // ------------------------------------------------------------------ settings, quality, pause
 const settings: Settings = loadSettings();
 /** Quality in use (Auto picks one and steps down when frames are slow). */
@@ -941,7 +999,7 @@ function checkRunEnd(dt: number) {
   pause();
   if (!s.crashed && s.tricks === 0) sound.success();
   const wasReplay = replaying;
-  replaying = false;
+  setReplay(false);
   const rating = rateRun(track, s);
   let levelInfo: { number: number; name: string; nextUnlocked: boolean; hasNext: boolean } | undefined;
   if (currentLevel !== null && !wasReplay) saveLevelResult(LEVELS[currentLevel].id, rating.stars, s.score);
@@ -964,10 +1022,7 @@ function checkRunEnd(dt: number) {
   }
   const best = wasReplay ? { best: recordBest(0, 0).best, newBest: false } : recordBest(s.score, rating.stars);
   if (rating.stars === 3) setTimeout(() => sound.perfect(), 700);
-  if (!wasReplay) {
-    replaying = false;
-    checkAchievements(true, rating.stars);
-  }
+  if (!wasReplay) checkAchievements(true, rating.stars);
   ui.showSummary(
     { ...s },
     {
@@ -988,7 +1043,7 @@ function checkRunEnd(dt: number) {
     () => stop(),
     () => {
       // Watch the run just recorded, with the player's inputs played back.
-      replaying = true;
+      setReplay(true);
       resetRun();
       play();
     },
@@ -1088,7 +1143,7 @@ function loop(time: number) {
     rig.update(dt, riderCenter, riderVel, STEPS_PER_SECOND, !rider.contact.some((c) => c) && !rider.crashed);
     if (rig.mode === 'follow') controls.update();
   } else {
-    rig.settle(dt);
+    if (!photoOn) rig.settle(dt);
     controls.update();
   }
   rig.applyShake(dt);
