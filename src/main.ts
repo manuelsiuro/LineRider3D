@@ -11,7 +11,8 @@ import { VEHICLES, vehicleById, type VehicleDef } from './physics/vehicles';
 import { Environment } from './world/Environment';
 import { terrainHeight } from './world/terrain';
 import { Editor } from './editor/Editor';
-import { UI, overlayOpen } from './ui/UI';
+import { UI, overlayOpen, type SettingsView } from './ui/UI';
+import { loadSettings, resetProgress, saveSettings, type Quality, type Settings } from './game/settings';
 import { Effects } from './render/Effects';
 import { Trail } from './render/Trail';
 import { SnowTracks } from './render/SnowTracks';
@@ -449,6 +450,11 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
     });
   },
   focusRider,
+  settings: () => openSettings(),
+  escape() {
+    if (mode === 'game' && playing) openPause();
+    else stop();
+  },
   async share(score = 0) {
     const url = await shareLink(track.serialize(), score, vehicle.id);
     const text = score > 0 ? `I scored ${score.toLocaleString()} on this Line Rider 3D track. Can you beat it?` : 'Ride my Line Rider 3D track!';
@@ -541,6 +547,10 @@ async function titleFlow() {
       );
       closeUp = false;
       playing = true;
+      continue;
+    }
+    if (choice === 'settings') {
+      await openSettings();
       continue;
     }
     if (choice === 'garage') {
@@ -666,6 +676,106 @@ function attractCamera(time: number, dt: number) {
   camera.position.lerp(desired, k);
   camera.lookAt(controls.target);
 }
+
+// ------------------------------------------------------------------ settings, quality, pause
+const settings: Settings = loadSettings();
+/** Quality in use (Auto picks one and steps down when frames are slow). */
+let activeQuality: Exclude<Quality, 'auto'> = lowPower ? 'medium' : 'high';
+
+function applyQuality(q: Exclude<Quality, 'auto'>) {
+  activeQuality = q;
+  const ratio = { low: 1, medium: 1.5, high: 2 }[q];
+  renderer.setPixelRatio(Math.min(devicePixelRatio, ratio));
+  postfx.setSize(innerWidth, innerHeight);
+  postfx.bloomEnabled = q !== 'low';
+  env.setShadows({ low: 0, medium: 1024, high: 2048 }[q]);
+  effects.setViewportHeight(innerHeight * renderer.getPixelRatio());
+  ui.setQualityNote(settings.quality === 'auto' ? `Auto: ${q[0].toUpperCase()}${q.slice(1)}` : '');
+}
+
+function applySettings(first = false) {
+  sound.setVolumes(settings.sfxVolume, settings.musicVolume);
+  rig.distanceScale = settings.cameraDistance;
+  rig.reducedMotion = settings.reducedMotion;
+  if (first || rig.mode !== settings.camera) {
+    rig.mode = settings.camera;
+    ui.setCameraLabel(CAMERA_LABELS[rig.mode]);
+  }
+  const wanted = settings.quality === 'auto' ? activeQuality : settings.quality;
+  if (first || wanted !== activeQuality) applyQuality(wanted);
+}
+
+/** Auto quality: watches real frame times and steps down when they're slow. */
+const fpsWindow = { time: 0, frames: 0, cooldown: 3 };
+function governQuality(rawDt: number) {
+  if (settings.quality !== 'auto' || document.hidden || rawDt <= 0 || rawDt > 0.5) return;
+  fpsWindow.cooldown -= rawDt;
+  fpsWindow.time += rawDt;
+  fpsWindow.frames++;
+  if (fpsWindow.time < 2.5) return;
+  const fps = fpsWindow.frames / fpsWindow.time;
+  fpsWindow.time = 0;
+  fpsWindow.frames = 0;
+  if (fpsWindow.cooldown > 0 || fps >= 42) return;
+  const next = activeQuality === 'high' ? 'medium' : activeQuality === 'medium' ? 'low' : null;
+  if (!next) return;
+  applyQuality(next);
+  fpsWindow.cooldown = 4;
+}
+
+async function openSettings() {
+  const view: SettingsView = {
+    ...settings,
+    qualityNote: settings.quality === 'auto' ? `Auto: ${activeQuality[0].toUpperCase()}${activeQuality.slice(1)}` : '',
+  };
+  await ui.showSettings(
+    view,
+    (v) => {
+      const qualityChanged = v.quality !== settings.quality;
+      Object.assign(settings, {
+        quality: v.quality as Quality,
+        sfxVolume: v.sfxVolume,
+        musicVolume: v.musicVolume,
+        camera: v.camera as CameraMode,
+        cameraDistance: v.cameraDistance,
+        reducedMotion: v.reducedMotion,
+      });
+      saveSettings(settings);
+      if (qualityChanged && settings.quality === 'auto') {
+        // Auto starts again from the device default.
+        fpsWindow.cooldown = 3;
+        applyQuality(lowPower ? 'medium' : 'high');
+      }
+      applySettings();
+    },
+    () => resetProgress(),
+  );
+}
+
+/** Esc while riding: a pause menu instead of throwing the run away. */
+async function openPause() {
+  pause();
+  const title = currentLevel !== null ? LEVELS[currentLevel].name : challengeScore > 0 ? 'Challenge' : 'Your track';
+  for (;;) {
+    const choice = await ui.showPause(title, true);
+    if (choice === 'settings') {
+      await openSettings();
+      continue;
+    }
+    if (choice === 'resume') play();
+    else if (choice === 'restart') {
+      stop();
+      play();
+    } else if (choice === 'levels') backToLevels();
+    else {
+      stop();
+      enterTitle();
+    }
+    return;
+  }
+}
+
+applySettings(true);
 
 // ------------------------------------------------------------------ loop
 addEventListener('resize', () => {
@@ -813,7 +923,8 @@ function checkRunEnd(dt: number) {
 
 function loop(time: number) {
   timer.update(time);
-  const dt = THREE.MathUtils.clamp(timer.getDelta(), 0, 0.1);
+  const rawDt = timer.getDelta();
+  const dt = THREE.MathUtils.clamp(rawDt, 0, 0.1);
   const t = timer.getElapsed();
 
   // Ease the time scale toward the current slow-motion target.
@@ -822,7 +933,7 @@ function loop(time: number) {
   timeScale += (scaleTarget - timeScale) * (1 - Math.exp(-dt * (scaleTarget < timeScale ? 18 : 5)));
   sound.slowmo(timeScale);
   impact = Math.max(0, impact - dt * 0.8);
-  postfx.impact = impact;
+  postfx.impact = settings.reducedMotion ? 0 : impact;
 
   const startFrame = frame;
   if (playing) {
@@ -906,7 +1017,8 @@ function loop(time: number) {
 
   if (mode === 'game') checkRunEnd(dt);
   flash = Math.max(0, flash - dt * 1.5);
-  postfx.flash = flash;
+  postfx.flash = settings.reducedMotion ? 0 : flash;
+  governQuality(rawDt);
 
   editor.update(!playing && mode === 'game' && currentLevel === null);
   trackView.update(t, riderCenter, sim.rider.stars);

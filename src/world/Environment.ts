@@ -116,6 +116,16 @@ export class Environment {
     scene.add(this.snow);
   }
 
+  /** Shadow quality: 0 = off, otherwise the shadow map size. */
+  setShadows(size: number) {
+    this.sun.castShadow = size > 0;
+    if (size > 0 && this.sun.shadow.mapSize.x !== size) {
+      this.sun.shadow.mapSize.set(size, size);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+    }
+  }
+
   /** Bakes the sky into an environment map for soft reflections. */
   bakeEnvironment(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
     const envScene = new THREE.Scene();

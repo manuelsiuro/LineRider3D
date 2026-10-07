@@ -21,6 +21,8 @@ export class CameraRig {
   private airPull = 0;
   /** Player preference: multiplies the chase distances. */
   distanceScale = 1;
+  /** Accessibility: no shake or zoom punches. */
+  reducedMotion = false;
   private smoothed = new THREE.Vector3();
   private heading = new THREE.Vector3(1, 0, 0);
   private shakeAmount = 0;
@@ -35,10 +37,12 @@ export class CameraRig {
 
   /** Quick zoom-in that eases back (big landings, wipeouts). */
   punch(degrees: number) {
+    if (this.reducedMotion) return;
     this.punchAmount = Math.max(this.punchAmount, degrees);
   }
 
   shake(amount: number) {
+    if (this.reducedMotion) return;
     this.shakeAmount = Math.max(this.shakeAmount, amount);
   }
 

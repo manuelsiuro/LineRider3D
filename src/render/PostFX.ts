@@ -52,10 +52,9 @@ export class PostFX {
     });
     this.composer = new EffectComposer(renderer, target);
     this.composer.addPass(new RenderPass(scene, camera));
-    if (!lowPower) {
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.28, 0.5, 1.15);
-      this.composer.addPass(this.bloom);
-    }
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.28, 0.5, 1.15);
+    this.bloom.enabled = !lowPower;
+    this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.grade = new ShaderPass(GradeShader);
     this.composer.addPass(this.grade);
@@ -64,6 +63,11 @@ export class PostFX {
   setSize(w: number, h: number) {
     this.composer.setPixelRatio(this.renderer.getPixelRatio());
     this.composer.setSize(w, h);
+  }
+
+  /** Bloom is the most expensive pass: off on low quality. */
+  set bloomEnabled(on: boolean) {
+    if (this.bloom) this.bloom.enabled = on;
   }
 
   /** White flash (0..1), e.g. when passing through a ring. */

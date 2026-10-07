@@ -16,7 +16,8 @@ export function overlayOpen() {
   return document.querySelector('.modal, .screen, .summary, .title-screen') !== null;
 }
 
-export type TitleChoice = 'levels' | 'create' | 'new' | 'wardrobe' | 'garage';
+export type TitleChoice = 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings';
+export type PauseChoice = 'resume' | 'restart' | 'settings' | 'levels' | 'menu';
 
 export interface UIHandlers {
   play(): void;
@@ -36,6 +37,10 @@ export interface UIHandlers {
   toggleSfx(): boolean;
   toggleMusic(): boolean;
   toggleRiderMode(): boolean;
+  /** Opens the settings screen. */
+  settings(): void;
+  /** Esc: pause menu while riding, otherwise stop. */
+  escape(): void;
   /** Next ride (editor quick switch). */
   cycleVehicle(): void;
   /** Touch pad input: bit mask from the on-screen buttons. */
@@ -57,6 +62,18 @@ export interface SummaryInfo {
   challenge?: number;
   /** Name of the ride used. */
   vehicle?: string;
+}
+
+/** What the settings screen edits (mirrors game/settings Settings). */
+export interface SettingsView {
+  quality: string;
+  /** Shown under Quality, e.g. "Auto: High". */
+  qualityNote: string;
+  sfxVolume: number;
+  musicVolume: number;
+  camera: string;
+  cameraDistance: number;
+  reducedMotion: boolean;
 }
 
 export interface VehicleCard {
@@ -189,6 +206,7 @@ export class UI {
     item('share', 'Share link', () => handlers.share());
     item('download', 'Export track', handlers.exportTrack);
     item('upload', 'Import track', () => fileInput.click());
+    item('gear', 'Settings', handlers.settings);
     item('help', 'How to play', () => this.showHelp());
     menuBtn.onclick = () => {
       handlers.click();
@@ -626,6 +644,7 @@ export class UI {
             <div class="title-row">
               <button class="big-btn ghost" data-c="garage">${icon('garage', 18)} Garage</button>
               <button class="big-btn ghost" data-c="wardrobe">${icon('sled', 18)} Wardrobe</button>
+              <button class="big-btn ghost icon-only" data-c="settings" title="Settings" aria-label="Settings">${icon('gear', 18)}</button>
               ${hasSave ? `<button class="big-btn ghost" data-c="new">${icon('plus', 18)} New track</button>` : ''}
             </div>
           </div>
@@ -637,7 +656,7 @@ export class UI {
         if (!c) return;
         this.handlers.click();
         overlay.classList.add('leaving');
-        if (c !== 'levels' && c !== 'wardrobe' && c !== 'garage') document.body.classList.remove('on-title');
+        if (c !== 'levels' && c !== 'wardrobe' && c !== 'garage' && c !== 'settings') document.body.classList.remove('on-title');
         setTimeout(() => overlay.remove(), 450);
         resolve(c);
       };
@@ -809,6 +828,132 @@ export class UI {
       if (keysEl) keysEl.innerHTML = `${icon('gamepad', 14)} ${keys}`;
       render(b.dataset.ride!);
     });
+  }
+
+  /** Pause menu; resolves with the choice. */
+  showPause(title: string, canLevels: boolean): Promise<PauseChoice> {
+    return new Promise((resolve) => {
+      const overlay = h(
+        'div',
+        'modal pause',
+        `<div class="card small" role="dialog" aria-label="Paused">
+          <span class="badge dark">Paused</span>
+          <h2>${title}</h2>
+          <div class="pause-actions">
+            <button class="big-btn primary" data-p="resume">${icon('play', 18)} Resume</button>
+            <button class="big-btn secondary" data-p="restart">${icon('replay', 18)} Restart</button>
+            <button class="big-btn ghost" data-p="settings">${icon('gear', 18)} Settings</button>
+            ${canLevels ? `<button class="big-btn ghost" data-p="levels">${icon('star', 18)} Levels</button>` : ''}
+            <button class="big-btn ghost" data-p="menu">${icon('home', 18)} Main menu</button>
+          </div>
+        </div>`,
+      );
+      const close = (c: PauseChoice) => {
+        this.handlers.click();
+        window.removeEventListener('keydown', onKey, true);
+        overlay.classList.add('leaving');
+        setTimeout(() => overlay.remove(), 200);
+        resolve(c);
+      };
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        close('resume');
+      };
+      window.addEventListener('keydown', onKey, true);
+      overlay.onclick = (e) => {
+        const b = (e.target as HTMLElement).closest('[data-p]') as HTMLElement | null;
+        if (b) close(b.dataset.p as PauseChoice);
+        else if (e.target === overlay) close('resume');
+      };
+      document.body.append(overlay);
+      (overlay.querySelector('[data-p="resume"]') as HTMLElement).focus();
+    });
+  }
+
+  /** Settings screen; every change is applied live through `onChange`. */
+  showSettings(s: SettingsView, onChange: (s: SettingsView) => void, onReset: () => void): Promise<void> {
+    return new Promise((resolve) => {
+      const seg = (name: string, options: [string, string][], value: string) =>
+        `<div class="seg" data-name="${name}">${options.map(([v, l]) => `<button class="${v === value ? 'on' : ''}" data-v="${v}">${l}</button>`).join('')}</div>`;
+      const overlay = h(
+        'div',
+        'screen settings',
+        `<div class="screen-inner">
+          <div class="screen-head">
+            <button class="btn icon-btn" data-back>${icon('chevronLeft')}</button>
+            <h2>Settings</h2>
+          </div>
+          <div class="settings-list">
+            <section>
+              <h3>Graphics</h3>
+              <div class="row"><span>Quality<small class="q-note">${s.qualityNote}</small></span>${seg('quality', [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], s.quality)}</div>
+            </section>
+            <section>
+              <h3>Sound</h3>
+              <label class="row"><span>Effects</span><input type="range" min="0" max="100" data-name="sfxVolume" value="${Math.round(s.sfxVolume * 100)}"></label>
+              <label class="row"><span>Music</span><input type="range" min="0" max="100" data-name="musicVolume" value="${Math.round(s.musicVolume * 100)}"></label>
+            </section>
+            <section>
+              <h3>Camera</h3>
+              <div class="row"><span>Default view</span>${seg('camera', [['cinematic', 'Cinema'], ['chase', 'Chase'], ['side', 'Side'], ['follow', 'Free']], s.camera)}</div>
+              <label class="row"><span>Distance</span><input type="range" min="70" max="140" data-name="cameraDistance" value="${Math.round(s.cameraDistance * 100)}"></label>
+              <label class="row toggle"><span>Reduced motion<small>No shake, zoom punches or flashes</small></span><input type="checkbox" data-name="reducedMotion" ${s.reducedMotion ? 'checked' : ''}><i></i></label>
+            </section>
+            <section>
+              <h3>Progress</h3>
+              <div class="row"><span>Reset stars, bests and ghosts</span><button class="big-btn danger small-btn" data-reset>Reset</button></div>
+            </section>
+          </div>
+        </div>`,
+      );
+      const emit = () => onChange({ ...s });
+      overlay.addEventListener('input', (e) => {
+        const el = e.target as HTMLInputElement;
+        const name = el.dataset.name as keyof SettingsView | undefined;
+        if (!name) return;
+        if (el.type === 'checkbox') (s as unknown as Record<string, unknown>)[name] = el.checked;
+        else (s as unknown as Record<string, unknown>)[name] = Number(el.value) / 100;
+        emit();
+      });
+      overlay.onclick = async (e) => {
+        const btn = (e.target as HTMLElement).closest('button');
+        if (!btn) return;
+        if (btn.dataset.back !== undefined) {
+          this.handlers.click();
+          overlay.classList.add('leaving');
+          setTimeout(() => overlay.remove(), 250);
+          resolve();
+          return;
+        }
+        if (btn.dataset.reset !== undefined) {
+          this.handlers.click();
+          if (await this.confirm('Reset all progress?', 'Stars, best scores and ghosts on this device will be erased. This cannot be undone.', 'Reset')) {
+            onReset();
+            this.flash('Progress reset');
+          }
+          return;
+        }
+        const segEl = btn.closest('.seg') as HTMLElement | null;
+        if (segEl) {
+          this.handlers.click();
+          segEl.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === btn));
+          (s as unknown as Record<string, unknown>)[segEl.dataset.name!] = btn.dataset.v;
+          emit();
+        }
+      };
+      document.body.append(overlay);
+    });
+  }
+
+  setCameraLabel(label: string) {
+    this.camBtn.innerHTML = `${icon('camera', 18)}<span>${label}</span>`;
+  }
+
+  /** Updates the "currently: Medium" note next to Auto quality. */
+  setQualityNote(text: string) {
+    const el = document.querySelector('.settings .q-note');
+    if (el) el.textContent = text;
   }
 
   /** Shows a link to copy by hand (when the clipboard isn't available). */
@@ -1050,7 +1195,7 @@ export class UI {
         else this.handlers.play();
         return;
       }
-      if (e.key === 'Escape') return this.handlers.stop();
+      if (e.key === 'Escape') return this.handlers.escape();
       if (e.key.toLowerCase() === 'c') return this.cycleCamera();
       if (e.key.toLowerCase() === 'f') return this.handlers.focusRider();
       const tool = TOOLS.find((t) => t.key === e.key.toUpperCase());

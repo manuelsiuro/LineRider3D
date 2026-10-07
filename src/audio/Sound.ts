@@ -51,6 +51,9 @@ export class Sound {
 
   sfxOn = true;
   musicOn = true;
+  /** Volumes (0..1) from the settings; the on/off buttons mute on top. */
+  sfxVolume = 0.9;
+  musicVolume = 0.6;
 
   constructor() {
     try {
@@ -90,10 +93,10 @@ export class Sound {
     this.master.connect(this.muffle).connect(comp).connect(ctx.destination);
 
     this.sfx = ctx.createGain();
-    this.sfx.gain.value = this.sfxOn ? 1 : 0;
+    this.sfx.gain.value = this.sfxGain();
     this.sfx.connect(this.master);
     this.music = ctx.createGain();
-    this.music.gain.value = this.musicOn ? 0.5 : 0;
+    this.music.gain.value = this.musicGain();
     this.music.connect(this.master);
 
     this.reverb = ctx.createConvolver();
@@ -152,13 +155,30 @@ export class Sound {
   setSfx(on: boolean) {
     this.sfxOn = on;
     this.persist();
-    if (this.ctx) this.sfx.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.1);
+    if (this.ctx) this.sfx.gain.setTargetAtTime(this.sfxGain(), this.ctx.currentTime, 0.1);
   }
 
   setMusic(on: boolean) {
     this.musicOn = on;
     this.persist();
-    if (this.ctx) this.music.gain.setTargetAtTime(on ? 0.5 : 0, this.ctx.currentTime, 0.3);
+    if (this.ctx) this.music.gain.setTargetAtTime(this.musicGain(), this.ctx.currentTime, 0.3);
+  }
+
+  private sfxGain() {
+    return this.sfxOn ? this.sfxVolume * 1.1 : 0;
+  }
+
+  private musicGain() {
+    return this.musicOn ? this.musicVolume * 0.8 : 0;
+  }
+
+  /** Volume sliders (0..1). */
+  setVolumes(sfx: number, music: number) {
+    this.sfxVolume = sfx;
+    this.musicVolume = music;
+    if (!this.ctx) return;
+    this.sfx.gain.setTargetAtTime(this.sfxGain(), this.ctx.currentTime, 0.05);
+    this.music.gain.setTargetAtTime(this.musicGain(), this.ctx.currentTime, 0.1);
   }
 
   private persist() {

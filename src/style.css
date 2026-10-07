@@ -2229,3 +2229,163 @@ body.rider-mode .touch-pad:not(.hidden) ~ .hud {
   transform-origin: top center;
   opacity: 0.92;
 }
+
+/* ------------------------------------------------------------ pause & settings */
+.pause .card {
+  width: min(360px, 100%);
+  text-align: center;
+}
+
+.pause-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pause-actions .big-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.screen.settings .screen-inner {
+  width: min(620px, 100%);
+}
+
+.settings-list {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-list section {
+  padding: 14px 18px;
+  border-radius: 20px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.settings-list h3 {
+  margin: 0 0 6px;
+  font: 600 12px var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.settings-list .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 48px;
+  font-weight: 600;
+}
+
+.settings-list .row + .row {
+  border-top: 1px solid var(--line);
+}
+
+.settings-list .row > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-list small {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.settings-list input[type='range'] {
+  width: min(240px, 50%);
+  accent-color: var(--accent);
+}
+
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  padding: 3px;
+  border-radius: 12px;
+  background: #eef3f8;
+}
+
+.seg button {
+  padding: 7px 12px;
+  border-radius: 9px;
+  font: 600 13px var(--font-ui);
+  color: var(--ink-soft);
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.seg button.on {
+  color: var(--accent);
+  background: white;
+  box-shadow: 0 1px 4px rgba(20, 50, 90, 0.15);
+}
+
+/* iOS-style switch */
+.row.toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.row.toggle i {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 28px;
+  border-radius: 14px;
+  background: #d5dde7;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.row.toggle i::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.25s var(--spring);
+}
+
+.row.toggle input:checked + i {
+  background: var(--accent);
+}
+
+.row.toggle input:checked + i::after {
+  transform: translateX(20px);
+}
+
+.row.toggle input:focus-visible + i {
+  outline: 3px solid var(--accent-2);
+}
+
+.big-btn.danger {
+  color: white;
+  background: var(--danger);
+}
+
+.big-btn.small-btn {
+  min-height: 0;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+@media (max-width: 480px) {
+  .settings-list .row {
+    flex-wrap: wrap;
+    padding: 6px 0;
+  }
+}
+
+.title-row .big-btn.icon-only {
+  flex: none;
+  width: 48px;
+  padding: 0;
+  justify-content: center;
+}
