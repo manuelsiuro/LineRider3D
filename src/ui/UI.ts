@@ -973,11 +973,12 @@ export class UI {
           <div>${icon('line')}<p>Start a stroke on the <b>end of another track</b> (orange ring) to connect them. The <b>colored side</b> is solid: draw left → right for a floor.</p></div>
           <div>${icon('ring')}<p><b>Boost</b> speeds up, <b>Ice</b> has no grip, <b>Bouncy</b> is a trampoline. With <b>Items</b>, add <b>stars</b> to collect, <b>rings</b> that launch Bosh and a <b>finish gate</b>.</p></div>
           <div>${icon('play')}<p>Press <b>Play</b> and watch Bosh ride. Scrub the timeline, try slow-mo and switch cameras.</p></div>
-          <div>${icon('gamepad')}<p><b>Rider mode</b>: <b>→</b> pushes and <b>←</b> brakes on the track. In the air they <b>flip</b> Bosh forward or backward. Land clean to score!</p></div>
+          <div>${icon('gamepad')}<p><b>Rider mode</b>: <b>→</b> pushes and <b>←</b> brakes on the track. In the air they <b>flip</b> Bosh forward or backward (on bikes and the buggy, → lifts the nose). On skis and the snowboard, <b>↑</b> spins 360s. Land clean to score!</p></div>
+          <div>${icon('garage')}<p><b>Garage</b>: ride a sled, skis, a snowboard, a BMX, a motorbike or a buggy. Press <b>V</b> to switch while editing.</p></div>
         </div>
         <p class="keys"><b>Desktop</b> left-drag draw · right-drag orbit · middle-drag pan · wheel zoom<br/>
         <b>Touch</b> one finger draw · two fingers orbit &amp; zoom · Camera tool to pan<br/>
-        <b>Keys</b> ← → ride · Space play · Esc stop · Q W E B R D S H tools · C camera · F focus · Ctrl+Z undo</p>
+        <b>Keys</b> ← → ride · ↑ spin · V ride · Space play · Esc stop · Q W E B R D S H tools · C camera · F focus · Ctrl+Z undo</p>
         <div class="actions"><button class="big-btn primary">Let's ride!</button></div>
       </div>`,
     );
