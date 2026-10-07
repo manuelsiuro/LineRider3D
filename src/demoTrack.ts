@@ -47,7 +47,7 @@ export function buildDemoTrack(track: Track) {
   const landY = (x: number) => arc(x) - 0.9;
   const LAND_END = 76;
   const OUT = 34;
-  profile(track, landY, 62, LAND_END);
+  profile(track, landY, 66, LAND_END);
   const y0 = landY(LAND_END);
   const slope = (landY(LAND_END) - landY(LAND_END - 0.5)) / 0.5;
   const runout = (x: number) => y0 + slope * (x - LAND_END) - (slope * (x - LAND_END) ** 2) / (2 * OUT);

@@ -2,10 +2,12 @@ import * as THREE from 'three';
 import type { Segment } from '../track/types';
 import type { Track } from '../track/Track';
 import { terrainHeight } from '../world/terrain';
+import { P, SLED, type Bone, type VehicleDef } from './vehicles';
 
 /**
- * Bosh, the rider: a Verlet ragdoll on a sled, adapted from classic Line Rider
- * to 3D. Units follow the original scaled by 0.1 (sled ≈ 1.75 long).
+ * Bosh, the rider: a Verlet ragdoll on his ride (sled, skis, bike...), adapted
+ * from classic Line Rider to 3D. Units follow the original scaled by 0.1
+ * (sled ≈ 1.75 long). The vehicle shapes live in vehicles.ts.
  */
 
 export const GRAVITY = new THREE.Vector3(0, -0.0175, 0);
@@ -13,8 +15,6 @@ const ITERATIONS = 6;
 const HIT_DEPTH = 1.0;
 const SEG_EXT = 0.05;
 const ACCEL = 0.012;
-const BREAK_STRAIN = 0.3;
-const RUNNER_GRIP = 0.25;
 const GROUND_FRICTION = 0.04;
 /** Most speed the snow can take away in one step (units/step). */
 const SNOW_MAX_DRAG = 0.006;
@@ -26,151 +26,87 @@ const MIN_BOUNCE = 0.06;
 const RING_BOOST = 0.22;
 
 /** Player input bits for one step (rider mode). */
-export const INPUT = { push: 1, brake: 2 } as const;
-
-/** Push acceleration along the sled while on a track (units/step²). */
-const PUSH_ACCEL = 0.0045;
-/** Pushing stops helping above this speed (units/step, ≈ 50 km/h). */
-const PUSH_MAX_SPEED = 0.58;
-/** Fraction of speed removed per step while braking on a track. */
-const BRAKE = 0.035;
-/** Flip control in the air: angular acceleration and cap (rad/step). */
-const FLIP_ACCEL = 0.03;
-const FLIP_MAX = 0.3;
-/** Spin kept per step after releasing the flip key. */
-const FLIP_SETTLE = 0.72;
-/** Landing while spinning faster than this (rad/step) is a crash. */
-const SPIN_CRASH = 0.14;
+export const INPUT = { push: 1, brake: 2, spin: 4 } as const;
 
 /** One-off events of a step, for sound and effects. */
 export const EVENT = { ring: 1, bounce: 2, star: 4, finish: 8 } as const;
 
 /** Max number of stars per track (one bit each in the recorded state). */
 export const MAX_STARS = 48;
-const STAR_RADIUS = 1.8;
+const STAR_RADIUS = 2.5;
 
-export const P = {
-  tailL: 0,
-  tailR: 1,
-  noseL: 2,
-  noseR: 3,
-  peg: 4,
-  string: 5,
-  butt: 6,
-  shoulder: 7,
-  lHand: 8,
-  rHand: 9,
-  lFoot: 10,
-  rFoot: 11,
-} as const;
-
-interface PointDef {
-  pos: [number, number, number];
-  friction: number;
-  runner?: boolean;
-}
-
-const POINTS: PointDef[] = [
-  { pos: [0, -0.5, -0.25], friction: 0, runner: true },
-  { pos: [0, -0.5, 0.25], friction: 0, runner: true },
-  { pos: [1.5, -0.5, -0.25], friction: 0 },
-  { pos: [1.5, -0.5, 0.25], friction: 0 },
-  { pos: [0, 0, 0], friction: 0.8 },
-  { pos: [1.75, 0, 0], friction: 0 },
-  { pos: [0.5, 0, 0], friction: 0.8 },
-  { pos: [0.5, 0.55, 0], friction: 0.8 },
-  { pos: [1.15, 0.5, -0.15], friction: 0.1 },
-  { pos: [1.15, 0.5, 0.15], friction: 0.1 },
-  { pos: [1.0, -0.35, -0.15], friction: 0 },
-  { pos: [1.0, -0.35, 0.15], friction: 0 },
-];
-
-type BoneKind = 'rigid' | 'mount' | 'repel';
-
-interface Bone {
-  a: number;
-  b: number;
-  rest: number;
-  kind: BoneKind;
-}
-
-function defineBones(): Bone[] {
-  const bones: Bone[] = [];
-  const add = (a: number, b: number, kind: BoneKind, restScale = 1) => {
-    const pa = new THREE.Vector3(...POINTS[a].pos);
-    const pb = new THREE.Vector3(...POINTS[b].pos);
-    bones.push({ a, b, kind, rest: pa.distanceTo(pb) * restScale });
-  };
-  // Sled: fully braced rigid body.
-  const sled = [P.tailL, P.tailR, P.noseL, P.noseR, P.peg, P.string];
-  for (let i = 0; i < sled.length; i++)
-    for (let j = i + 1; j < sled.length; j++) add(sled[i], sled[j], 'rigid');
-  // Body.
-  add(P.butt, P.shoulder, 'rigid');
-  add(P.shoulder, P.lHand, 'rigid');
-  add(P.shoulder, P.rHand, 'rigid');
-  add(P.butt, P.lFoot, 'rigid');
-  add(P.butt, P.rFoot, 'rigid');
-  // Attachments to the sled: these break on hard impacts.
-  for (const s of [P.peg, P.tailL, P.tailR, P.noseL, P.noseR]) add(P.butt, s, 'mount');
-  add(P.shoulder, P.peg, 'mount');
-  add(P.shoulder, P.noseL, 'mount');
-  add(P.shoulder, P.noseR, 'mount');
-  add(P.lHand, P.string, 'mount');
-  add(P.rHand, P.string, 'mount');
-  add(P.lFoot, P.noseL, 'mount');
-  add(P.rFoot, P.noseR, 'mount');
-  // Keep feet from folding into the chest.
-  add(P.shoulder, P.lFoot, 'repel', 0.5);
-  add(P.shoulder, P.rFoot, 'repel', 0.5);
-  return bones;
-}
-
-const BONES = defineBones();
+export { P };
 
 /**
- * Same bones with left/right swapped. Gauss-Seidel relaxation is order
+ * Recorded state layout: 6 numbers per point (position, previous position),
+ * then these fields at `points * 6 + offset`.
+ */
+export const META = { crashed: 0, contact: 1, events: 2, spin: 3, stars: 4, finished: 5, yaw: 6 } as const;
+export const META_SIZE = 7;
+export const stateSize = (def: VehicleDef) => def.points.length * 6 + META_SIZE;
+
+/**
+ * The same bones with left/right swapped. Gauss-Seidel relaxation is order
  * dependent, so alternating both orders keeps the ragdoll symmetric and stops
  * it from drifting sideways.
  */
-const MIRROR: Record<number, number> = {
-  [P.tailL]: P.tailR,
-  [P.tailR]: P.tailL,
-  [P.noseL]: P.noseR,
-  [P.noseR]: P.noseL,
-  [P.lHand]: P.rHand,
-  [P.rHand]: P.lHand,
-  [P.lFoot]: P.rFoot,
-  [P.rFoot]: P.lFoot,
-};
-const mirror = (i: number) => MIRROR[i] ?? i;
-const BONES_MIRRORED = BONES.map((b) => ({ ...b, a: mirror(b.a), b: mirror(b.b) }));
-export const POINT_COUNT = POINTS.length;
+const mirroredBones = new WeakMap<VehicleDef, Bone[]>();
+function bonesMirrored(def: VehicleDef): Bone[] {
+  let out = mirroredBones.get(def);
+  if (!out) {
+    const m = (i: number) => def.mirror[i] ?? i;
+    out = def.bones.map((b) => ({ ...b, a: m(b.a), b: m(b.b) }));
+    mirroredBones.set(def, out);
+  }
+  return out;
+}
 
 const tmp = new THREE.Vector3();
 const tmp2 = new THREE.Vector3();
 const vel = new THREE.Vector3();
 
 export class Rider {
-  pos: THREE.Vector3[] = POINTS.map(() => new THREE.Vector3());
-  prev: THREE.Vector3[] = POINTS.map(() => new THREE.Vector3());
+  readonly pos: THREE.Vector3[];
+  readonly prev: THREE.Vector3[];
   crashed = false;
+  /** Why the last crash happened (debugging aid, not part of the state). */
+  crashReason = '';
   /** EVENT bitmask of the last step. */
   events = 0;
   /** Contact flags of the last step (for effects). */
-  contact: boolean[] = POINTS.map(() => false);
+  readonly contact: boolean[];
+  readonly count: number;
 
   private nearby = new Set<Segment>();
+  private bonesMirrored: Bone[];
+  private scratch: THREE.Vector3[];
+  private original: THREE.Vector3[];
+
+  constructor(readonly def: VehicleDef = SLED) {
+    this.count = def.points.length;
+    const vecs = () => def.points.map(() => new THREE.Vector3());
+    this.pos = vecs();
+    this.prev = vecs();
+    this.scratch = vecs();
+    this.original = vecs();
+    this.contact = def.points.map(() => false);
+    this.bonesMirrored = bonesMirrored(def);
+  }
+
+  get stateSize() {
+    return this.count * 6 + META_SIZE;
+  }
 
   reset(start: THREE.Vector3, yaw: number, speed = 0.04) {
     const rot = new THREE.Matrix4().makeRotationY(yaw);
     const forward = new THREE.Vector3(1, 0, 0).applyMatrix4(rot);
-    POINTS.forEach((def, i) => {
+    this.def.points.forEach((def, i) => {
       this.pos[i].set(...def.pos).applyMatrix4(rot).add(start);
       this.prev[i].copy(this.pos[i]).addScaledVector(forward, -speed);
     });
     this.crashed = false;
     this.spin = 0;
+    this.yawSpin = 0;
     this.stars = 0;
     this.finished = false;
   }
@@ -179,20 +115,24 @@ export class Rider {
   /** Strongest bouncy-line hit of this step, applied to the whole rider. */
   private bounce: { up: THREE.Vector3; speed: number } | null = null;
 
-  /** Player-driven spin (rad/step) while airborne. */
+  /** Player-driven flip spin (rad/step) while airborne. */
   spin = 0;
+  /** Player-driven flat spin (rad/step) while airborne. */
+  yawSpin = 0;
   /** Bit mask of collected stars (by Track.starList order). */
   stars = 0;
   finished = false;
 
   step(track: Track, input = 0) {
+    // Without flat spins, the spin key simply pushes.
+    if (input & INPUT.spin && !this.def.handling.yaw) input |= INPUT.push;
     if (input && !this.crashed) this.control(input);
     this.applySpin(input);
     this.ringRef.copy(this.pos[P.butt]);
     this.bounce = null;
     this.events = 0;
     // Integrate.
-    for (let i = 0; i < POINT_COUNT; i++) {
+    for (let i = 0; i < this.count; i++) {
       const p = this.pos[i];
       vel.subVectors(p, this.prev[i]);
       this.prev[i].copy(p);
@@ -200,17 +140,24 @@ export class Rider {
       this.contact[i] = false;
     }
 
+    this.normalSum.set(0, 0, 0);
+    this.dirSum.set(0, 0, 0);
+    this.offSum.set(0, 0, 0);
+    this.offCount = 0;
+    this.gripContacts = 0;
+    this.forward(this.heading);
     for (let it = 0; it < ITERATIONS; it++) {
       this.satisfyBonesSymmetric(it === 0);
       this.collide(track);
     }
+    this.assist(input);
     this.applyBounce();
     this.passRings(track, this.ringRef, this.pos[P.butt]);
     this.collectStars(track);
     this.checkFinish(track, this.ringRef, this.pos[P.butt]);
   }
 
-  /** Picks up stars near the body or sled. */
+  /** Picks up stars near the body or the vehicle. */
   private collectStars(track: Track) {
     if (track.stars.size === 0 || this.crashed) return;
     const list = track.starList();
@@ -242,73 +189,200 @@ export class Rider {
 
   /**
    * Bouncy lines launch the whole rider at once (like a trampoline); bouncing
-   * only the contact points would rip Bosh off his sled.
+   * only the contact points would rip Bosh off his ride.
    */
   private applyBounce() {
     if (!this.bounce) return;
     const { up, speed } = this.bounce;
     // Average velocity of the whole rider.
     const avg = new THREE.Vector3();
-    for (let i = 0; i < POINT_COUNT; i++) avg.add(tmp.subVectors(this.pos[i], this.prev[i]));
-    avg.divideScalar(POINT_COUNT);
+    for (let i = 0; i < this.count; i++) avg.add(tmp.subVectors(this.pos[i], this.prev[i]));
+    avg.divideScalar(this.count);
     const vn = avg.dot(up);
     if (speed - vn <= 0) return;
     if (speed - vn > 0.08) this.events |= EVENT.bounce;
     // Launch as one rigid body: same velocity for every point, so a bounce
     // never adds spin (which would pile up over several pads).
     avg.addScaledVector(up, speed - vn);
-    for (let i = 0; i < POINT_COUNT; i++) this.prev[i].copy(this.pos[i]).sub(avg);
+    for (let i = 0; i < this.count; i++) this.prev[i].copy(this.pos[i]).sub(avg);
+  }
+
+  /** Surface normal summed over the contacts of this step (for balance). */
+  private normalSum = new THREE.Vector3();
+  /** Track direction summed over the contacts of this step (for steering). */
+  private dirSum = new THREE.Vector3();
+  private heading = new THREE.Vector3();
+  private offSum = new THREE.Vector3();
+  private offCount = 0;
+  /** Runner contacts with grip this step (not on ice). */
+  private gripContacts = 0;
+
+  /**
+   * Rotates pos and prev about their own pivots (reorients without adding
+   * speed): the center of mass, or the contact patch when `aboutBase`.
+   */
+  private rotateAll(q: THREE.Quaternion, aboutBase = false) {
+    for (const pts of [this.pos, this.prev]) {
+      const c = new THREE.Vector3();
+      if (aboutBase) {
+        for (const i of [P.tailL, P.tailR, P.noseL, P.noseR]) c.add(pts[i]);
+        c.divideScalar(4);
+      } else {
+        for (const p of pts) c.add(p);
+        c.divideScalar(this.count);
+      }
+      for (const p of pts) p.sub(c).applyQuaternion(q).add(c);
+    }
   }
 
   /**
-   * Player control: push / brake while the sled touches a track, flips while
-   * airborne. Works on velocities (prev positions) so it stays deterministic.
+   * Arcade assists of the new rides: riders balance on the ground (no tipping
+   * over in banked turns), and in the air the nose slowly follows the flight
+   * path when no flip key is held.
    */
-  private control(input: number) {
-    const sledDown = [P.tailL, P.tailR, P.noseL, P.noseR].some((i) => this.contact[i]);
-    const tailMid = tmp.addVectors(this.pos[P.tailL], this.pos[P.tailR]).multiplyScalar(0.5);
-    const fwd = tmp2.addVectors(this.pos[P.noseL], this.pos[P.noseR]).multiplyScalar(0.5).sub(tailMid).normalize();
-
-    if (sledDown) {
-      if (input & INPUT.push) {
-        const speed = vel.subVectors(this.pos[P.butt], this.prev[P.butt]).dot(fwd);
-        if (speed < PUSH_MAX_SPEED) for (let i = 0; i < POINT_COUNT; i++) this.prev[i].addScaledVector(fwd, -PUSH_ACCEL);
+  private assist(input: number) {
+    const h = this.def.handling;
+    if (this.crashed || (h.balance === 0 && h.airAlign === 0 && h.steer === 0)) return;
+    const fwd = this.forward(new THREE.Vector3());
+    const lat = new THREE.Vector3().subVectors(this.pos[P.tailR], this.pos[P.tailL]).normalize();
+    const up = new THREE.Vector3().crossVectors(lat, fwd).normalize();
+    const grounded = [P.tailL, P.tailR, P.noseL, P.noseR].some((i) => this.contact[i]);
+    if (grounded && h.balance > 0 && this.normalSum.lengthSq() > 1e-6) {
+      // Roll and pitch toward the surface normal.
+      const n = this.normalSum.clone().normalize();
+      const angle = up.angleTo(n);
+      if (angle > 1e-4 && angle < 1.2) {
+        const q = new THREE.Quaternion().setFromUnitVectors(up, n);
+        this.rotateAll(new THREE.Quaternion().slerp(q, h.balance), true);
       }
-      if (input & INPUT.brake) {
-        for (let i = 0; i < POINT_COUNT; i++) {
-          vel.subVectors(this.pos[i], this.prev[i]).multiplyScalar(BRAKE);
-          this.prev[i].add(vel);
+    }
+    if (grounded && h.steer > 0 && this.dirSum.lengthSq() > 1e-6) {
+      // Yaw (around the vehicle's up axis) toward the track direction, aiming
+      // a little toward the center line (lane keeping).
+      const d = this.dirSum.clone().normalize();
+      if (this.offCount > 0) {
+        const off = this.offSum.clone().divideScalar(this.offCount);
+        const len = off.length();
+        if (len > 1e-6) d.addScaledVector(off, -Math.min(len * 0.15, 0.25) / len);
+      }
+      d.addScaledVector(up, -d.dot(up));
+      if (d.lengthSq() > 1e-6) {
+        d.normalize();
+        const yaw = Math.atan2(new THREE.Vector3().crossVectors(fwd, d).dot(up), fwd.dot(d));
+        if (Math.abs(yaw) > 1e-4 && Math.abs(yaw) < 0.9) this.rotateAll(new THREE.Quaternion().setFromAxisAngle(up, yaw * h.steer), true);
+      }
+    }
+    if (grounded && h.carve > 0 && this.gripContacts > 0) {
+      // Carve: the whole rider follows the edges instead of sliding wide.
+      const n = this.normalSum.lengthSq() > 1e-6 ? this.normalSum.clone().normalize() : up;
+      const side = lat.clone().addScaledVector(n, -lat.dot(n)).normalize();
+      const v = new THREE.Vector3();
+      for (let i = 0; i < this.count; i++) v.add(tmp.subVectors(this.pos[i], this.prev[i]));
+      v.divideScalar(this.count);
+      const slip = v.dot(side) * h.carve;
+      for (let i = 0; i < this.count; i++) this.prev[i].addScaledVector(side, slip);
+    }
+    const airborne = !this.contact.some((c) => c);
+    if (airborne && h.airAlign > 0 && !(input & (INPUT.push | INPUT.brake)) && Math.abs(this.spin) < 0.02) {
+      // Angular-velocity controller on pitch: the nose eases toward the
+      // direction of flight instead of tumbling from the takeoff.
+      const v = new THREE.Vector3();
+      for (let i = 0; i < this.count; i++) v.add(tmp.subVectors(this.pos[i], this.prev[i]));
+      v.addScaledVector(lat, -v.dot(lat));
+      if (v.lengthSq() > 1e-6) {
+        v.normalize();
+        const pitchErr = Math.atan2(new THREE.Vector3().crossVectors(fwd, v).dot(lat), fwd.dot(v));
+        // Only near the flight direction: a flip in progress is left alone.
+        if (Math.abs(pitchErr) < 1.6) {
+          const prevFwd = new THREE.Vector3()
+            .addVectors(this.prev[P.noseL], this.prev[P.noseR])
+            .sub(this.prev[P.tailL])
+            .sub(this.prev[P.tailR])
+            .normalize();
+          const omega = Math.atan2(new THREE.Vector3().crossVectors(prevFwd, fwd).dot(lat), prevFwd.dot(fwd));
+          const target = THREE.MathUtils.clamp(pitchErr * 0.08, -0.04, 0.04);
+          const delta = (omega - target) * h.airAlign;
+          // Turning the previous pose toward the current one changes the spin rate only.
+          const c = new THREE.Vector3();
+          for (const p of this.prev) c.add(p);
+          c.divideScalar(this.count);
+          const q = new THREE.Quaternion().setFromAxisAngle(lat, delta);
+          for (const p of this.prev) p.sub(c).applyQuaternion(q).add(c);
         }
       }
     }
   }
 
+  /** Forward axis of the vehicle (tail to nose). */
+  private forward(out: THREE.Vector3) {
+    const tailMid = tmp.addVectors(this.pos[P.tailL], this.pos[P.tailR]).multiplyScalar(0.5);
+    return out.addVectors(this.pos[P.noseL], this.pos[P.noseR]).multiplyScalar(0.5).sub(tailMid).normalize();
+  }
+
   /**
-   * Arcade flip control: holding a key spins Bosh around the sled's lateral
-   * axis, releasing it settles the spin. Positions and previous positions are
-   * rotated about their own centers, so the flight path is untouched.
+   * Player control: push / brake while the vehicle touches a track, flips
+   * while airborne. Works on velocities (prev positions) so it stays
+   * deterministic.
+   */
+  private control(input: number) {
+    const h = this.def.handling;
+    const down = [P.tailL, P.tailR, P.noseL, P.noseR].some((i) => this.contact[i]);
+    if (!down) return;
+    const fwd = this.forward(tmp2);
+    if (input & INPUT.push) {
+      const speed = vel.subVectors(this.pos[P.butt], this.prev[P.butt]).dot(fwd);
+      if (speed < h.pushMax) for (let i = 0; i < this.count; i++) this.prev[i].addScaledVector(fwd, -h.pushAccel);
+    }
+    if (input & INPUT.brake) {
+      for (let i = 0; i < this.count; i++) {
+        vel.subVectors(this.pos[i], this.prev[i]).multiplyScalar(h.brake);
+        this.prev[i].add(vel);
+      }
+    }
+  }
+
+  /**
+   * Arcade air control: holding a key spins the rider around the vehicle's
+   * lateral axis (flips) or up axis (flat spins); releasing it settles the
+   * spin. Positions and previous positions are rotated about their own
+   * centers, so the flight path is untouched.
    */
   private applySpin(input: number) {
+    const h = this.def.handling;
     const airborne = !this.contact.some((c) => c);
     if (!airborne || this.crashed) {
-      // Touching down mid-flip throws Bosh off the sled.
-      if (!airborne && Math.abs(this.spin) > SPIN_CRASH) this.crashed = true;
+      // Touching down mid-spin throws Bosh off his ride.
+      if (!airborne && !this.crashed && (Math.abs(this.spin) > h.spinCrash || Math.abs(this.yawSpin) > h.spinCrash)) {
+        this.crashed = true;
+        this.crashReason = 'spin';
+      }
       this.spin = 0;
+      this.yawSpin = 0;
       return;
     }
-    if (input & INPUT.push) this.spin = Math.max(this.spin - FLIP_ACCEL, -FLIP_MAX);
-    else if (input & INPUT.brake) this.spin = Math.min(this.spin + FLIP_ACCEL, FLIP_MAX);
-    else this.spin *= FLIP_SETTLE;
-    if (Math.abs(this.spin) < 1e-4) {
-      this.spin = 0;
-      return;
+    const lean = h.flipSign * h.flipAccel;
+    if (input & INPUT.push) this.spin = THREE.MathUtils.clamp(this.spin - lean, -h.flipMax, h.flipMax);
+    else if (input & INPUT.brake) this.spin = THREE.MathUtils.clamp(this.spin + lean, -h.flipMax, h.flipMax);
+    else this.spin *= h.flipSettle;
+    if (Math.abs(this.spin) < 1e-4) this.spin = 0;
+    if (h.yaw) {
+      if (input & INPUT.spin) this.yawSpin = Math.min(this.yawSpin + h.yaw.accel, h.yaw.max);
+      else this.yawSpin *= h.flipSettle;
+      if (Math.abs(this.yawSpin) < 1e-4) this.yawSpin = 0;
     }
-    const axis = new THREE.Vector3().subVectors(this.pos[P.tailR], this.pos[P.tailL]).normalize();
-    const q = new THREE.Quaternion().setFromAxisAngle(axis, this.spin);
+    if (this.spin === 0 && this.yawSpin === 0) return;
+    const lat = new THREE.Vector3().subVectors(this.pos[P.tailR], this.pos[P.tailL]).normalize();
+    const q = new THREE.Quaternion();
+    if (this.spin !== 0) q.setFromAxisAngle(lat, this.spin);
+    if (this.yawSpin !== 0) {
+      const fwd = this.forward(new THREE.Vector3());
+      const up = new THREE.Vector3().crossVectors(lat, fwd).normalize();
+      q.premultiply(new THREE.Quaternion().setFromAxisAngle(up, this.yawSpin));
+    }
     for (const pts of [this.pos, this.prev]) {
       const c = new THREE.Vector3();
       for (const p of pts) c.add(p);
-      c.divideScalar(POINT_COUNT);
+      c.divideScalar(this.count);
       for (const p of pts) p.sub(c).applyQuaternion(q).add(c);
     }
   }
@@ -327,12 +401,9 @@ export class Rider {
       // Push along the axis, in the direction the rider is travelling.
       const dir = d1 > d0 ? 1 : -1;
       this.events |= EVENT.ring;
-      for (let i = 0; i < POINT_COUNT; i++) this.prev[i].addScaledVector(ring.axis, -dir * RING_BOOST);
+      for (let i = 0; i < this.count; i++) this.prev[i].addScaledVector(ring.axis, -dir * RING_BOOST);
     }
   }
-
-  private scratch: THREE.Vector3[] = POINTS.map(() => new THREE.Vector3());
-  private original: THREE.Vector3[] = POINTS.map(() => new THREE.Vector3());
 
   /**
    * Relaxes the bones in both orders (normal and left/right mirrored) from the
@@ -340,17 +411,18 @@ export class Rider {
    * and Bosh doesn't slowly drift or tip sideways.
    */
   private satisfyBonesSymmetric(checkBreak: boolean) {
-    for (let i = 0; i < POINT_COUNT; i++) this.original[i].copy(this.pos[i]);
-    this.satisfyBones(BONES, checkBreak);
-    for (let i = 0; i < POINT_COUNT; i++) {
+    for (let i = 0; i < this.count; i++) this.original[i].copy(this.pos[i]);
+    this.satisfyBones(this.def.bones, checkBreak);
+    for (let i = 0; i < this.count; i++) {
       this.scratch[i].copy(this.pos[i]);
       this.pos[i].copy(this.original[i]);
     }
-    this.satisfyBones(BONES_MIRRORED, checkBreak);
-    for (let i = 0; i < POINT_COUNT; i++) this.pos[i].add(this.scratch[i]).multiplyScalar(0.5);
+    this.satisfyBones(this.bonesMirrored, checkBreak);
+    for (let i = 0; i < this.count; i++) this.pos[i].add(this.scratch[i]).multiplyScalar(0.5);
   }
 
   private satisfyBones(bones: Bone[], checkBreak: boolean) {
+    const breakStrain = this.def.handling.breakStrain;
     for (const bone of bones) {
       if (bone.kind === 'mount' && this.crashed) continue;
       const pa = this.pos[bone.a];
@@ -360,36 +432,42 @@ export class Rider {
       if (dist < 1e-9) continue;
       if (bone.kind === 'repel' && dist >= bone.rest) continue;
       const diff = (dist - bone.rest) / dist;
-      if (bone.kind === 'mount' && checkBreak && Math.abs(dist - bone.rest) / bone.rest > BREAK_STRAIN) {
+      if (bone.kind === 'mount' && checkBreak && Math.abs(dist - bone.rest) / bone.rest > breakStrain) {
+        if (!this.crashed) this.crashReason = `mount ${bone.a}-${bone.b} ${((dist - bone.rest) / bone.rest).toFixed(2)}`;
         this.crashed = true;
         continue;
       }
-      tmp.multiplyScalar(diff * 0.5);
+      tmp.multiplyScalar(bone.kind === 'spring' ? diff * 0.5 * bone.k : diff * 0.5);
       pa.add(tmp);
       pb.sub(tmp);
     }
   }
 
-  /** Lateral axis of the sled, used for runner grip. */
-  private sledSide(out: THREE.Vector3) {
-    return out.subVectors(this.pos[P.tailR], this.pos[P.tailL]).normalize();
-  }
-
   private collide(track: Track) {
-    const side = this.sledSide(tmp2.clone());
-    for (let i = 0; i < POINT_COUNT; i++) {
+    const h = this.def.handling;
+    const tallWalls = h.tallWalls;
+    const side = tmp2.subVectors(this.pos[P.tailR], this.pos[P.tailL]).normalize().clone();
+    for (let i = 0; i < this.count; i++) {
       const p = this.pos[i];
-      const def = POINTS[i];
+      const def = this.def.points[i];
       this.nearby.clear();
       track.querySegments(p, this.nearby);
+      // With tall walls only the vehicle is walled in; the body may lean over.
+      const body = tallWalls && i >= P.butt && i <= P.rFoot;
       for (const seg of this.nearby) {
+        if (body && seg.wall) continue;
         tmp.subVectors(p, seg.a);
         const d = tmp.dot(seg.up);
         if (d >= 0 || d < -HIT_DEPTH) continue;
         const t = tmp.dot(seg.dir);
         if (t < -SEG_EXT || t > seg.len + SEG_EXT) continue;
         const s = tmp.dot(seg.side);
-        if (s < -seg.halfWidth || s > seg.halfWidth) continue;
+        // Beyond the segment's sides; for walls "high" is the top edge.
+        const high = seg.side.y >= 0 ? s > seg.halfWidth : s < -seg.halfWidth;
+        // Tall walls also reach a little below the surface, so edges can't slip under.
+        const bottom = seg.wall && tallWalls ? seg.halfWidth + 0.35 : seg.halfWidth;
+        const low = seg.side.y >= 0 ? s < -bottom : s > bottom;
+        if (low || (high && !(seg.wall && tallWalls))) continue;
         vel.subVectors(p, this.prev[i]);
         const incoming = vel.dot(seg.up);
         if (incoming > 0) continue; // moving away: let it pass
@@ -397,7 +475,20 @@ export class Rider {
 
         // Push out of the surface.
         p.addScaledVector(seg.up, -d);
+        if (i < 4 && !seg.wall) {
+          this.normalSum.add(seg.up);
+          // Track direction, oriented the way the ride faces.
+          const sgn = seg.dir.dot(this.heading) >= 0 ? 1 : -1;
+          this.dirSum.addScaledVector(seg.dir, sgn);
+          // How far off the center line (as a vector from the line to the point).
+          this.offSum.addScaledVector(seg.side, s);
+          this.offCount++;
+        }
         this.contact[i] = true;
+        if (def.fatal && !this.crashed && !seg.wall) {
+          this.crashed = true;
+          this.crashReason = `fatal ${i} track`;
+        }
 
         vel.subVectors(p, this.prev[i]);
         const vn = vel.dot(seg.up);
@@ -407,12 +498,13 @@ export class Rider {
           const speed = vt.length();
           if (speed > 1e-9) vt.multiplyScalar(Math.max(0, 1 - (def.friction * -d) / speed));
         }
-        // Sled runners resist sliding sideways (rear only, so the sled self-aligns).
+        // Runners resist sliding sideways (mostly at the rear, so the ride self-aligns).
         if (def.runner && !this.crashed && type !== 'ice' && !seg.wall) {
+          this.gripContacts++;
           const lat = tmp.copy(side).addScaledVector(seg.up, -side.dot(seg.up));
           if (lat.lengthSq() > 1e-6) {
             lat.normalize();
-            vt.addScaledVector(lat, -vt.dot(lat) * RUNNER_GRIP);
+            vt.addScaledVector(lat, -vt.dot(lat) * h.grip);
           }
         }
         if (type === 'accel') vt.addScaledVector(seg.dir, ACCEL);
@@ -427,12 +519,17 @@ export class Rider {
       const ground = terrainHeight(p.x, p.z);
       if (p.y < ground) {
         p.y = ground;
+        if (i < 4) this.normalSum.y += 1;
         this.contact[i] = true;
+        if (def.fatal && !this.crashed) {
+          this.crashed = true;
+          this.crashReason = `fatal ${i} ground`;
+        }
         vel.subVectors(p, this.prev[i]);
         vel.y = 0;
         // Snow drag, capped so fast arrivals slow down instead of stopping dead.
         const speed = vel.length();
-        if (speed > 1e-9) vel.multiplyScalar(Math.max(0, speed - Math.min(speed * GROUND_FRICTION, SNOW_MAX_DRAG)) / speed);
+        if (speed > 1e-9) vel.multiplyScalar(Math.max(0, speed - Math.min(speed * GROUND_FRICTION * h.snowDrag, SNOW_MAX_DRAG * h.snowDrag)) / speed);
         this.prev[i].set(p.x - vel.x, p.y, p.z - vel.z);
       }
     }
@@ -447,33 +544,37 @@ export class Rider {
   }
 
   writeState(buf: Float64Array) {
-    for (let i = 0; i < POINT_COUNT; i++) {
+    const n = this.count;
+    for (let i = 0; i < n; i++) {
       this.pos[i].toArray(buf, i * 6);
       this.prev[i].toArray(buf, i * 6 + 3);
     }
-    buf[POINT_COUNT * 6] = this.crashed ? 1 : 0;
+    const m = n * 6;
+    buf[m + META.crashed] = this.crashed ? 1 : 0;
     let mask = 0;
-    for (let i = 0; i < POINT_COUNT; i++) if (this.contact[i]) mask |= 1 << i;
-    buf[POINT_COUNT * 6 + 1] = mask;
-    buf[POINT_COUNT * 6 + 2] = this.events;
-    buf[POINT_COUNT * 6 + 3] = this.spin;
-    buf[POINT_COUNT * 6 + 4] = this.stars;
-    buf[POINT_COUNT * 6 + 5] = this.finished ? 1 : 0;
+    for (let i = 0; i < n; i++) if (this.contact[i]) mask |= 1 << i;
+    buf[m + META.contact] = mask;
+    buf[m + META.events] = this.events;
+    buf[m + META.spin] = this.spin;
+    buf[m + META.stars] = this.stars;
+    buf[m + META.finished] = this.finished ? 1 : 0;
+    buf[m + META.yaw] = this.yawSpin;
   }
 
   readState(buf: Float64Array) {
-    for (let i = 0; i < POINT_COUNT; i++) {
+    const n = this.count;
+    for (let i = 0; i < n; i++) {
       this.pos[i].fromArray(buf, i * 6);
       this.prev[i].fromArray(buf, i * 6 + 3);
     }
-    this.crashed = buf[POINT_COUNT * 6] === 1;
-    const mask = buf[POINT_COUNT * 6 + 1];
-    for (let i = 0; i < POINT_COUNT; i++) this.contact[i] = (mask & (1 << i)) !== 0;
-    this.events = buf[POINT_COUNT * 6 + 2];
-    this.spin = buf[POINT_COUNT * 6 + 3];
-    this.stars = buf[POINT_COUNT * 6 + 4];
-    this.finished = buf[POINT_COUNT * 6 + 5] === 1;
+    const m = n * 6;
+    this.crashed = buf[m + META.crashed] === 1;
+    const mask = buf[m + META.contact];
+    for (let i = 0; i < n; i++) this.contact[i] = (mask & (1 << i)) !== 0;
+    this.events = buf[m + META.events];
+    this.spin = buf[m + META.spin];
+    this.stars = buf[m + META.stars];
+    this.finished = buf[m + META.finished] === 1;
+    this.yawSpin = buf[m + META.yaw];
   }
 }
-
-export const STATE_SIZE = POINT_COUNT * 6 + 6;

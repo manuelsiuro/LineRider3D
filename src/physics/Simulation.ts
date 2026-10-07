@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { Rider, STATE_SIZE } from './Rider';
+import { META, Rider } from './Rider';
+import { SLED, type VehicleDef } from './vehicles';
 import type { Track } from '../track/Track';
 
 export const STEPS_PER_SECOND = 40;
@@ -10,14 +11,31 @@ const MAX_FRAMES = STEPS_PER_SECOND * 60 * 10;
  * timeline can be scrubbed freely. Any track change invalidates the recording.
  */
 export class Simulation {
-  readonly rider = new Rider();
+  rider: Rider;
   frame = 0;
   private history: Float64Array[] = [];
   /** Recorded player input per frame (input[f] drives the step f → f+1). */
   private inputs: number[] = [];
   private revision = -1;
 
-  constructor(readonly track: Track) {}
+  constructor(
+    readonly track: Track,
+    vehicle: VehicleDef = SLED,
+  ) {
+    this.rider = new Rider(vehicle);
+  }
+
+  get vehicle(): VehicleDef {
+    return this.rider.def;
+  }
+
+  /** Switches the ride; the recording starts over (inputs are kept). */
+  setVehicle(vehicle: VehicleDef) {
+    if (vehicle === this.rider.def) return;
+    this.rider = new Rider(vehicle);
+    this.history = [];
+    this.revision = -1;
+  }
 
   /** Number of frames already computed. */
   get recorded() {
@@ -44,7 +62,7 @@ export class Simulation {
     if (this.revision === this.track.revision && this.history.length > 0) return;
     this.revision = this.track.revision;
     this.rider.reset(this.track.start, this.startYaw());
-    const s = new Float64Array(STATE_SIZE);
+    const s = new Float64Array(this.rider.stateSize);
     this.rider.writeState(s);
     this.history = [s];
   }
@@ -62,7 +80,7 @@ export class Simulation {
       this.rider.readState(this.history[this.history.length - 1]);
       while (this.history.length <= frame) {
         this.rider.step(this.track, this.inputs[this.history.length - 1] ?? 0);
-        const s = new Float64Array(STATE_SIZE);
+        const s = new Float64Array(this.rider.stateSize);
         this.rider.writeState(s);
         this.history.push(s);
       }
@@ -118,6 +136,6 @@ export class Simulation {
 
   crashedAt(frame: number) {
     const s = this.history[frame];
-    return s ? s[STATE_SIZE - 6] === 1 : false;
+    return s ? s[this.rider.count * 6 + META.crashed] === 1 : false;
   }
 }

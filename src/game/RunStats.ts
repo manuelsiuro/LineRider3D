@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { EVENT, P, POINT_COUNT } from '../physics/Rider';
+import { EVENT, META, META_SIZE, P } from '../physics/Rider';
 import type { Simulation } from '../physics/Simulation';
 import type { Segment } from '../track/types';
 import { terrainHeight } from '../world/terrain';
@@ -47,11 +47,8 @@ export interface Trick {
 }
 
 const BUTT = P.butt * 6;
-const CRASH = POINT_COUNT * 6;
-const CONTACT = POINT_COUNT * 6 + 1;
-const EVENTS = POINT_COUNT * 6 + 2;
-const SPIN = POINT_COUNT * 6 + 3;
-const STARS = POINT_COUNT * 6 + 4;
+/** Offset of a recorded state's META fields (the layout depends on the vehicle). */
+const meta = (s: Float64Array) => s.length - META_SIZE;
 
 function countBits(mask: number) {
   let n = 0;
@@ -101,15 +98,21 @@ function signedAngle(a: number[], b: number[], axis: number[]) {
   return Math.atan2(sin, cos);
 }
 
-/** Names and scores a jump (before grade and combo) from its rotation and airtime. */
-export function scoreJump(rotation: number, air: number): { name: string; points: number } | null {
+/** Names and scores a jump (before grade and combo) from its rotations and airtime. */
+export function scoreJump(rotation: number, air: number, yaw = 0): { name: string; points: number } | null {
   const deg = Math.abs((rotation * 180) / Math.PI);
   const flips = Math.floor((deg + 90) / 360);
+  // Flat spins count in half turns (a 180 lands switch).
+  const halves = Math.floor((Math.abs((yaw * 180) / Math.PI) + 60) / 180);
   const airPoints = Math.round(air * 10) * 20;
-  if (flips === 0) return air >= 1 ? { name: 'Big Air', points: airPoints } : null;
-  const kind = rotation > 0 ? 'Backflip' : 'Frontflip';
-  const name = flips === 1 ? kind : `${NUMBER_NAMES[flips] ?? `${flips}×`} ${kind}`;
-  return { name, points: 1000 * flips * flips + airPoints };
+  if (flips === 0 && halves === 0) return air >= 1 ? { name: 'Big Air', points: airPoints } : null;
+  const parts: string[] = [];
+  if (flips > 0) {
+    const kind = rotation > 0 ? 'Backflip' : 'Frontflip';
+    parts.push(flips === 1 ? kind : `${NUMBER_NAMES[flips] ?? `${flips}×`} ${kind}`);
+  }
+  if (halves > 0) parts.push(String(halves * 180));
+  return { name: parts.join(' '), points: 1000 * flips * flips + 250 * halves * halves + airPoints };
 }
 
 /**
@@ -137,10 +140,12 @@ export class RunStats {
   private airFrames = 0;
   private stillFrames = 0;
   private airRotation = 0;
-  private pending: { rotation: number; air: number; frame: number; angle: number; spin: number } | null = null;
+  private pending: { rotation: number; yaw: number; air: number; frame: number; angle: number; spin: number } | null = null;
+  private airYaw = 0;
+  private upB = [0, 0, 0];
   private queue: Trick[] = [];
   /** Touchdowns after a jump, for slow-motion moments. */
-  private touchdowns: { rotation: number; air: number }[] = [];
+  private touchdowns: { rotation: number; yaw: number; air: number }[] = [];
   private bestTrickPoints = 0;
   private chain = 0;
   private lastActionFrame = -1e9;
@@ -180,6 +185,7 @@ export class RunStats {
     this.airFrames = 0;
     this.stillFrames = 0;
     this.airRotation = 0;
+    this.airYaw = 0;
     this.pending = null;
     this.queue = [];
     this.touchdowns = [];
@@ -286,35 +292,46 @@ export class RunStats {
       s.speed = step * fps;
       if (!s.crashed) s.topSpeed = Math.max(s.topSpeed, s.speed);
 
-      const airborne = b[CONTACT] === 0;
+      const airborne = b[meta(b) + META.contact] === 0;
       const wasCrashed = s.crashed;
       // Track pitch rotation while airborne.
       if (airborne && !wasCrashed) {
         sledAxes(a, this.fwdA, this.latB);
         sledAxes(b, this.fwdB, this.latB);
         this.airRotation += signedAngle(this.fwdA, this.fwdB, this.latB);
+        // Flat spin: rotation of the nose around the vehicle's up axis.
+        const [lx, ly, lz] = this.latB;
+        const [fx, fy, fz] = this.fwdB;
+        this.upB[0] = ly * fz - lz * fy;
+        this.upB[1] = lz * fx - lx * fz;
+        this.upB[2] = lx * fy - ly * fx;
+        this.airYaw += signedAngle(this.fwdA, this.fwdB, this.upB);
       }
       if (!airborne && this.airFrames > 0 && !wasCrashed) {
         if (this.pending) {
           // Glancing touch then airborne again: still the same jump.
           this.pending.rotation += this.airRotation;
+          this.pending.yaw += this.airYaw;
           this.pending.air += this.airFrames / fps;
           this.pending.frame = f;
           this.pending.angle = this.landingAngle(sim, b);
-          this.pending.spin = a[SPIN];
+          this.pending.spin = Math.max(Math.abs(a[meta(a) + META.spin]), Math.abs(a[meta(a) + META.yaw]));
         } else if (this.airFrames >= MIN_AIR_FRAMES) {
-          this.pending = { rotation: this.airRotation, air: this.airFrames / fps, frame: f, angle: this.landingAngle(sim, b), spin: a[SPIN] };
-          this.touchdowns.push({ rotation: this.airRotation, air: this.airFrames / fps });
+          this.pending = { rotation: this.airRotation, yaw: this.airYaw, air: this.airFrames / fps, frame: f, angle: this.landingAngle(sim, b), spin: Math.max(Math.abs(a[meta(a) + META.spin]), Math.abs(a[meta(a) + META.yaw])) };
+          this.touchdowns.push({ rotation: this.airRotation, yaw: this.airYaw, air: this.airFrames / fps });
         }
       }
-      if (!airborne) this.airRotation = 0;
+      if (!airborne) {
+        this.airRotation = 0;
+        this.airYaw = 0;
+      }
       this.airFrames = airborne ? this.airFrames + 1 : 0;
       s.air = this.airFrames / fps;
       if (!s.crashed) s.bestAir = Math.max(s.bestAir, s.air);
       this.stillFrames = s.speed < 0.6 ? this.stillFrames + 1 : 0;
       s.still = this.stillFrames / fps;
 
-      const ev = b[EVENTS];
+      const ev = b[meta(b) + META.events];
       if (ev & EVENT.ring) {
         s.rings++;
         if (!s.crashed) {
@@ -324,7 +341,7 @@ export class RunStats {
       }
       if (ev & EVENT.bounce) s.bounces++;
       if (ev & EVENT.star) {
-        s.stars = countBits(b[STARS]);
+        s.stars = countBits(b[meta(b) + META.stars]);
         if (!s.crashed) this.bump(f);
       }
       if (ev & EVENT.finish && !s.finished) {
@@ -333,16 +350,16 @@ export class RunStats {
       }
       events |= ev;
       // A crash after crossing the finish doesn't spoil the run.
-      s.crashed = b[CRASH] === 1 && !s.finished;
+      s.crashed = b[meta(b) + META.crashed] === 1 && !s.finished;
 
       if (s.crashed && !wasCrashed) {
         // Crashing mid-air or right after touchdown voids the trick and the combo.
-        const attempt = this.pending ?? (airborne ? { rotation: this.airRotation, air: this.airFrames / fps } : null);
-        if (attempt && (Math.abs(attempt.rotation) > Math.PI || attempt.air > 1)) this.bail();
+        const attempt = this.pending ?? (airborne ? { rotation: this.airRotation, yaw: this.airYaw, air: this.airFrames / fps } : null);
+        if (attempt && (Math.abs(attempt.rotation) > Math.PI || Math.abs(attempt.yaw) > Math.PI || attempt.air > 1)) this.bail();
         this.pending = null;
         this.chain = 0;
       } else if (this.pending && f - this.pending.frame >= LAND_FRAMES) {
-        const base = scoreJump(this.pending.rotation, this.pending.air);
+        const base = scoreJump(this.pending.rotation, this.pending.air, this.pending.yaw);
         if (base) this.award(base, gradeLanding(this.pending.angle, this.pending.spin), f);
         this.pending = null;
       }
