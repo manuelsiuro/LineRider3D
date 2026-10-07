@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { segmentFrame } from './frames';
+import { pointFrames, segmentFrame } from './frames';
+
+/** Height of bobsled side walls. */
+export const WALL_HEIGHT = 0.7;
 import type { Decor, DecorKind, DrawMode, Finish, LineType, Ring, Segment, Star, Stroke } from './types';
 
 const CELL = 4;
@@ -29,6 +32,7 @@ interface SerializedTrack {
     planeNormal: number[];
     bank: number;
     autoBank?: boolean;
+    walls?: boolean;
     width: number;
   }[];
   decor: { kind: DecorKind; position: number[]; rotation: number; scale: number }[];
@@ -67,6 +71,7 @@ export class Track {
 
   addStroke(s: Omit<Stroke, 'id'> & { id?: number }): Stroke {
     const stroke: Stroke = { ...s, id: s.id ?? this.nextId++ };
+    if (stroke.autoBank) stroke.bankRefY = this.start.y;
     this.nextId = Math.max(this.nextId, stroke.id + 1);
     this.strokes.set(stroke.id, stroke);
     this.index(stroke);
@@ -144,6 +149,13 @@ export class Track {
 
   setStart(p: THREE.Vector3) {
     this.start.copy(p);
+    // Auto-banked turns depend on the start height (expected speed).
+    for (const s of this.strokes.values()) {
+      if (s.autoBank && s.bankRefY !== p.y) {
+        s.bankRefY = p.y;
+        this.updateStroke(s);
+      }
+    }
     this.emit({ kind: 'startChanged' });
   }
 
@@ -206,20 +218,52 @@ export class Track {
         halfWidth: stroke.width / 2,
       };
       segs.push(seg);
-      // Insert into every cell touched by the segment's bounding box.
-      const r = stroke.width / 2 + 1;
-      const min = new THREE.Vector3().copy(a).min(b).subScalar(r);
-      const max = new THREE.Vector3().copy(a).max(b).addScalar(r);
-      for (let x = Math.floor(min.x / CELL); x <= Math.floor(max.x / CELL); x++)
-        for (let y = Math.floor(min.y / CELL); y <= Math.floor(max.y / CELL); y++)
-          for (let z = Math.floor(min.z / CELL); z <= Math.floor(max.z / CELL); z++) {
-            const key = `${x},${y},${z}`;
-            let list = this.grid.get(key);
-            if (!list) this.grid.set(key, (list = []));
-            list.push(seg);
-          }
     }
+    if (stroke.walls) segs.push(...this.wallSegments(stroke));
+    for (const seg of segs) this.insert(seg, stroke.width / 2 + 1);
     this.segmentsByStroke.set(stroke.id, segs);
+  }
+
+  /** Inserts a segment into every grid cell touched by its bounding box. */
+  private insert(seg: Segment, r: number) {
+    const min = new THREE.Vector3().copy(seg.a).min(seg.b).subScalar(r);
+    const max = new THREE.Vector3().copy(seg.a).max(seg.b).addScalar(r);
+    for (let x = Math.floor(min.x / CELL); x <= Math.floor(max.x / CELL); x++)
+      for (let y = Math.floor(min.y / CELL); y <= Math.floor(max.y / CELL); y++)
+        for (let z = Math.floor(min.z / CELL); z <= Math.floor(max.z / CELL); z++) {
+          const key = `${x},${y},${z}`;
+          let list = this.grid.get(key);
+          if (!list) this.grid.set(key, (list = []));
+          list.push(seg);
+        }
+  }
+
+  /**
+   * Low walls along both edges, as collision segments whose solid side faces
+   * the inside of the channel.
+   */
+  private wallSegments(stroke: Stroke): Segment[] {
+    const frames = pointFrames(stroke);
+    const pts = stroke.points;
+    const hw = stroke.width / 2;
+    const out: Segment[] = [];
+    for (const s of [-1, 1]) {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const fa = frames[i];
+        const fb = frames[i + 1];
+        const a = pts[i].clone().addScaledVector(fa.side, s * hw).addScaledVector(fa.up, WALL_HEIGHT / 2);
+        const b = pts[i + 1].clone().addScaledVector(fb.side, s * hw).addScaledVector(fb.up, WALL_HEIGHT / 2);
+        const len = a.distanceTo(b);
+        if (len < 1e-6) continue;
+        const dir = new THREE.Vector3().subVectors(b, a).normalize();
+        // Normal points inward (towards the track center).
+        const up = fa.side.clone().add(fb.side).multiplyScalar(-s);
+        up.addScaledVector(dir, -up.dot(dir)).normalize();
+        const side = new THREE.Vector3().crossVectors(dir, up).normalize();
+        out.push({ stroke, a, b, dir, len, up, side, halfWidth: WALL_HEIGHT / 2, wall: true });
+      }
+    }
+    return out;
   }
 
   private unindex(stroke: Stroke) {
@@ -246,6 +290,7 @@ export class Track {
         planeNormal: s.planeNormal.toArray().map(r),
         bank: r(s.bank),
         autoBank: s.autoBank,
+        walls: s.walls,
         width: r(s.width),
       })),
       decor: [...this.decor.values()].map((d) => ({
@@ -280,6 +325,7 @@ export class Track {
         planeNormal: new THREE.Vector3().fromArray(s.planeNormal),
         bank: s.bank,
         autoBank: s.autoBank,
+        walls: s.walls,
         width: s.width,
       });
     }

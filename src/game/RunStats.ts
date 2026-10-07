@@ -244,6 +244,7 @@ export class RunStats {
     near.clear();
     sim.track.querySegments(center, near);
     for (const seg of near) {
+      if (seg.wall) continue;
       tmp.subVectors(center, seg.a);
       const t = tmp.dot(seg.dir);
       if (t < -0.5 || t > seg.len + 0.5) continue;
@@ -320,7 +321,8 @@ export class RunStats {
         s.finishTime = f / fps;
       }
       events |= ev;
-      s.crashed = b[CRASH] === 1;
+      // A crash after crossing the finish doesn't spoil the run.
+      s.crashed = b[CRASH] === 1 && !s.finished;
 
       if (s.crashed && !wasCrashed) {
         // Crashing mid-air or right after touchdown voids the trick and the combo.

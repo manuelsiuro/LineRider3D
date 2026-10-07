@@ -17,6 +17,15 @@ const MAT = {
 
 const UP = new THREE.Vector3(0, 1, 0);
 
+/** Recolors Bosh (all player riders share these materials). */
+export function applyOutfit(o: { jacket: number; pants: number; scarf: number; hat: number; sled: number }) {
+  MAT.jacket.color.setHex(o.jacket);
+  MAT.pants.color.setHex(o.pants);
+  MAT.scarf.color.setHex(o.scarf);
+  MAT.hat.color.setHex(o.hat);
+  MAT.wood.color.setHex(o.sled);
+}
+
 /** A capsule (cylinder + rounded ends) that can be stretched between two points. */
 class Limb {
   mesh: THREE.Mesh;

@@ -37,8 +37,18 @@ function applyBank(f: Frame, bank: number): Frame {
   return f;
 }
 
-/** Speed²/gravity of a typical ride, used to size automatic banking. */
+/** Speed²/gravity used when the start height is unknown. */
 const BANK_FACTOR = 14;
+
+/**
+ * Expected speed²/gravity at height y. Tracks are frictionless, so ideally
+ * v² = 2·g·drop; collisions on curvy track lose some energy, and measured
+ * rides come out at about 1.4·drop.
+ */
+function bankFactor(stroke: Stroke, y: number) {
+  if (stroke.bankRefY === undefined) return BANK_FACTOR;
+  return THREE.MathUtils.clamp(1.4 * (stroke.bankRefY - y) + 1, 4, 40);
+}
 const MAX_AUTO_BANK = THREE.MathUtils.degToRad(70);
 const autoBankCache = new WeakMap<Stroke, { key: string; banks: number[] }>();
 
@@ -48,7 +58,7 @@ const autoBankCache = new WeakMap<Stroke, { key: string; banks: number[] }>();
  */
 function autoBanks(stroke: Stroke): number[] {
   const pts = stroke.points;
-  const key = `${pts.length}:${pts[0]?.x}:${pts[pts.length - 1]?.z}`;
+  const key = `${pts.length}:${pts[0]?.x}:${pts[pts.length - 1]?.z}:${stroke.bankRefY}`;
   const cached = autoBankCache.get(stroke);
   if (cached && cached.key === key) return cached.banks;
   const n = pts.length;
@@ -67,7 +77,7 @@ function autoBanks(stroke: Stroke): number[] {
     const cross = (t1x * t2z - t1z * t2x) / (l1 * l2);
     const dot = (t1x * t2x + t1z * t2z) / (l1 * l2);
     const curvature = Math.atan2(cross, dot) / ((l1 + l2) / 2);
-    raw[i] = THREE.MathUtils.clamp(Math.atan(curvature * BANK_FACTOR), -MAX_AUTO_BANK, MAX_AUTO_BANK);
+    raw[i] = THREE.MathUtils.clamp(Math.atan(curvature * bankFactor(stroke, b.y)), -MAX_AUTO_BANK, MAX_AUTO_BANK);
   }
   // Ease in/out at the ends and smooth.
   const banks = raw.map((_, i) => {

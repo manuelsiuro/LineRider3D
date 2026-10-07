@@ -1666,3 +1666,314 @@ body.is-playing .bottom > * {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ------------------------------------------------------------ title extras */
+.title-row {
+  display: flex;
+  gap: 10px;
+}
+
+.title-row .big-btn {
+  flex: 1;
+  height: 48px;
+  font-size: 16px;
+  padding: 0 14px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.pill .ic {
+  color: var(--gold);
+  fill: var(--gold);
+}
+
+.pill.big {
+  font-size: 16px;
+  padding: 6px 12px;
+  color: var(--ink);
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+/* ------------------------------------------------------------ full screens */
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  justify-content: center;
+  overflow-y: auto;
+  padding: max(20px, env(safe-area-inset-top)) 16px 24px;
+  background: linear-gradient(180deg, rgba(220, 235, 250, 0.82), rgba(200, 222, 245, 0.9));
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: fade 0.3s var(--ease);
+}
+
+.screen.leaving {
+  animation: fade-out 0.25s var(--ease) forwards;
+}
+
+.screen-inner {
+  width: min(880px, 100%);
+}
+
+.screen-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.screen-head h2 {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 6vw, 44px);
+  font-weight: 700;
+}
+
+.screen-sub {
+  margin: -6px 0 18px;
+  color: var(--ink-soft);
+}
+
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.level-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px;
+  min-height: 150px;
+  border-radius: 22px;
+  text-align: left;
+  color: white;
+  background: linear-gradient(150deg, #4b98ec, #2a5fb8);
+  box-shadow: 0 14px 30px -12px rgba(30, 80, 160, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.18s var(--spring);
+  animation: card-in 0.4s var(--spring) backwards;
+}
+
+.level-card:nth-child(4n + 2) {
+  background: linear-gradient(150deg, #7b6cff, #4f3fd1);
+}
+
+.level-card:nth-child(4n + 3) {
+  background: linear-gradient(150deg, #34c992, #1b8f63);
+}
+
+.level-card:nth-child(4n + 4) {
+  background: linear-gradient(150deg, #ff9f55, #e2602a);
+}
+
+.level-card:hover {
+  transform: translateY(-4px) scale(1.02);
+}
+
+.level-card.locked {
+  background: linear-gradient(150deg, #a7b4c4, #8392a5);
+  box-shadow: var(--shadow);
+  cursor: default;
+}
+
+.level-card.locked:hover {
+  transform: none;
+}
+
+.level-num {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.level-name {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.level-stars {
+  display: flex;
+  gap: 2px;
+}
+
+.level-stars i {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.level-stars i.on {
+  color: #ffd34d;
+}
+
+.level-stars i.on .ic {
+  fill: #ffd34d;
+  filter: drop-shadow(0 0 6px rgba(255, 211, 77, 0.8));
+}
+
+.level-best {
+  font-size: 12.5px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+/* Wardrobe */
+.outfit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.outfit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 20px;
+  text-align: left;
+  background: white;
+  box-shadow: var(--shadow);
+  border: 3px solid transparent;
+  transition: transform 0.18s var(--spring), border-color 0.2s;
+}
+
+.outfit:hover {
+  transform: translateY(-3px);
+}
+
+.outfit.active {
+  border-color: var(--accent);
+}
+
+.outfit.locked {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.swatches {
+  display: flex;
+  gap: 5px;
+}
+
+.swatches i {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.08);
+}
+
+.outfit-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.outfit-req {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.outfit.active .outfit-req {
+  color: var(--accent);
+}
+
+/* Level intro */
+.intro .card {
+  width: min(440px, 100%);
+}
+
+.badge.dark {
+  color: white;
+  background: var(--accent);
+}
+
+.intro-goals {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.intro-goals li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+}
+
+.intro-goals li .ic {
+  color: #c9d2dc;
+  fill: #e9eef3;
+}
+
+.intro-goals li.done .ic {
+  color: #f2a51f;
+  fill: #ffd34d;
+}
+
+.intro .keys {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Level mode: no editor */
+body.level-mode .bottom {
+  display: none;
+}
+
+body.level-mode .player .rider-btn {
+  pointer-events: none;
+}
+
+/* Undo/redo are meaningless without editing. */
+body.level-mode .top-right .btn-group:first-child {
+  display: none;
+}
+
+.summary .actions {
+  flex-wrap: wrap;
+}
+
+.actions .big-btn.icon-only {
+  width: 48px;
+  padding: 0;
+}
+
+/* Wardrobe: a bottom sheet so Bosh stays visible for the live preview. */
+.screen.wardrobe {
+  align-items: flex-end;
+  background: linear-gradient(to top, rgba(220, 235, 250, 0.95) 0%, rgba(220, 235, 250, 0.85) 45%, rgba(220, 235, 250, 0) 75%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}

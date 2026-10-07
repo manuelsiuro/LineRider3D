@@ -6,7 +6,7 @@ import type { Stats, Trick } from '../game/RunStats';
 import { GRADE_LABEL } from '../game/RunStats';
 import { icon } from './icons';
 
-export type TitleChoice = 'continue' | 'demo' | 'new';
+export type TitleChoice = 'levels' | 'create' | 'new' | 'wardrobe';
 
 export interface UIHandlers {
   play(): void;
@@ -20,6 +20,8 @@ export interface UIHandlers {
   exportTrack(): void;
   importTrack(file: File): void;
   focusRider(): void;
+  levels(): void;
+  mainMenu(): void;
   toggleSfx(): boolean;
   toggleMusic(): boolean;
   toggleRiderMode(): boolean;
@@ -36,6 +38,23 @@ export interface SummaryInfo {
   rating: number;
   starsTotal: number;
   ghostSaved?: boolean;
+  /** Set when playing a built-in level. */
+  level?: { number: number; name: string; nextUnlocked: boolean; hasNext: boolean };
+}
+
+export interface LevelCard {
+  name: string;
+  tip: string;
+  stars: number;
+  score: number;
+  unlocked: boolean;
+}
+
+export interface OutfitCard {
+  id: string;
+  name: string;
+  stars: number;
+  colors: number[];
 }
 
 const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
@@ -127,6 +146,8 @@ export class UI {
       };
       menu.append(b);
     };
+    item('home', 'Main menu', handlers.mainMenu);
+    item('star', 'Levels', handlers.levels);
     item('plus', 'New track', handlers.newTrack);
     item('sled', 'Demo track', handlers.loadDemo);
     item('download', 'Export track', handlers.exportTrack);
@@ -517,7 +538,7 @@ export class UI {
   }
 
   /** Title screen; resolves with the player's choice. */
-  showTitle(hasSave: boolean): Promise<TitleChoice> {
+  showTitle(hasSave: boolean, stars: number, maxStars: number): Promise<TitleChoice> {
     document.body.classList.add('on-title');
     return new Promise((resolve) => {
       const overlay = h(
@@ -530,9 +551,12 @@ export class UI {
             <p class="tagline">Draw it. Ride it. Wipe out in style.</p>
           </div>
           <div class="title-actions">
-            ${hasSave ? `<button class="big-btn primary" data-c="continue">${icon('play', 20)} Continue my track</button>` : ''}
-            <button class="big-btn ${hasSave ? 'secondary' : 'primary'}" data-c="demo">${icon('sled', 20)} Ride the demo</button>
-            <button class="big-btn ghost" data-c="new">${icon('pencil', 20)} Draw a new track</button>
+            <button class="big-btn primary" data-c="levels">${icon('play', 20)} Play <span class="pill">${icon('star', 14)} ${stars}/${maxStars}</span></button>
+            <button class="big-btn secondary" data-c="${hasSave ? 'create' : 'new'}">${icon('pencil', 20)} ${hasSave ? 'Continue my track' : 'Create a track'}</button>
+            <div class="title-row">
+              <button class="big-btn ghost" data-c="wardrobe">${icon('sled', 18)} Wardrobe</button>
+              ${hasSave ? `<button class="big-btn ghost" data-c="new">${icon('plus', 18)} New track</button>` : ''}
+            </div>
           </div>
           <p class="title-foot">${icon('sound', 16)} Best with sound on · works with mouse and touch</p>
         </div>`,
@@ -542,16 +566,143 @@ export class UI {
         if (!c) return;
         this.handlers.click();
         overlay.classList.add('leaving');
-        document.body.classList.remove('on-title');
-        setTimeout(() => overlay.remove(), 600);
+        if (c !== 'levels' && c !== 'wardrobe') document.body.classList.remove('on-title');
+        setTimeout(() => overlay.remove(), 450);
         resolve(c);
       };
       document.body.append(overlay);
     });
   }
 
+  /** Level select; resolves with a level index, or null to go back. */
+  showLevels(levels: LevelCard[], stars: number): Promise<number | null> {
+    return new Promise((resolve) => {
+      const cards = levels
+        .map(
+          (l, i) => `<button class="level-card ${l.unlocked ? '' : 'locked'}" data-i="${i}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${i * 0.04}s">
+            <span class="level-num">${l.unlocked ? i + 1 : icon('lock', 20)}</span>
+            <span class="level-name">${l.name}</span>
+            <span class="level-stars">${[0, 1, 2].map((k) => `<i class="${k < l.stars ? 'on' : ''}">${icon('star', 18)}</i>`).join('')}</span>
+            <span class="level-best">${l.unlocked ? (l.score ? `Best ${l.score.toLocaleString()}` : 'Not played') : 'Get a star on the previous level'}</span>
+          </button>`,
+        )
+        .join('');
+      const overlay = h(
+        'div',
+        'screen',
+        `<div class="screen-inner">
+          <div class="screen-head">
+            <button class="btn icon-btn" data-back>${icon('chevronLeft')}</button>
+            <h2>Levels</h2>
+            <span class="pill big">${icon('star', 16)} ${stars} / ${levels.length * 3}</span>
+          </div>
+          <div class="level-grid">${cards}</div>
+        </div>`,
+      );
+      overlay.onclick = (e) => {
+        const btn = (e.target as HTMLElement).closest('button');
+        if (!btn) return;
+        this.handlers.click();
+        if (btn.dataset.back !== undefined) {
+          overlay.classList.add('leaving');
+          setTimeout(() => overlay.remove(), 250);
+          resolve(null);
+          return;
+        }
+        const i = Number(btn.dataset.i);
+        if (Number.isNaN(i)) return;
+        overlay.classList.add('leaving');
+        document.body.classList.remove('on-title');
+        setTimeout(() => overlay.remove(), 250);
+        resolve(i);
+      };
+      document.body.append(overlay);
+    });
+  }
+
+  /** Outfit picker with live preview on Bosh. */
+  showWardrobe(outfits: OutfitCard[], stars: number, selected: string, onPick: (id: string) => void): Promise<void> {
+    return new Promise((resolve) => {
+      const render = (sel: string) =>
+        outfits
+          .map((o) => {
+            const unlocked = stars >= o.stars;
+            const swatch = o.colors.map((c) => `<i style="background:#${c.toString(16).padStart(6, '0')}"></i>`).join('');
+            return `<button class="outfit ${o.id === sel ? 'active' : ''} ${unlocked ? '' : 'locked'}" data-id="${o.id}" ${unlocked ? '' : 'disabled'}>
+              <span class="swatches">${swatch}</span>
+              <span class="outfit-name">${o.name}</span>
+              <span class="outfit-req">${unlocked ? (o.id === sel ? 'Wearing' : 'Wear') : `${icon('lock', 13)} ${o.stars} ${icon('star', 13)}`}</span>
+            </button>`;
+          })
+          .join('');
+      const overlay = h(
+        'div',
+        'screen wardrobe',
+        `<div class="screen-inner">
+          <div class="screen-head">
+            <button class="btn icon-btn" data-back>${icon('chevronLeft')}</button>
+            <h2>Wardrobe</h2>
+            <span class="pill big">${icon('star', 16)} ${stars}</span>
+          </div>
+          <p class="screen-sub">Earn stars in the levels to unlock new looks for Bosh.</p>
+          <div class="outfit-grid">${render(selected)}</div>
+        </div>`,
+      );
+      overlay.onclick = (e) => {
+        const btn = (e.target as HTMLElement).closest('button');
+        if (!btn) return;
+        this.handlers.click();
+        if (btn.dataset.back !== undefined) {
+          overlay.classList.add('leaving');
+          setTimeout(() => overlay.remove(), 250);
+          resolve();
+          return;
+        }
+        const id = btn.dataset.id;
+        if (!id) return;
+        onPick(id);
+        overlay.querySelector('.outfit-grid')!.innerHTML = render(id);
+      };
+      document.body.append(overlay);
+    });
+  }
+
+  /** Level intro card with its goals. */
+  showLevelIntro(number: number, name: string, tip: string, goals: string[], stars: number): Promise<void> {
+    return new Promise((resolve) => {
+      const overlay = h(
+        'div',
+        'modal intro',
+        `<div class="card">
+          <span class="badge dark">Level ${number}</span>
+          <h2>${name}</h2>
+          <p>${tip}</p>
+          <ul class="intro-goals">${goals.map((g, i) => `<li class="${i < stars ? 'done' : ''}">${icon('star', 18)}${g}</li>`).join('')}</ul>
+          <p class="keys">${icon('gamepad', 14)} → push · ← brake · in the air: flip, release to land</p>
+          <div class="actions"><button class="big-btn primary">${icon('play', 18)} Ride!</button></div>
+        </div>`,
+      );
+      overlay.onclick = (e) => {
+        if (!(e.target as HTMLElement).closest('button') && e.target !== overlay) return;
+        this.handlers.click();
+        overlay.classList.add('leaving');
+        setTimeout(() => overlay.remove(), 200);
+        resolve();
+      };
+      document.body.append(overlay);
+    });
+  }
+
   /** End-of-run card. */
-  showSummary(stats: Stats, info: SummaryInfo, onReplay: () => void, onEdit: () => void, onWatch: () => void) {
+  showSummary(
+    stats: Stats,
+    info: SummaryInfo,
+    onReplay: () => void,
+    onEdit: () => void,
+    onWatch: () => void,
+    onLevels?: () => void,
+    onNext?: () => void,
+  ) {
     document.querySelector('.summary')?.remove();
     const clean = !stats.crashed;
     const fmt = (n: number, d = 0) => n.toFixed(d);
@@ -560,7 +711,7 @@ export class UI {
       'summary',
       `<div class="card">
         <div class="summary-head ${clean ? 'clean' : 'wipeout'}">
-          <span class="badge">${stats.finished ? `Finished · ${stats.finishTime.toFixed(2)}s` : clean ? 'Clean run' : 'Wipeout'}</span>
+          ${info.level ? `<span class="badge">Level ${info.level.number} · ${info.level.name}</span> ` : ''}<span class="badge">${stats.finished ? `Finished · ${stats.finishTime.toFixed(2)}s` : clean ? 'Clean run' : 'Wipeout'}</span>
           <div class="rating">${[0, 1, 2].map((i) => `<span class="rstar ${i < info.rating ? 'on' : ''}" style="animation-delay:${0.25 + i * 0.18}s">${icon('star', 44)}</span>`).join('')}</div>
           <h2>${info.rating === 3 ? 'Legendary!' : stats.finished ? 'Finished!' : clean ? 'Nice ride!' : 'Ouch, Bosh!'}</h2>
           <div class="score-line">
@@ -580,9 +731,16 @@ export class UI {
           <div><b>${info.starsTotal ? `${stats.stars}/${info.starsTotal}` : `x${stats.bestCombo}`}</b><span>${info.starsTotal ? 'Stars' : 'Best combo'}</span></div>
         </div>
         <div class="actions">
-          <button class="big-btn ghost" data-a="edit">${icon('pencil', 18)} Edit</button>
-          ${info.riderMode ? `<button class="big-btn ghost" data-a="watch">${icon('eye', 18)} Replay</button>` : ''}
-          <button class="big-btn primary" data-a="replay">${icon('replay', 18)} Ride again</button>
+          ${
+            info.level
+              ? `<button class="big-btn ghost icon-only" data-a="levels" title="Levels" aria-label="Levels">${icon('menu', 20)}</button>
+                 <button class="big-btn ghost icon-only" data-a="watch" title="Watch replay" aria-label="Watch replay">${icon('eye', 20)}</button>
+                 <button class="big-btn ${info.level.hasNext && info.level.nextUnlocked ? 'ghost' : 'primary'}" data-a="replay">${icon('replay', 18)} Retry</button>
+                 ${info.level.hasNext && info.level.nextUnlocked ? `<button class="big-btn primary" data-a="next">Next ${icon('chevronRight', 18)}</button>` : ''}`
+              : `<button class="big-btn ghost" data-a="edit">${icon('pencil', 18)} Edit</button>
+                 ${info.riderMode ? `<button class="big-btn ghost" data-a="watch">${icon('eye', 18)} Replay</button>` : ''}
+                 <button class="big-btn primary" data-a="replay">${icon('replay', 18)} Ride again</button>`
+          }
         </div>
       </div>`,
     );
@@ -595,6 +753,8 @@ export class UI {
       if (a === 'replay') onReplay();
       else if (a === 'edit') onEdit();
       else if (a === 'watch') onWatch();
+      else if (a === 'levels') onLevels?.();
+      else if (a === 'next') onNext?.();
     };
     document.body.append(overlay);
   }

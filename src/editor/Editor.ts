@@ -40,6 +40,8 @@ interface DrawState {
 
 export class Editor {
   tool: Tool = 'pencil';
+  /** Off while playing built-in levels. */
+  enabled = true;
   settings: EditorSettings = {
     lineType: 'normal',
     mode: 'profile',
@@ -254,6 +256,7 @@ export class Editor {
   }
 
   private onDown = (e: PointerEvent) => {
+    if (!this.enabled) return;
     if (e.pointerType === 'touch') {
       this.touches.add(e.pointerId);
       if (this.touches.size > 1) {
@@ -427,6 +430,7 @@ export class Editor {
       planeNormal: this.draw!.normal.clone(),
       bank: THREE.MathUtils.degToRad(this.settings.bank),
       autoBank: this.settings.mode === 'path' && this.settings.autoBank,
+      bankRefY: this.track.start.y,
       width: this.settings.width,
     };
   }

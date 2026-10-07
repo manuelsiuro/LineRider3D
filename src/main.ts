@@ -10,7 +10,7 @@ import { EVENT, INPUT, P } from './physics/Rider';
 import { Environment } from './world/Environment';
 import { terrainHeight } from './world/terrain';
 import { Editor } from './editor/Editor';
-import { UI, type TitleChoice } from './ui/UI';
+import { UI } from './ui/UI';
 import { Effects } from './render/Effects';
 import { Trail } from './render/Trail';
 import { PostFX } from './render/PostFX';
@@ -19,6 +19,9 @@ import { RunStats } from './game/RunStats';
 import { buildDemoTrack } from './demoTrack';
 import { rateRun } from './game/rating';
 import { GhostRun, beats, encodeInputs, loadGhost, saveGhost } from './game/Ghost';
+import { LEVELS } from './levels/levels';
+import { OUTFITS, isUnlocked, loadProgress, saveLevelResult, selectOutfit, selectedOutfit, totalStars } from './game/progress';
+import { applyOutfit } from './render/RiderView';
 
 const STORAGE_KEY = 'lr3d.track';
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency ?? 8) <= 4;
@@ -127,7 +130,7 @@ function loadInto(fn: () => void) {
 }
 
 track.on((e) => {
-  if (loading || e.kind === 'cleared') return;
+  if (loading || e.kind === 'cleared' || currentLevel !== null) return;
   pristine = false;
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
@@ -150,6 +153,7 @@ function savedTrack(): SerializedTrack | null {
 }
 
 loadInto(() => buildDemoTrack(track));
+applyOutfit(selectedOutfit());
 
 // ------------------------------------------------------------------ camera moves
 const riderCenter = new THREE.Vector3();
@@ -299,11 +303,19 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
     slowMo = !slowMo;
     return slowMo;
   },
+  levels() {
+    backToLevels();
+  },
+  mainMenu() {
+    stop();
+    enterTitle();
+  },
   async newTrack() {
     if (!pristine && track.strokes.size > 0) {
       const ok = await ui.confirm('Start a new track?', 'Your current track will be replaced. Export it first if you want to keep it.', 'Start fresh');
       if (!ok) return;
     }
+    setLevel(null);
     startNewTrack();
   },
   async loadDemo() {
@@ -312,6 +324,7 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
       if (!ok) return;
     }
     loadInto(() => buildDemoTrack(track));
+applyOutfit(selectedOutfit());
     pristine = true;
     editor.history.clear();
     stop();
@@ -329,6 +342,7 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
   importTrack(file) {
     file.text().then((text) => {
       try {
+        setLevel(null);
         track.load(JSON.parse(text) as SerializedTrack);
         editor.history.clear();
         stop();
@@ -375,51 +389,142 @@ function startNewTrack() {
   flyTo(new THREE.Vector3(0, 14, 30), new THREE.Vector3(0, 10, 0));
 }
 
-// ------------------------------------------------------------------ title screen
+// ------------------------------------------------------------------ title, levels, wardrobe
+/** Index of the built-in level being played, or null in the editor. */
+let currentLevel: number | null = null;
+
 function enterTitle() {
   mode = 'title';
   ghost = null;
+  setLevel(null);
+  loadInto(() => buildDemoTrack(track));
+applyOutfit(selectedOutfit());
+  pristine = true;
   resetRun();
   sim.clearInputs();
   playing = true;
-  ui.showTitle(savedTrack() !== null).then(onTitleChoice);
+  titleFlow();
 }
 
-function onTitleChoice(choice: TitleChoice) {
+async function titleFlow() {
+  for (;;) {
+    const progress = loadProgress();
+    const choice = await ui.showTitle(savedTrack() !== null, totalStars(progress), LEVELS.length * 3);
+    if (choice === 'wardrobe') {
+      const stars = totalStars(progress);
+      // Freeze Bosh at the start for a close look at his outfit.
+      closeUp = true;
+      playing = false;
+      resetRun();
+      await ui.showWardrobe(
+        OUTFITS.map((o) => ({ id: o.id, name: o.name, stars: o.stars, colors: [o.jacket, o.scarf, o.hat, o.sled] })),
+        stars,
+        selectedOutfit().id,
+        (id) => {
+          selectOutfit(id);
+          applyOutfit(selectedOutfit());
+        },
+      );
+      closeUp = false;
+      playing = true;
+      continue;
+    }
+    if (choice === 'levels') {
+      const idx = await pickLevel();
+      if (idx === null) continue;
+      startLevel(idx);
+      return;
+    }
+    leaveTitle();
+    if (choice === 'create') {
+      const data = savedTrack();
+      if (data) {
+        loadInto(() => track.load(data));
+        pristine = false;
+      }
+      const v = startView();
+      flyTo(v.pos, v.target);
+    } else {
+      startNewTrack();
+      let seen = false;
+      try {
+        seen = !!localStorage.getItem('lr3d.helpSeen');
+        localStorage.setItem('lr3d.helpSeen', '1');
+      } catch {
+        /* storage unavailable */
+      }
+      if (!seen) setTimeout(() => ui.showHelp(), 900);
+    }
+    return;
+  }
+}
+
+function pickLevel(): Promise<number | null> {
+  const progress = loadProgress();
+  return ui.showLevels(
+    LEVELS.map((l, i) => ({
+      name: l.name,
+      tip: l.tip,
+      stars: progress[l.id]?.stars ?? 0,
+      score: progress[l.id]?.score ?? 0,
+      unlocked: isUnlocked(i, progress),
+    })),
+    totalStars(progress),
+  );
+}
+
+function leaveTitle() {
   mode = 'game';
   playing = false;
   resetRun();
   ui.setPlaying(false);
-  if (choice === 'continue') {
-    const data = savedTrack();
-    if (data) {
-      loadInto(() => track.load(data));
-      pristine = false;
-    }
-    const v = startView();
-    flyTo(v.pos, v.target);
-  } else if (choice === 'demo') {
-    const v = startView();
-    flyTo(v.pos, v.target, 1.2, () => play());
-  } else {
-    startNewTrack();
-    let seen = false;
-    try {
-      seen = !!localStorage.getItem('lr3d.helpSeen');
-      localStorage.setItem('lr3d.helpSeen', '1');
-    } catch {
-      /* storage unavailable */
-    }
-    if (!seen) setTimeout(() => ui.showHelp(), 900);
-  }
 }
+
+/** Level mode: no editing, rider controls on, nothing is autosaved. */
+function setLevel(index: number | null) {
+  currentLevel = index;
+  editor.enabled = index === null;
+  document.body.classList.toggle('level-mode', index !== null);
+  ui.setRiderMode(index !== null ? true : riderMode);
+}
+
+/** Effective rider mode: always on in levels. */
+const riderOn = () => currentLevel !== null || riderMode;
+
+async function startLevel(index: number) {
+  leaveTitle();
+  setLevel(index);
+  const level = LEVELS[index];
+  loadInto(() => level.build(track));
+  pristine = true;
+  editor.history.clear();
+  stop();
+  const v = startView();
+  flyTo(v.pos, v.target, 1.3);
+  const best = loadProgress()[level.id]?.stars ?? 0;
+  const goals = rateRun(track, runStats.stats).goals.map((g) => g.label);
+  await ui.showLevelIntro(index + 1, level.name, level.tip, goals, best);
+  play();
+}
+
+async function backToLevels() {
+  stop();
+  const idx = await pickLevel();
+  if (idx === null) enterTitle();
+  else startLevel(idx);
+}
+
+/** Wardrobe preview: the title camera moves in close on Bosh. */
+let closeUp = false;
 
 /** Slow cinematic orbit around the rider behind the title screen. */
 function attractCamera(time: number, dt: number) {
-  const k = 1 - Math.exp(-dt * 2);
-  controls.target.lerp(riderCenter, k);
+  const k = 1 - Math.exp(-dt * (closeUp ? 3 : 2));
+  const focus = closeUp ? riderCenter.clone().add(new THREE.Vector3(0, -0.7, 0)) : riderCenter;
+  controls.target.lerp(focus, k);
   const a = time * 0.12;
-  const desired = riderCenter.clone().add(new THREE.Vector3(Math.sin(a) * 16, 5 + Math.sin(time * 0.3) * 2, Math.cos(a) * 16));
+  const dist = closeUp ? 5.8 : 16;
+  const desired = riderCenter.clone().add(new THREE.Vector3(Math.sin(a) * dist, (closeUp ? 0.6 : 5) + Math.sin(time * 0.3) * (closeUp ? 0.2 : 2), Math.cos(a) * dist));
   camera.position.lerp(desired, k);
   camera.lookAt(controls.target);
 }
@@ -500,9 +605,19 @@ function checkRunEnd(dt: number) {
   const wasReplay = replaying;
   replaying = false;
   const rating = rateRun(track, s);
+  let levelInfo: { number: number; name: string; nextUnlocked: boolean; hasNext: boolean } | undefined;
+  if (currentLevel !== null && !wasReplay) saveLevelResult(LEVELS[currentLevel].id, rating.stars, s.score);
+  if (currentLevel !== null) {
+    levelInfo = {
+      number: currentLevel + 1,
+      name: LEVELS[currentLevel].name,
+      hasNext: currentLevel + 1 < LEVELS.length,
+      nextUnlocked: isUnlocked(currentLevel + 1),
+    };
+  }
   // Save this run as the ghost to beat if it's the best so far.
   let ghostSaved = false;
-  if (!wasReplay && riderMode) {
+  if (!wasReplay && riderOn()) {
     const key = trackKey();
     if (beats(s.score, s.finishTime, loadGhost(key))) {
       saveGhost(key, { rle: encodeInputs(sim.inputsUpTo(frame)), frames: frame, score: s.score, finishTime: s.finishTime });
@@ -513,7 +628,15 @@ function checkRunEnd(dt: number) {
   if (rating.stars === 3) setTimeout(() => sound.perfect(), 700);
   ui.showSummary(
     { ...s },
-    { ...best, riderMode, goals: rating.goals, rating: rating.stars, starsTotal: track.stars.size, ghostSaved },
+    {
+      ...best,
+      riderMode: riderOn(),
+      goals: rating.goals,
+      rating: rating.stars,
+      starsTotal: track.stars.size,
+      ghostSaved,
+      level: levelInfo,
+    },
     () => {
       resetRun();
       play();
@@ -524,6 +647,10 @@ function checkRunEnd(dt: number) {
       replaying = true;
       resetRun();
       play();
+    },
+    () => backToLevels(),
+    () => {
+      if (currentLevel !== null) startLevel(currentLevel + 1);
     },
   );
 }
@@ -544,7 +671,7 @@ renderer.setAnimationLoop((time) => {
   }
   // Rider mode: record the live input for every step we are about to simulate
   // (including the look-ahead step used for interpolation).
-  if (playing && mode === 'game' && riderMode && !replaying) {
+  if (playing && mode === 'game' && riderOn() && !replaying) {
     const mask = keyMask | touchMask;
     for (let f = startFrame; f <= frame; f++) sim.setInput(f, mask);
   }
@@ -615,12 +742,12 @@ renderer.setAnimationLoop((time) => {
   flash = Math.max(0, flash - dt * 1.5);
   postfx.flash = flash;
 
-  editor.update(!playing && mode === 'game');
+  editor.update(!playing && mode === 'game' && currentLevel === null);
   trackView.update(t, riderCenter, sim.rider.stars);
   env.update(dt, controls.target, t);
   ui.setTime(frame, sim.recorded, STEPS_PER_SECOND);
   ui.setHud(mode === 'game' && (playing || frame > 0) && !summaryShown, stats, track.stars.size);
-  ui.setTouchPad(isTouch && riderMode && mode === 'game' && playing && !replaying);
+  ui.setTouchPad(isTouch && riderOn() && mode === 'game' && playing && !replaying);
   postfx.render(dt);
 
   if (!booted) {

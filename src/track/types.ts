@@ -22,6 +22,13 @@ export interface Stroke {
   bank: number;
   /** Path strokes: tilt turns inward automatically, like a bobsled run. */
   autoBank?: boolean;
+  /**
+   * Height of the track start, kept up to date by the Track: auto-banking
+   * estimates the rider's speed from how far below the start a point is.
+   */
+  bankRefY?: number;
+  /** Bobsled side walls along both edges (collide like the track). */
+  walls?: boolean;
   width: number;
 }
 
@@ -68,6 +75,8 @@ export interface Segment {
   up: THREE.Vector3;
   side: THREE.Vector3;
   halfWidth: number;
+  /** Side wall of a bobsled channel (plain surface, never boost/bouncy). */
+  wall?: boolean;
 }
 
 export const LINE_COLORS: Record<LineType, number> = {

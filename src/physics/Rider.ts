@@ -47,7 +47,7 @@ export const EVENT = { ring: 1, bounce: 2, star: 4, finish: 8 } as const;
 
 /** Max number of stars per track (one bit each in the recorded state). */
 export const MAX_STARS = 48;
-const STAR_RADIUS = 1.3;
+const STAR_RADIUS = 1.8;
 
 export const P = {
   tailL: 0,
@@ -247,13 +247,17 @@ export class Rider {
   private applyBounce() {
     if (!this.bounce) return;
     const { up, speed } = this.bounce;
-    let avg = 0;
-    for (let i = 0; i < POINT_COUNT; i++) avg += tmp.subVectors(this.pos[i], this.prev[i]).dot(up);
-    avg /= POINT_COUNT;
-    const delta = speed - avg;
-    if (delta <= 0) return;
-    if (delta > 0.08) this.events |= EVENT.bounce;
-    for (let i = 0; i < POINT_COUNT; i++) this.prev[i].addScaledVector(up, -delta);
+    // Average velocity of the whole rider.
+    const avg = new THREE.Vector3();
+    for (let i = 0; i < POINT_COUNT; i++) avg.add(tmp.subVectors(this.pos[i], this.prev[i]));
+    avg.divideScalar(POINT_COUNT);
+    const vn = avg.dot(up);
+    if (speed - vn <= 0) return;
+    if (speed - vn > 0.08) this.events |= EVENT.bounce;
+    // Launch as one rigid body: same velocity for every point, so a bounce
+    // never adds spin (which would pile up over several pads).
+    avg.addScaledVector(up, speed - vn);
+    for (let i = 0; i < POINT_COUNT; i++) this.prev[i].copy(this.pos[i]).sub(avg);
   }
 
   /**
@@ -389,7 +393,7 @@ export class Rider {
         vel.subVectors(p, this.prev[i]);
         const incoming = vel.dot(seg.up);
         if (incoming > 0) continue; // moving away: let it pass
-        const type = seg.stroke.type;
+        const type = seg.wall ? 'normal' : seg.stroke.type;
 
         // Push out of the surface.
         p.addScaledVector(seg.up, -d);
@@ -404,7 +408,7 @@ export class Rider {
           if (speed > 1e-9) vt.multiplyScalar(Math.max(0, 1 - (def.friction * -d) / speed));
         }
         // Sled runners resist sliding sideways (rear only, so the sled self-aligns).
-        if (def.runner && !this.crashed && type !== 'ice') {
+        if (def.runner && !this.crashed && type !== 'ice' && !seg.wall) {
           const lat = tmp.copy(side).addScaledVector(seg.up, -side.dot(seg.up));
           if (lat.lengthSq() > 1e-6) {
             lat.normalize();

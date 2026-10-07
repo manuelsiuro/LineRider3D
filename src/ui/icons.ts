@@ -37,6 +37,7 @@ const P: Record<string, string> = {
   flagFinish: '<path d="M5 22V3"/><path d="M5 4h14v9H5"/><path d="M9 4v9M13 4v9M5 8.5h14"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   circle: '<circle cx="12" cy="12" r="8"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/>',
   replay: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
   snowflake:
