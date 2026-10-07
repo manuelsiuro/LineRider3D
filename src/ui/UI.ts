@@ -1313,7 +1313,7 @@ export class UI {
         </div>
         <p class="keys"><b>Desktop</b> left-drag draw · right-drag orbit · middle-drag pan · wheel zoom<br/>
         <b>Touch</b> one finger draw · two fingers orbit &amp; zoom · Camera tool to pan<br/>
-        <b>Keys</b> ← → ride · ↑ spin · V ride · Space play · Esc stop · Q W E B R D S H tools · C camera · F focus · Ctrl+Z undo</p>
+        <b>Keys</b> ← → ride · ↑ spin · V ride · Space play · Esc pause · P photo · Q W E B R D S H tools · C camera · F focus · Ctrl+Z undo</p>
         <div class="actions"><button class="big-btn primary">Let's ride!</button></div>
       </div>`,
     );
