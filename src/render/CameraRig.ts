@@ -18,11 +18,18 @@ export class CameraRig {
   private smoothed = new THREE.Vector3();
   private heading = new THREE.Vector3(1, 0, 0);
   private shakeAmount = 0;
+  /** Momentary zoom-in, in degrees of FOV. */
+  private punchAmount = 0;
   private shakeOffset = new THREE.Vector3();
   readonly baseFov: number;
 
   constructor(private camera: THREE.PerspectiveCamera, private controls: OrbitControls) {
     this.baseFov = camera.fov;
+  }
+
+  /** Quick zoom-in that eases back (big landings, wipeouts). */
+  punch(degrees: number) {
+    this.punchAmount = Math.max(this.punchAmount, degrees);
   }
 
   shake(amount: number) {
@@ -38,8 +45,9 @@ export class CameraRig {
   /** Eases the field of view toward the base value (speed widens it). */
   settle(dt: number, speedPerSecond = 0) {
     this.clearShake();
-    const target = this.baseFov + THREE.MathUtils.clamp((speedPerSecond - 10) * 0.45, 0, 14);
-    const fov = THREE.MathUtils.lerp(this.camera.fov, target, 1 - Math.exp(-dt * 3));
+    this.punchAmount *= Math.exp(-dt * 2.2);
+    const target = this.baseFov + THREE.MathUtils.clamp((speedPerSecond - 10) * 0.45, 0, 14) - this.punchAmount;
+    const fov = THREE.MathUtils.lerp(this.camera.fov, target, 1 - Math.exp(-dt * (this.punchAmount > 1 ? 9 : 3)));
     if (Math.abs(fov - this.camera.fov) > 0.01) {
       this.camera.fov = fov;
       this.camera.updateProjectionMatrix();

@@ -81,6 +81,20 @@ let acc = 0;
 let summaryShown = false;
 let crashClock = 0;
 let finishClock = 0;
+
+// ------------------------------------------------------------------ slow motion moments
+/** Playback speed (1 = real time). Only playback: the simulation stays exact. */
+let timeScale = 1;
+let slowTarget = 1;
+let slowTimer = 0;
+let impact = 0;
+
+/** Bullet time for `seconds` of real time. */
+function slowmo(scale: number, seconds: number) {
+  slowTarget = scale;
+  slowTimer = seconds;
+  sound.slowmoHit();
+}
 /** Stars already sparkled this run (so scrubbing doesn't repeat them). */
 const sparkled = new Set<number>();
 let flash = 0;
@@ -207,6 +221,8 @@ function focusRider() {
 
 // ------------------------------------------------------------------ run control
 function resetRun() {
+  slowTimer = 0;
+  impact = 0;
   frame = 0;
   acc = 0;
   summaryShown = false;
@@ -582,6 +598,17 @@ function handleRideEvents(events: number, justCrashed: boolean) {
     sound.crash();
     ui.popup('WIPEOUT!', 'crash');
     rig.shake(0.6);
+    rig.punch(12);
+    slowmo(0.22, 1.1);
+    impact = 1;
+  }
+  // Big touchdowns get a moment of bullet time.
+  for (const td of runStats.takeTouchdowns()) {
+    if (Math.abs(td.rotation) > 5.2 || td.air > 1.3) {
+      slowmo(0.3, 0.5);
+      rig.punch(8);
+      flash = Math.max(flash, 0.15);
+    }
   }
   for (const trick of runStats.takeTricks()) {
     ui.trick(trick);
@@ -660,9 +687,17 @@ renderer.setAnimationLoop((time) => {
   const dt = Math.min(timer.getDelta(), 0.1);
   const t = timer.getElapsed();
 
+  // Ease the time scale toward the current slow-motion target.
+  slowTimer = Math.max(0, slowTimer - dt);
+  const scaleTarget = slowTimer > 0 && mode === 'game' ? slowTarget : 1;
+  timeScale += (scaleTarget - timeScale) * (1 - Math.exp(-dt * (scaleTarget < timeScale ? 18 : 5)));
+  sound.slowmo(timeScale);
+  impact = Math.max(0, impact - dt * 0.8);
+  postfx.impact = impact;
+
   const startFrame = frame;
   if (playing) {
-    acc += dt * (slowMo && mode === 'game' ? 0.25 : 1);
+    acc += dt * timeScale * (slowMo && mode === 'game' ? 0.25 : 1);
     while (acc >= STEP) {
       acc -= STEP;
       frame++;
@@ -758,4 +793,4 @@ renderer.setAnimationLoop((time) => {
   }
 });
 
-if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, keys: (m: number) => (keyMask = m), ghostInfo: () => ({ visible: ghostView.root.visible, frame: ghost?.sim.frame, butt: ghost?.sim.rider.pos[P.butt].toArray(), me: sim.rider.pos[P.butt].toArray() }) } });
+if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, keys: (m: number) => (keyMask = m), fx: () => ({ timeScale, impact, fov: camera.fov }), ghostInfo: () => ({ visible: ghostView.root.visible, frame: ghost?.sim.frame, butt: ghost?.sim.rider.pos[P.butt].toArray(), me: sim.rider.pos[P.butt].toArray() }) } });

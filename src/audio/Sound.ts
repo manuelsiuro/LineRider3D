@@ -22,6 +22,7 @@ interface Layer {
 export class Sound {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
+  private muffle!: BiquadFilterNode;
   private sfx!: GainNode;
   private music!: GainNode;
   private reverb!: ConvolverNode;
@@ -67,7 +68,11 @@ export class Sound {
     this.master.gain.value = 0.9;
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16;
-    this.master.connect(comp).connect(ctx.destination);
+    // Low-pass on everything: opened fully normally, closed in slow motion.
+    this.muffle = ctx.createBiquadFilter();
+    this.muffle.type = 'lowpass';
+    this.muffle.frequency.value = 20000;
+    this.master.connect(this.muffle).connect(comp).connect(ctx.destination);
 
     this.sfx = ctx.createGain();
     this.sfx.gain.value = this.sfxOn ? 1 : 0;
@@ -148,6 +153,28 @@ export class Sound {
     } catch {
       /* storage unavailable */
     }
+  }
+
+  /** Muffles the mix during slow motion (timeScale < 1). */
+  slowmo(timeScale: number) {
+    if (!this.ctx) return;
+    const f = timeScale >= 0.99 ? 20000 : 500 + 6000 * timeScale;
+    this.muffle.frequency.setTargetAtTime(f, this.ctx.currentTime, 0.05);
+  }
+
+  /** Deep whoosh at the start of a slow-motion moment. */
+  slowmoHit() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(220, t);
+    osc.frequency.exponentialRampToValueAtTime(55, t + 0.6);
+    const g = ctx.createGain();
+    this.env(g, t, 0.25, 0.01, 0.7);
+    osc.connect(g).connect(this.sfx);
+    osc.start(t);
+    osc.stop(t + 0.8);
   }
 
   /** Updates ride layers. Speed in units/second. */

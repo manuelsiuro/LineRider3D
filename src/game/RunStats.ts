@@ -139,6 +139,8 @@ export class RunStats {
   private airRotation = 0;
   private pending: { rotation: number; air: number; frame: number; angle: number; spin: number } | null = null;
   private queue: Trick[] = [];
+  /** Touchdowns after a jump, for slow-motion moments. */
+  private touchdowns: { rotation: number; air: number }[] = [];
   private bestTrickPoints = 0;
   private chain = 0;
   private lastActionFrame = -1e9;
@@ -180,10 +182,18 @@ export class RunStats {
     this.airRotation = 0;
     this.pending = null;
     this.queue = [];
+    this.touchdowns = [];
     this.bestTrickPoints = 0;
     this.chain = 0;
     this.lastActionFrame = -1e9;
     this.lastTrickName = '';
+  }
+
+  /** Jumps that just touched down (rotation in radians, air in seconds). */
+  takeTouchdowns() {
+    const t = this.touchdowns;
+    this.touchdowns = [];
+    return t;
   }
 
   /** Tricks resolved since the last call (landed or bailed). */
@@ -294,6 +304,7 @@ export class RunStats {
           this.pending.spin = a[SPIN];
         } else if (this.airFrames >= MIN_AIR_FRAMES) {
           this.pending = { rotation: this.airRotation, air: this.airFrames / fps, frame: f, angle: this.landingAngle(sim, b), spin: a[SPIN] };
+          this.touchdowns.push({ rotation: this.airRotation, air: this.airFrames / fps });
         }
       }
       if (!airborne) this.airRotation = 0;
