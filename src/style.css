@@ -1977,3 +1977,32 @@ body.level-mode .top-right .btn-group:first-child {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
+
+.link-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #f3f6fa;
+  font: 500 13px var(--font-ui);
+  color: var(--ink-soft);
+}
+
+.challenge-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0 !important;
+  color: white !important;
+  font-weight: 600;
+}
+
+body.level-mode .share-btn {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .share-btn {
+    display: none;
+  }
+}

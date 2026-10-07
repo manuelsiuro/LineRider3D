@@ -22,6 +22,7 @@ export interface UIHandlers {
   focusRider(): void;
   levels(): void;
   mainMenu(): void;
+  share(challenge?: number): void;
   toggleSfx(): boolean;
   toggleMusic(): boolean;
   toggleRiderMode(): boolean;
@@ -40,6 +41,8 @@ export interface SummaryInfo {
   ghostSaved?: boolean;
   /** Set when playing a built-in level. */
   level?: { number: number; name: string; nextUnlocked: boolean; hasNext: boolean };
+  /** Score to beat from a friend's challenge link. */
+  challenge?: number;
 }
 
 export interface LevelCard {
@@ -150,6 +153,7 @@ export class UI {
     item('star', 'Levels', handlers.levels);
     item('plus', 'New track', handlers.newTrack);
     item('sled', 'Demo track', handlers.loadDemo);
+    item('share', 'Share link', () => handlers.share());
     item('download', 'Export track', handlers.exportTrack);
     item('upload', 'Import track', () => fileInput.click());
     item('help', 'How to play', () => this.showHelp());
@@ -183,7 +187,12 @@ export class UI {
     group1.append(this.undoBtn, this.redoBtn);
     const group2 = h('div', 'btn-group');
     group2.append(sfxBtn, musicBtn);
-    right.append(group1, focusBtn, this.camBtn, group2);
+    const shareBtn = button('btn icon-btn share-btn', icon('share'), 'Share this track');
+    shareBtn.onclick = () => {
+      handlers.click();
+      handlers.share();
+    };
+    right.append(group1, shareBtn, focusBtn, this.camBtn, group2);
     top.append(left, right);
     editor.history.onChange = () => this.refreshHistory();
     this.refreshHistory();
@@ -667,6 +676,72 @@ export class UI {
     });
   }
 
+  /** Shows a link to copy by hand (when the clipboard isn't available). */
+  showLink(url: string, challenge: number) {
+    const overlay = h(
+      'div',
+      'modal',
+      `<div class="card small">
+        <h2>${challenge ? 'Challenge a friend' : 'Share your track'}</h2>
+        <p>${challenge ? `Send this link: your friend rides the same track and tries to beat <b>${challenge.toLocaleString()}</b> points.` : 'Anyone with this link can ride your track.'}</p>
+        <input class="link-input" readonly value="${url}" />
+        <div class="actions">
+          <button class="big-btn ghost" data-a="close">Close</button>
+          <button class="big-btn primary" data-a="copy">${icon('share', 18)} Copy link</button>
+        </div>
+      </div>`,
+    );
+    const input = overlay.querySelector('input')!;
+    setTimeout(() => input.select(), 50);
+    overlay.onclick = async (e) => {
+      const btn = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+      if (btn?.dataset.a === 'copy') {
+        this.handlers.click();
+        input.select();
+        let ok = false;
+        try {
+          await Promise.race([navigator.clipboard.writeText(url), new Promise((_, no) => setTimeout(no, 1500))]);
+          ok = true;
+        } catch {
+          // Older browsers: copy the selected text.
+          ok = document.execCommand?.('copy') ?? false;
+        }
+        btn.innerHTML = ok ? `${icon('check', 18)} Copied!` : 'Select & copy the link';
+        return;
+      }
+      if (!btn && e.target !== overlay) return;
+      overlay.classList.add('leaving');
+      setTimeout(() => overlay.remove(), 200);
+    };
+    document.body.append(overlay);
+  }
+
+  /** Intro for a track opened from a share link. */
+  showSharedIntro(challenge: number, goals: string[]): Promise<void> {
+    return new Promise((resolve) => {
+      const overlay = h(
+        'div',
+        'modal intro',
+        `<div class="card">
+          <span class="badge dark">${challenge ? 'Challenge' : 'Shared track'}</span>
+          <h2>${challenge ? `Beat ${challenge.toLocaleString()} points!` : 'A friend shared a track'}</h2>
+          <p>${challenge ? 'Your friend set this score on this track. Can you top it?' : 'Ride it, then edit it or make it your own.'}</p>
+          <ul class="intro-goals">${goals.map((g) => `<li>${icon('star', 18)}${g}</li>`).join('')}</ul>
+          <p class="keys">${icon('gamepad', 14)} → push · ← brake · in the air: flip, release to land</p>
+          <div class="actions"><button class="big-btn primary">${icon('play', 18)} Ride!</button></div>
+        </div>`,
+      );
+      overlay.onclick = (e) => {
+        if (!(e.target as HTMLElement).closest('button') && e.target !== overlay) return;
+        this.handlers.click();
+        overlay.classList.add('leaving');
+        setTimeout(() => overlay.remove(), 200);
+        resolve();
+      };
+      document.body.append(overlay);
+    });
+  }
+
   /** Level intro card with its goals. */
   showLevelIntro(number: number, name: string, tip: string, goals: string[], stars: number): Promise<void> {
     return new Promise((resolve) => {
@@ -720,6 +795,11 @@ export class UI {
           </div>
           ${stats.bestTrick ? `<p class="best-trick">Best trick: <b>${stats.bestTrick}</b></p>` : ''}
           ${info.ghostSaved ? `<span class="ghost-badge">${icon('eye', 14)} Saved as your ghost to beat</span>` : ''}
+          ${
+            info.challenge
+              ? `<p class="challenge-line">${stats.score >= info.challenge ? `${icon('trophy', 16)} You beat the challenge of ${info.challenge.toLocaleString()}!` : `${(info.challenge - stats.score).toLocaleString()} points short of the ${info.challenge.toLocaleString()} challenge`}</p>`
+              : ''
+          }
         </div>
         <ul class="goals">${info.goals.map((g) => `<li class="${g.done ? 'done' : ''}">${icon(g.done ? 'check' : 'circle', 16)}${g.label}</li>`).join('')}</ul>
         <div class="stats">
@@ -737,8 +817,9 @@ export class UI {
                  <button class="big-btn ghost icon-only" data-a="watch" title="Watch replay" aria-label="Watch replay">${icon('eye', 20)}</button>
                  <button class="big-btn ${info.level.hasNext && info.level.nextUnlocked ? 'ghost' : 'primary'}" data-a="replay">${icon('replay', 18)} Retry</button>
                  ${info.level.hasNext && info.level.nextUnlocked ? `<button class="big-btn primary" data-a="next">Next ${icon('chevronRight', 18)}</button>` : ''}`
-              : `<button class="big-btn ghost" data-a="edit">${icon('pencil', 18)} Edit</button>
-                 ${info.riderMode ? `<button class="big-btn ghost" data-a="watch">${icon('eye', 18)} Replay</button>` : ''}
+              : `<button class="big-btn ghost icon-only" data-a="edit" title="Edit track" aria-label="Edit track">${icon('pencil', 20)}</button>
+                 ${info.riderMode ? `<button class="big-btn ghost icon-only" data-a="watch" title="Watch replay" aria-label="Watch replay">${icon('eye', 20)}</button>` : ''}
+                 ${stats.score > 0 ? `<button class="big-btn ghost" data-a="challenge">${icon('share', 18)} Challenge</button>` : ''}
                  <button class="big-btn primary" data-a="replay">${icon('replay', 18)} Ride again</button>`
           }
         </div>
@@ -748,6 +829,10 @@ export class UI {
       const a = (e.target as HTMLElement).closest('button')?.dataset.a;
       if (!a && e.target !== overlay) return;
       this.handlers.click();
+      if (a === 'challenge') {
+        this.handlers.share(stats.score);
+        return;
+      }
       overlay.classList.add('leaving');
       setTimeout(() => overlay.remove(), 250);
       if (a === 'replay') onReplay();
@@ -755,6 +840,7 @@ export class UI {
       else if (a === 'watch') onWatch();
       else if (a === 'levels') onLevels?.();
       else if (a === 'next') onNext?.();
+
     };
     document.body.append(overlay);
   }

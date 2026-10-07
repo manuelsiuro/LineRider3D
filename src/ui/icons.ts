@@ -38,6 +38,7 @@ const P: Record<string, string> = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   circle: '<circle cx="12" cy="12" r="8"/>',
   lock: '<rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
   home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/>',
   replay: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
   snowflake:

@@ -7,7 +7,7 @@ Draw tracks in a snowy landscape and watch Bosh sled down them. Works on desktop
 npm install
 npm run dev            # http://localhost:5173 (also exposed on your LAN for phones)
 npm run build          # type-check + production build in dist/
-npm run test:physics   # headless physics runs (demo track + banked turn)
+npm run test:physics   # headless checks: physics, controls, scoring, ghosts, every level
 ```
 
 ## How it plays
@@ -24,13 +24,27 @@ npm run test:physics   # headless physics runs (demo track + banked turn)
 - Tools: Pencil, Line, Eraser, Bank (drag to tilt a track), Decor (pines, snowmen, cabins…), Ring, Start flag, Camera.
 - Timeline scrubbing is exact: the simulation is deterministic at 40 steps/s and every frame is recorded.
 
+## Game modes
+
+- **Play**: eight built-in levels (First Run → Grand Finale), each teaching a mechanic. Every level has
+  three goals (reach the finish, collect all stars, reach the target score) worth one star each.
+  A star on a level unlocks the next; total stars unlock outfits for Bosh in the **Wardrobe**.
+- **Create**: the track editor. Add stars, boost rings and a finish gate with the **Items** tool and set
+  the target score, then share it.
+- **Share**: the ⤴ button (or ☰ › Share link) puts the whole track in a link. From a run summary,
+  **Challenge** shares the track with your score to beat.
+
 ## Rider mode
 
 Toggle the 🎮 button in the player bar to control Bosh:
 
 - **→ / ↑** push (on a track, up to ~50 km/h) · **← / ↓** brake
-- In the air the same keys **flip** Bosh forward / backward. Land clean to score:
-  Frontflip / Backflip 1000, Double 4000, Triple 9000 (+ airtime), Big Air, rings +250.
+- In the air the same keys **flip** Bosh forward / backward; release to stop spinning.
+  Landing mid-spin is a wipeout. Frontflip / Backflip 1000, Double 4000, Triple 9000 (+ airtime),
+  Big Air, rings +250.
+- **Landing grades**: Perfect ×2 (flat on the slope, not spinning), Good ×1, Sketchy ×½.
+- **Combos**: tricks, rings and stars chained within 3.5 s raise a multiplier up to ×5.
+- **Ghost**: your best run on each track rides alongside you as a translucent Bosh.
 - Touch screens get on-screen Push / Brake buttons.
 - Inputs are recorded per frame, so runs stay deterministic: **Replay** shows exactly what you did,
   and rewinding the timeline then playing lets you retry from that moment.
@@ -41,7 +55,8 @@ Toggle the 🎮 button in the player bar to control Bosh:
 - Title screen with a live demo run and cinematic camera behind it
 - Bloom, sky reflections, color grading, speed trail, snow particles, camera shake
 - Procedural WebAudio sound (wind, runners, snow, crash, rings, bounces) and ambient music
-- Live speed gauge, airtime, callouts and an end-of-run summary
+- Live speed gauge, airtime, combo meter, callouts and an end-of-run summary with a 3-star rating
+- Bullet time on big landings and slow-motion wipeouts
 
 ## Code map
 
@@ -54,6 +69,7 @@ Toggle the 🎮 button in the player bar to control Bosh:
 | `src/world/` | Sky, terrain, mountains, forest, snowfall, procedural decor models |
 | `src/ui/` | HTML overlay: title, HUD, toolbar, dialogs, SVG icons |
 | `src/audio/` | Procedural sound effects and music |
-| `src/game/` | Run statistics derived from the recorded simulation |
+| `src/game/` | Run stats & scoring, rating, ghosts, progress/outfits, share links |
+| `src/levels/` | Built-in levels and the builders that shape them from measured physics |
 
 Tracks autosave to `localStorage`; use the ☰ menu to export/import JSON.

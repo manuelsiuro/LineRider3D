@@ -17,6 +17,7 @@ import { PostFX } from './render/PostFX';
 import { Sound } from './audio/Sound';
 import { RunStats } from './game/RunStats';
 import { buildDemoTrack } from './demoTrack';
+import { readSharedLink, shareLink } from './game/share';
 import { rateRun } from './game/rating';
 import { GhostRun, beats, encodeInputs, loadGhost, saveGhost } from './game/Ghost';
 import { LEVELS } from './levels/levels';
@@ -371,6 +372,20 @@ applyOutfit(selectedOutfit());
     });
   },
   focusRider,
+  async share(score = 0) {
+    const url = await shareLink(track.serialize(), score);
+    const text = score > 0 ? `I scored ${score.toLocaleString()} on this Line Rider 3D track. Can you beat it?` : 'Ride my Line Rider 3D track!';
+    // Phones: the native share sheet. Elsewhere: a dialog with a copy button.
+    if (navigator.share && isTouch) {
+      try {
+        await navigator.share({ title: 'Line Rider 3D', text, url });
+        return;
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+      }
+    }
+    ui.showLink(url, score);
+  },
   toggleSfx() {
     sound.setSfx(!sound.sfxOn);
     return sound.sfxOn;
@@ -395,6 +410,7 @@ applyOutfit(selectedOutfit());
 }, riderMode);
 
 function startNewTrack() {
+  challengeScore = 0;
   loadInto(() => {
     track.clear();
     track.setStart(new THREE.Vector3(0, 12, 0));
@@ -408,9 +424,12 @@ function startNewTrack() {
 // ------------------------------------------------------------------ title, levels, wardrobe
 /** Index of the built-in level being played, or null in the editor. */
 let currentLevel: number | null = null;
+/** Score to beat when the track came from a friend's challenge link. */
+let challengeScore = 0;
 
 function enterTitle() {
   mode = 'title';
+  challengeScore = 0;
   ghost = null;
   setLevel(null);
   loadInto(() => buildDemoTrack(track));
@@ -509,6 +528,7 @@ const riderOn = () => currentLevel !== null || riderMode;
 
 async function startLevel(index: number) {
   leaveTitle();
+  challengeScore = 0;
   setLevel(index);
   const level = LEVELS[index];
   loadInto(() => level.build(track));
@@ -663,6 +683,7 @@ function checkRunEnd(dt: number) {
       starsTotal: track.stars.size,
       ghostSaved,
       level: levelInfo,
+      challenge: challengeScore,
     },
     () => {
       resetRun();
@@ -789,8 +810,32 @@ renderer.setAnimationLoop((time) => {
     booted = true;
     document.getElementById('boot')?.classList.add('gone');
     setTimeout(() => document.getElementById('boot')?.remove(), 700);
-    enterTitle();
+    // A share link opens its track directly; otherwise show the title.
+    readSharedLink()
+      .then((shared) => (shared ? enterShared(shared.data, shared.challenge) : enterTitle()))
+      .catch(() => {
+        ui.flash('That share link looks broken');
+        enterTitle();
+      });
   }
 });
+
+/** Opens a track from a share link, with an intro (and the challenge score). */
+async function enterShared(data: SerializedTrack, challenge: number) {
+  leaveTitle();
+  setLevel(null);
+  loadInto(() => track.load(data));
+  pristine = true;
+  challengeScore = challenge;
+  history.replaceState(null, '', location.pathname + location.search);
+  if (challenge > 0) {
+    riderMode = true;
+    ui.setRiderMode(true);
+  }
+  const v = startView();
+  flyTo(v.pos, v.target, 1.3);
+  await ui.showSharedIntro(challenge, rateRun(track, runStats.stats).goals.map((g) => g.label));
+  play();
+}
 
 if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, keys: (m: number) => (keyMask = m), fx: () => ({ timeScale, impact, fov: camera.fov }), ghostInfo: () => ({ visible: ghostView.root.visible, frame: ghost?.sim.frame, butt: ghost?.sim.rider.pos[P.butt].toArray(), me: sim.rider.pos[P.butt].toArray() }) } });
