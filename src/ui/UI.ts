@@ -6,6 +6,8 @@ import type { Stats, Trick } from '../game/RunStats';
 import { GRADE_LABEL } from '../game/RunStats';
 import { icon } from './icons';
 
+const hex = (n: number) => n.toString(16).padStart(6, '0');
+
 /** Writes text only when it changed (the HUD updates every frame). */
 function setText(el: Element, text: string) {
   if (el.textContent !== text) el.textContent = text;
@@ -16,7 +18,7 @@ export function overlayOpen() {
   return document.querySelector('.modal, .screen, .summary, .title-screen') !== null;
 }
 
-export type TitleChoice = 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings';
+export type TitleChoice = 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies';
 export type PauseChoice = 'resume' | 'restart' | 'settings' | 'levels' | 'menu';
 
 export interface UIHandlers {
@@ -81,6 +83,20 @@ export interface VehicleCard {
   name: string;
   blurb: string;
   stats: { speed: number; grip: number; air: number; toughness: number };
+  /** Ride challenges done / total. */
+  progress: { done: number; total: number };
+  paints: { id: string; name: string; colors: number[]; unlocked: boolean; need: number }[];
+  paint: string;
+}
+
+export interface TrophyCard {
+  id: string;
+  title: string;
+  desc: string;
+  /** Ride icon for ride challenges. */
+  ride?: string;
+  rideName?: string;
+  unlocked: boolean;
 }
 
 /** Ride choice shown on a level intro. */
@@ -644,6 +660,7 @@ export class UI {
             <div class="title-row">
               <button class="big-btn ghost" data-c="garage">${icon('garage', 18)} Garage</button>
               <button class="big-btn ghost" data-c="wardrobe">${icon('sled', 18)} Wardrobe</button>
+              <button class="big-btn ghost" data-c="trophies">${icon('trophy', 18)} Trophies</button>
               <button class="big-btn ghost icon-only" data-c="settings" title="Settings" aria-label="Settings">${icon('gear', 18)}</button>
               ${hasSave ? `<button class="big-btn ghost" data-c="new">${icon('plus', 18)} New track</button>` : ''}
             </div>
@@ -656,7 +673,7 @@ export class UI {
         if (!c) return;
         this.handlers.click();
         overlay.classList.add('leaving');
-        if (c !== 'levels' && c !== 'wardrobe' && c !== 'garage' && c !== 'settings') document.body.classList.remove('on-title');
+        if (c !== 'levels' && c !== 'wardrobe' && c !== 'garage' && c !== 'settings' && c !== 'trophies') document.body.classList.remove('on-title');
         setTimeout(() => overlay.remove(), 450);
         resolve(c);
       };
@@ -758,7 +775,7 @@ export class UI {
   }
 
   /** Ride picker with stats; the ride is previewed live behind the screen. */
-  showGarage(cards: VehicleCard[], selected: string, onPick: (id: string) => void): Promise<void> {
+  showGarage(cards: VehicleCard[], selected: string, onPick: (id: string) => void, onPaint: (ride: string, paint: string) => VehicleCard[]): Promise<void> {
     return new Promise((resolve) => {
       const bars = (label: string, v: number) =>
         `<span class="stat"><span class="stat-label">${label}</span><span class="stat-bar">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= v ? 'on' : ''}"></i>`).join('')}</span></span>`;
@@ -770,6 +787,15 @@ export class UI {
               <span class="ride-name">${c.name}${c.id === sel ? `<span class="ride-tag">${icon('check', 13)} Riding</span>` : ''}</span>
               <span class="ride-blurb">${c.blurb}</span>
               <span class="ride-stats">${bars('Speed', c.stats.speed)}${bars('Grip', c.stats.grip)}${bars('Air', c.stats.air)}${bars('Tough', c.stats.toughness)}</span>
+              <span class="ride-paints">
+                <span class="ride-prog">${icon('trophy', 13)} ${c.progress.done}/${c.progress.total}</span>
+                ${c.paints
+                  .map((p) => {
+                    const bg = p.colors.length ? `background:linear-gradient(135deg,#${hex(p.colors[0])} 55%,#${hex(p.colors[1])} 55%)` : '';
+                    return `<i class="paint ${p.id === c.paint ? 'on' : ''} ${p.unlocked ? '' : 'locked'} ${p.colors.length ? '' : 'outfit'}" data-ride="${c.id}" data-paint="${p.id}" title="${p.unlocked ? p.name : `${p.name}: complete ${p.need} ride challenge${p.need > 1 ? 's' : ''}`}" style="${bg}">${p.unlocked ? '' : icon('lock', 11)}</i>`;
+                  })
+                  .join('')}
+              </span>
             </button>`,
           )
           .join('');
@@ -795,8 +821,21 @@ export class UI {
           resolve();
           return;
         }
+        const paint = (e.target as HTMLElement).closest('.paint') as HTMLElement | null;
+        if (paint) {
+          if (paint.classList.contains('locked')) {
+            this.flash(paint.title);
+            return;
+          }
+          cards = onPaint(paint.dataset.ride!, paint.dataset.paint!);
+          selected = paint.dataset.ride!;
+          onPick(selected);
+          overlay.querySelector('.ride-grid')!.innerHTML = render(selected);
+          return;
+        }
         const id = btn.dataset.id;
         if (!id) return;
+        selected = id;
         onPick(id);
         overlay.querySelector('.ride-grid')!.innerHTML = render(id);
       };
@@ -827,6 +866,82 @@ export class UI {
       const keys = ride.onPick(b.dataset.ride!);
       if (keysEl) keysEl.innerHTML = `${icon('gamepad', 14)} ${keys}`;
       render(b.dataset.ride!);
+    });
+  }
+
+  private toastQueue: { title: string; desc: string; ride?: string }[] = [];
+  private toasting = false;
+
+  /** Achievement unlocked banner (queued, one at a time). */
+  toast(title: string, desc: string, ride?: string) {
+    this.toastQueue.push({ title, desc, ride });
+    if (!this.toasting) this.nextToast();
+  }
+
+  private nextToast() {
+    const t = this.toastQueue.shift();
+    if (!t) {
+      this.toasting = false;
+      return;
+    }
+    this.toasting = true;
+    const el = h(
+      'div',
+      'toast',
+      `<span class="toast-icon">${icon(t.ride ?? 'trophy', 26)}</span>
+       <span class="toast-text"><small>${t.ride ? 'Ride challenge complete' : 'Achievement unlocked'}</small><b>${t.title}</b><em>${t.desc}</em></span>`,
+    );
+    document.body.append(el);
+    setTimeout(() => el.classList.add('leaving'), 3200);
+    setTimeout(() => {
+      el.remove();
+      this.nextToast();
+    }, 3600);
+  }
+
+  /** Achievements and ride challenges. */
+  showTrophies(cards: TrophyCard[]): Promise<void> {
+    return new Promise((resolve) => {
+      const done = cards.filter((c) => c.unlocked).length;
+      const groups = new Map<string, TrophyCard[]>();
+      for (const c of cards) {
+        const key = c.rideName ?? 'General';
+        groups.set(key, [...(groups.get(key) ?? []), c]);
+      }
+      const section = ([name, list]: [string, TrophyCard[]]) => `
+        <section class="trophy-group">
+          <h3>${list[0].ride ? icon(list[0].ride, 16) : icon('trophy', 16)} ${name}<span>${list.filter((c) => c.unlocked).length}/${list.length}</span></h3>
+          <div class="trophy-grid">${list
+            .map(
+              (c) => `<div class="trophy ${c.unlocked ? 'on' : ''}">
+                <span class="trophy-icon">${icon(c.unlocked ? 'trophy' : 'lock', 20)}</span>
+                <span><b>${c.title}</b><small>${c.desc}</small></span>
+              </div>`,
+            )
+            .join('')}</div>
+        </section>`;
+      const overlay = h(
+        'div',
+        'screen trophies',
+        `<div class="screen-inner">
+          <div class="screen-head">
+            <button class="btn icon-btn" data-back>${icon('chevronLeft')}</button>
+            <h2>Trophies</h2>
+            <span class="pill big">${icon('trophy', 16)} ${done} / ${cards.length}</span>
+          </div>
+          <p class="screen-sub">Ride challenges unlock new paint jobs in the Garage.</p>
+          ${[...groups.entries()].map(section).join('')}
+        </div>`,
+      );
+      overlay.onclick = (e) => {
+        const btn = (e.target as HTMLElement).closest('[data-back]');
+        if (!btn) return;
+        this.handlers.click();
+        overlay.classList.add('leaving');
+        setTimeout(() => overlay.remove(), 250);
+        resolve();
+      };
+      document.body.append(overlay);
     });
   }
 

@@ -4,6 +4,13 @@ import { SLED, type VehicleDef } from '../physics/vehicles';
 import { Limb, MAT } from './riderParts';
 import { buildVehicleModel, type Basis, type VehicleModel } from './vehicleModels';
 
+/** Paint job of the ride (overrides the outfit's ride colors). */
+export function applyPaint(main: number, accent: number) {
+  MAT.wood.color.setHex(main);
+  MAT.paint.color.setHex(main);
+  MAT.accent.color.setHex(accent);
+}
+
 /** Recolors Bosh and his ride (all player riders share these materials). */
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 

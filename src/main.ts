@@ -25,7 +25,8 @@ import { rateRun } from './game/rating';
 import { GhostRun, beats, encodeInputs, loadGhost, saveGhost } from './game/Ghost';
 import { LEVELS } from './levels/levels';
 import { OUTFITS, isUnlocked, loadProgress, saveLevelResult, selectOutfit, selectVehicle, selectedOutfit, selectedVehicleId, totalStars } from './game/progress';
-import { applyOutfit } from './render/RiderView';
+import { applyOutfit, applyPaint } from './render/RiderView';
+import { ACHIEVEMENTS, PAINTS, bumpWipeouts, evaluate, loadCounters, paintFor, rideProgress, selectPaint, unlockedAchievements, type RunContext } from './game/achievements';
 
 const STORAGE_KEY = 'lr3d.track';
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency ?? 8) <= 4;
@@ -100,6 +101,8 @@ function slowmo(scale: number, seconds: number) {
   slowTimer = seconds;
   sound.slowmoHit();
 }
+/** Tricks landed this run (for achievements). */
+const runTricks: string[] = [];
 /** Stars already sparkled this run (so scrubbing doesn't repeat them). */
 const sparkled = new Set<number>();
 let flash = 0;
@@ -152,6 +155,7 @@ function applyVehicle(def: VehicleDef) {
   sim.setVehicle(def);
   riderView.setVehicle(def);
   sound.setRide(def.sound);
+  dressRider();
   snowTracks.width = { sled: 0.07, skis: 0.07, snowboard: 0.18, bike: 0.08, moto: 0.12, buggy: 0.17 }[def.id];
   ui.setVehicle(def.id, def.name, lockReason());
   ghost = null;
@@ -162,6 +166,30 @@ function applyVehicle(def: VehicleDef) {
 function lockReason() {
   if (!lockedVehicle) return null;
   return challengeScore > 0 ? "the challenger's ride" : "this level's ride";
+}
+
+/** Outfit colors, then the ride's paint job on top. */
+function dressRider() {
+  applyOutfit(selectedOutfit());
+  const p = paintFor(vehicle.id);
+  if (p.colors) applyPaint(p.colors[0], p.colors[1]);
+}
+
+/** Garage cards with challenge progress and paint jobs. */
+function garageCards() {
+  const got = unlockedAchievements();
+  return VEHICLES.map((v) => {
+    const prog = rideProgress(v.id, got);
+    return {
+      id: v.id,
+      name: v.name,
+      blurb: v.blurb,
+      stats: v.stats,
+      progress: prog,
+      paint: paintFor(v.id).id,
+      paints: PAINTS[v.id].map((p) => ({ id: p.id, name: p.name, colors: p.colors ?? [], unlocked: prog.done >= p.need, need: p.need })),
+    };
+  });
 }
 
 /** Picks a ride as the player's choice (persisted). */
@@ -237,7 +265,7 @@ function savedTrack(): SerializedTrack | null {
 }
 
 loadInto(() => buildDemoTrack(track));
-applyOutfit(selectedOutfit());
+dressRider();
 
 // ------------------------------------------------------------------ camera moves
 const riderCenter = new THREE.Vector3();
@@ -299,6 +327,7 @@ function resetRun() {
   crashClock = 0;
   finishClock = 0;
   sparkled.clear();
+  runTricks.length = 0;
   effects.reset();
   trail.reset();
   snowTracks.reset();
@@ -542,7 +571,7 @@ async function titleFlow() {
         selectedOutfit().id,
         (id) => {
           selectOutfit(id);
-          applyOutfit(selectedOutfit());
+          dressRider();
         },
       );
       closeUp = false;
@@ -553,17 +582,36 @@ async function titleFlow() {
       await openSettings();
       continue;
     }
+    if (choice === 'trophies') {
+      const got = unlockedAchievements();
+      await ui.showTrophies(
+        ACHIEVEMENTS.map((a) => ({
+          id: a.id,
+          title: a.title,
+          desc: a.desc,
+          ride: a.ride,
+          rideName: a.ride ? vehicleById(a.ride).name : undefined,
+          unlocked: !!got[a.id],
+        })),
+      );
+      continue;
+    }
     if (choice === 'garage') {
       // Bosh waits at the start on his ride for a close look.
       closeUp = true;
       playing = false;
       resetRun();
       await ui.showGarage(
-        VEHICLES.map((v) => ({ id: v.id, name: v.name, blurb: v.blurb, stats: v.stats })),
+        garageCards(),
         vehicle.id,
         (id) => {
           chooseVehicle(id);
           playing = false;
+        },
+        (ride, paint) => {
+          selectPaint(ride as VehicleDef['id'], paint);
+          dressRider();
+          return garageCards();
         },
       );
       closeUp = false;
@@ -827,6 +875,7 @@ function handleRideEvents(events: number, justCrashed: boolean) {
     }
   }
   if (justCrashed) {
+    if (!replaying) wipeouts = bumpWipeouts();
     sound.crash();
     ui.popup('WIPEOUT!', 'crash');
     rig.shake(0.6);
@@ -845,9 +894,34 @@ function handleRideEvents(events: number, justCrashed: boolean) {
   for (const trick of runStats.takeTricks()) {
     ui.trick(trick);
     if (trick.bailed) continue;
+    runTricks.push(trick.name);
     if (trick.grade === 'perfect') sound.perfect();
     else if (trick.points >= 1000) sound.success();
     else sound.click(true);
+  }
+}
+
+let wipeouts = loadCounters().wipeouts;
+
+/** Unlocks achievements for the current run state (mid-run or at the end). */
+function checkAchievements(ended: boolean, rating = 0) {
+  if (mode !== 'game' || replaying) return;
+  const s = runStats.stats;
+  const ctx: RunContext = {
+    stats: s,
+    vehicle: vehicle.id,
+    levelId: currentLevel !== null ? LEVELS[currentLevel].id : null,
+    rating,
+    tricks: runTricks,
+    ended,
+    totalStars: totalStars(),
+    wipeouts,
+    beatChallenge: ended && challengeScore > 0 && s.score >= challengeScore,
+    ownTrack: currentLevel === null && challengeScore === 0 && !pristine,
+  };
+  for (const a of evaluate(ctx)) {
+    ui.toast(a.title, a.desc, a.ride);
+    sound.success();
   }
 }
 
@@ -890,6 +964,10 @@ function checkRunEnd(dt: number) {
   }
   const best = wasReplay ? { best: recordBest(0, 0).best, newBest: false } : recordBest(s.score, rating.stars);
   if (rating.stars === 3) setTimeout(() => sound.perfect(), 700);
+  if (!wasReplay) {
+    replaying = false;
+    checkAchievements(true, rating.stars);
+  }
   ui.showSummary(
     { ...s },
     {
@@ -981,6 +1059,7 @@ function loop(time: number) {
     trail.push(tail, side, stats.speed);
     snowTracks.update(frame, rider.pos, rider.contact, rider.crashed);
     if (mode === 'game') handleRideEvents(events, justCrashed);
+    if (frame % 10 === 0) checkAchievements(false);
   }
 
   // Ride sounds.

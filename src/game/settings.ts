@@ -47,7 +47,7 @@ export function saveSettings(s: Settings) {
 /** Wipes stars, bests, ghosts and unlocks (keeps settings and the editor track). */
 export function resetProgress() {
   try {
-    for (const k of ['lr3d.progress', 'lr3d.best', 'lr3d.ghosts', 'lr3d.outfit', 'lr3d.achievements', 'lr3d.paint']) localStorage.removeItem(k);
+    for (const k of ['lr3d.progress', 'lr3d.best', 'lr3d.ghosts', 'lr3d.outfit', 'lr3d.achievements', 'lr3d.paint', 'lr3d.counters']) localStorage.removeItem(k);
   } catch {
     /* storage unavailable */
   }
