@@ -16,6 +16,12 @@ const ACCEL = 0.012;
 const BREAK_STRAIN = 0.3;
 const RUNNER_GRIP = 0.25;
 const GROUND_FRICTION = 0.04;
+/** Bouncy lines return this much of the impact speed... */
+const RESTITUTION = 0.9;
+/** ...and always give at least this little hop. */
+const MIN_BOUNCE = 0.06;
+/** Velocity added (per step) when passing through a boost ring. */
+const RING_BOOST = 0.22;
 
 export const P = {
   tailL: 0,
@@ -138,7 +144,13 @@ export class Rider {
     this.crashed = false;
   }
 
+  private ringRef = new THREE.Vector3();
+  /** Strongest bouncy-line hit of this step, applied to the whole rider. */
+  private bounce: { up: THREE.Vector3; speed: number } | null = null;
+
   step(track: Track) {
+    this.ringRef.copy(this.pos[P.butt]);
+    this.bounce = null;
     // Integrate.
     for (let i = 0; i < POINT_COUNT; i++) {
       const p = this.pos[i];
@@ -151,6 +163,40 @@ export class Rider {
     for (let it = 0; it < ITERATIONS; it++) {
       this.satisfyBones(it % 2 === 0 ? BONES : BONES_MIRRORED, it === 0);
       this.collide(track);
+    }
+    this.applyBounce();
+    this.passRings(track, this.ringRef, this.pos[P.butt]);
+  }
+
+  /**
+   * Bouncy lines launch the whole rider at once (like a trampoline); bouncing
+   * only the contact points would rip Bosh off his sled.
+   */
+  private applyBounce() {
+    if (!this.bounce) return;
+    const { up, speed } = this.bounce;
+    let avg = 0;
+    for (let i = 0; i < POINT_COUNT; i++) avg += tmp.subVectors(this.pos[i], this.prev[i]).dot(up);
+    avg /= POINT_COUNT;
+    const delta = speed - avg;
+    if (delta <= 0) return;
+    for (let i = 0; i < POINT_COUNT; i++) this.prev[i].addScaledVector(up, -delta);
+  }
+
+  /** Boosts the rider when the body crosses a ring's plane inside its radius. */
+  private passRings(track: Track, from: THREE.Vector3, to: THREE.Vector3) {
+    for (const ring of track.rings.values()) {
+      const d0 = tmp.subVectors(from, ring.position).dot(ring.axis);
+      const d1 = tmp.subVectors(to, ring.position).dot(ring.axis);
+      if (d0 === d1 || Math.sign(d0) === Math.sign(d1)) continue;
+      // Where the path crosses the ring plane.
+      const t = d0 / (d0 - d1);
+      const hit = tmp.lerpVectors(from, to, t).sub(ring.position);
+      hit.addScaledVector(ring.axis, -hit.dot(ring.axis));
+      if (hit.length() > ring.radius) continue;
+      // Push along the axis, in the direction the rider is travelling.
+      const dir = d1 > d0 ? 1 : -1;
+      for (let i = 0; i < POINT_COUNT; i++) this.prev[i].addScaledVector(ring.axis, -dir * RING_BOOST);
     }
   }
 
@@ -195,7 +241,9 @@ export class Rider {
         const s = tmp.dot(seg.side);
         if (s < -seg.halfWidth || s > seg.halfWidth) continue;
         vel.subVectors(p, this.prev[i]);
-        if (vel.dot(seg.up) > 0) continue; // moving away: let it pass
+        const incoming = vel.dot(seg.up);
+        if (incoming > 0) continue; // moving away: let it pass
+        const type = seg.stroke.type;
 
         // Push out of the surface.
         p.addScaledVector(seg.up, -d);
@@ -204,20 +252,24 @@ export class Rider {
         vel.subVectors(p, this.prev[i]);
         const vn = vel.dot(seg.up);
         const vt = vel.addScaledVector(seg.up, -vn);
-        // Friction proportional to penetration (normal force).
-        if (def.friction > 0) {
+        // Friction proportional to penetration (normal force). Ice has none.
+        if (def.friction > 0 && type !== 'ice') {
           const speed = vt.length();
           if (speed > 1e-9) vt.multiplyScalar(Math.max(0, 1 - (def.friction * -d) / speed));
         }
         // Sled runners resist sliding sideways (rear only, so the sled self-aligns).
-        if (def.runner && !this.crashed) {
+        if (def.runner && !this.crashed && type !== 'ice') {
           const lat = tmp.copy(side).addScaledVector(seg.up, -side.dot(seg.up));
           if (lat.lengthSq() > 1e-6) {
             lat.normalize();
             vt.addScaledVector(lat, -vt.dot(lat) * RUNNER_GRIP);
           }
         }
-        if (seg.stroke.type === 'accel') vt.addScaledVector(seg.dir, ACCEL);
+        if (type === 'accel') vt.addScaledVector(seg.dir, ACCEL);
+        if (type === 'bouncy') {
+          const speed = Math.max(-incoming * RESTITUTION, MIN_BOUNCE);
+          if (!this.bounce || speed > this.bounce.speed) this.bounce = { up: seg.up, speed };
+        }
         this.prev[i].copy(p).sub(vt).addScaledVector(seg.up, -vn);
       }
 

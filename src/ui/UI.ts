@@ -23,6 +23,7 @@ const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
   { id: 'eraser', icon: '🧽', label: 'Eraser', key: 'E' },
   { id: 'bank', icon: '🌀', label: 'Bank', key: 'B' },
   { id: 'decor', icon: '🌲', label: 'Decor', key: 'D' },
+  { id: 'ring', icon: '💫', label: 'Ring', key: 'R' },
   { id: 'start', icon: '🚩', label: 'Start', key: 'S' },
   { id: 'hand', icon: '✋', label: 'Camera', key: 'H' },
 ];
@@ -30,6 +31,8 @@ const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
 const LINE_TYPES: { id: LineType; label: string }[] = [
   { id: 'normal', label: 'Track' },
   { id: 'accel', label: 'Boost' },
+  { id: 'ice', label: 'Ice' },
+  { id: 'bouncy', label: 'Bouncy' },
   { id: 'scenery', label: 'Scenery' },
 ];
 
@@ -234,9 +237,10 @@ export class UI {
       );
     } else {
       const tips: Partial<Record<Tool, string>> = {
-        eraser: 'Tap or drag over a track or decoration to remove it.',
+        eraser: 'Tap or drag over a track, ring or decoration to remove it.',
         bank: 'Drag a track left/right to tilt it (snaps every 15°).',
         start: 'Tap a track or the drawing plane to move the start flag.',
+        ring: 'Tap a track to put a boost ring over it, or tap the drawing plane. Riding through launches Bosh!',
         hand: 'Drag to orbit, two fingers / right-drag to pan, pinch / wheel to zoom.',
       };
       row().append(h('span', 'tip', tips[tool] ?? ''));
@@ -282,10 +286,11 @@ export class UI {
           <li>Start a stroke on the <b>end of another track</b> (orange ring) to connect them seamlessly.</li>
           <li>Tracks are solid on their <b>colored side</b>: draw left → right for a floor.</li>
           <li><b>Bank</b> tilts a track for turns, loops and corkscrews.</li>
+          <li>Track types: <b>Boost</b> speeds up, <b>Ice</b> has no grip, <b>Bouncy</b> is a trampoline. <b>💫 Rings</b> launch Bosh through them.</li>
         </ul>
         <p class="keys"><b>Desktop:</b> left-drag draw · right-drag orbit · middle-drag pan · wheel zoom<br/>
         <b>Mobile:</b> one finger draw · two fingers orbit &amp; pinch zoom · ✋ tool to pan</p>
-        <p class="keys">Space play/pause · Esc stop · Q W E B D S H tools · C camera · F focus · Ctrl+Z undo</p>
+        <p class="keys">Space play/pause · Esc stop · Q W E B D R S H tools · C camera · F focus · Ctrl+Z undo</p>
         <button class="btn wide">Let's ride!</button>
       </div>`,
     );

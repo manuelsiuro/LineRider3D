@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { segmentFrame } from './frames';
-import type { Decor, DecorKind, DrawMode, LineType, Segment, Stroke } from './types';
+import type { Decor, DecorKind, DrawMode, LineType, Ring, Segment, Stroke } from './types';
 
 const CELL = 4;
 
@@ -10,6 +10,8 @@ export type TrackEvent =
   | { kind: 'strokeChanged'; stroke: Stroke }
   | { kind: 'decorAdded'; decor: Decor }
   | { kind: 'decorRemoved'; decor: Decor }
+  | { kind: 'ringAdded'; ring: Ring }
+  | { kind: 'ringRemoved'; ring: Ring }
   | { kind: 'startChanged' }
   | { kind: 'cleared' };
 
@@ -26,11 +28,13 @@ interface SerializedTrack {
     width: number;
   }[];
   decor: { kind: DecorKind; position: number[]; rotation: number; scale: number }[];
+  rings?: { position: number[]; axis: number[]; radius: number }[];
 }
 
 export class Track {
   strokes = new Map<number, Stroke>();
   decor = new Map<number, Decor>();
+  rings = new Map<number, Ring>();
   start = new THREE.Vector3(0, 12, 0);
 
   private nextId = 1;
@@ -85,6 +89,19 @@ export class Track {
     this.emit({ kind: 'decorRemoved', decor });
   }
 
+  addRing(r: Omit<Ring, 'id'> & { id?: number }): Ring {
+    const ring: Ring = { ...r, id: r.id ?? this.nextId++ };
+    this.nextId = Math.max(this.nextId, ring.id + 1);
+    this.rings.set(ring.id, ring);
+    this.emit({ kind: 'ringAdded', ring });
+    return ring;
+  }
+
+  removeRing(ring: Ring) {
+    if (!this.rings.delete(ring.id)) return;
+    this.emit({ kind: 'ringRemoved', ring });
+  }
+
   setStart(p: THREE.Vector3) {
     this.start.copy(p);
     this.emit({ kind: 'startChanged' });
@@ -93,6 +110,7 @@ export class Track {
   clear() {
     this.strokes.clear();
     this.decor.clear();
+    this.rings.clear();
     this.grid.clear();
     this.segmentsByStroke.clear();
     this.emit({ kind: 'cleared' });
@@ -193,6 +211,11 @@ export class Track {
         rotation: r(d.rotation),
         scale: r(d.scale),
       })),
+      rings: [...this.rings.values()].map((g) => ({
+        position: g.position.toArray().map(r),
+        axis: g.axis.toArray().map(r),
+        radius: r(g.radius),
+      })),
     };
   }
 
@@ -218,6 +241,13 @@ export class Track {
         position: new THREE.Vector3().fromArray(d.position),
         rotation: d.rotation,
         scale: d.scale,
+      });
+    }
+    for (const g of data.rings ?? []) {
+      this.addRing({
+        position: new THREE.Vector3().fromArray(g.position),
+        axis: new THREE.Vector3().fromArray(g.axis).normalize(),
+        radius: g.radius,
       });
     }
     this.emit({ kind: 'startChanged' });

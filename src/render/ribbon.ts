@@ -34,18 +34,47 @@ function makeTexture(type: LineType): THREE.CanvasTexture {
   ctx.fillRect(8, 0, 3, TEX);
   ctx.fillRect(TEX - 11, 0, 3, TEX);
   if (type === 'accel') {
-    // Chevrons pointing along the drawing direction (+v).
+    // Chevrons pointing along the drawing direction (+v, which is canvas up
+    // because textures are flipped vertically).
     ctx.strokeStyle = 'rgba(255,236,190,0.95)';
     ctx.lineWidth = 12;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(32, 36);
-    ctx.lineTo(64, 88);
-    ctx.lineTo(96, 36);
+    ctx.moveTo(32, 88);
+    ctx.lineTo(64, 36);
+    ctx.lineTo(96, 88);
     ctx.stroke();
   } else if (type === 'normal') {
     ctx.fillStyle = 'rgba(255,255,255,0.16)';
     ctx.fillRect(20, 0, TEX - 40, 6);
+  } else if (type === 'ice') {
+    // Cracks in clear ice.
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = 1.5;
+    for (let k = 0; k < 5; k++) {
+      ctx.beginPath();
+      let x = 14 + rand() * 100;
+      let y = rand() * TEX;
+      ctx.moveTo(x, y);
+      for (let j = 0; j < 4; j++) {
+        x += (rand() - 0.5) * 40;
+        y += (rand() - 0.3) * 30;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  } else if (type === 'bouncy') {
+    // Springy zigzag.
+    ctx.strokeStyle = 'rgba(255,240,250,0.9)';
+    ctx.lineWidth = 8;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(24, 0);
+    ctx.lineTo(104, 32);
+    ctx.lineTo(24, 64);
+    ctx.lineTo(104, 96);
+    ctx.lineTo(24, 128);
+    ctx.stroke();
   } else {
     // Garland of little lights for scenery.
     const colors = ['#ffd84a', '#ff6b6b', '#ffffff', '#7fe0ff'];
@@ -74,12 +103,12 @@ export function topMaterial(type: LineType) {
     // Glossy, icy finish.
     m = new THREE.MeshPhysicalMaterial({
       map: tex,
-      roughness: 0.45,
+      roughness: type === 'ice' ? 0.05 : type === 'bouncy' ? 0.6 : 0.45,
       metalness: 0,
-      clearcoat: type === 'scenery' ? 0 : 0.9,
-      clearcoatRoughness: 0.25,
-      transparent: type === 'scenery',
-      opacity: type === 'scenery' ? 0.8 : 1,
+      clearcoat: type === 'scenery' || type === 'bouncy' ? 0 : 0.9,
+      clearcoatRoughness: type === 'ice' ? 0.02 : 0.25,
+      transparent: type === 'scenery' || type === 'ice',
+      opacity: type === 'scenery' ? 0.8 : type === 'ice' ? 0.82 : 1,
       emissive: type === 'scenery' ? new THREE.Color(0x1d5a2e) : new THREE.Color(0x000000),
       emissiveIntensity: 0.4,
     });

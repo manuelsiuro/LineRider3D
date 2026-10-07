@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Track } from '../track/Track';
-import type { Decor } from '../track/types';
+import type { Decor, Ring } from '../track/types';
+import { animateRing, buildRing } from './ringModel';
 import { buildDecor, M } from '../world/models';
 import { buildRibbonMesh } from './ribbon';
 import { buildSupports, supportMaterial } from './supports';
@@ -9,15 +10,17 @@ import { buildSupports, supportMaterial } from './supports';
 export class TrackView {
   readonly ribbons = new THREE.Group();
   readonly decor = new THREE.Group();
+  readonly rings = new THREE.Group();
   /** Decorative wooden scaffolding under tracks. */
   readonly supports = new THREE.Group();
   readonly startMarker: THREE.Group;
   private ribbonById = new Map<number, THREE.Mesh>();
   private supportById = new Map<number, THREE.Mesh>();
   private decorById = new Map<number, THREE.Object3D>();
+  private ringById = new Map<number, THREE.Object3D>();
 
   constructor(scene: THREE.Scene, private track: Track) {
-    scene.add(this.ribbons, this.decor, this.supports);
+    scene.add(this.ribbons, this.decor, this.supports, this.rings);
     this.startMarker = this.buildStartMarker();
     scene.add(this.startMarker);
 
@@ -37,12 +40,19 @@ export class TrackView {
         case 'decorRemoved':
           this.removeDecor(e.decor.id);
           break;
+        case 'ringAdded':
+          this.addRing(e.ring);
+          break;
+        case 'ringRemoved':
+          this.removeRing(e.ring.id);
+          break;
         case 'startChanged':
           this.startMarker.position.copy(track.start);
           break;
         case 'cleared':
           for (const id of [...this.ribbonById.keys()]) this.removeRibbon(id);
           for (const id of [...this.decorById.keys()]) this.removeDecor(id);
+          for (const id of [...this.ringById.keys()]) this.removeRing(id);
           break;
       }
     });
@@ -97,6 +107,27 @@ export class TrackView {
       if (o instanceof THREE.Mesh) o.geometry.dispose();
     });
     this.decorById.delete(id);
+  }
+
+  private addRing(r: Ring) {
+    const obj = buildRing(r);
+    this.ringById.set(r.id, obj);
+    this.rings.add(obj);
+  }
+
+  private removeRing(id: number) {
+    const obj = this.ringById.get(id);
+    if (!obj) return;
+    this.rings.remove(obj);
+    obj.traverse((o) => {
+      if (o instanceof THREE.Mesh) o.geometry.dispose();
+    });
+    this.ringById.delete(id);
+  }
+
+  /** Per-frame animation of interactive props. */
+  update(time: number, rider: THREE.Vector3) {
+    for (const obj of this.ringById.values()) animateRing(obj, time, obj.position.distanceTo(rider));
   }
 
   /** Highlights a ribbon (eraser / bank hover). */

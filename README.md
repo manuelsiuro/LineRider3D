@@ -18,8 +18,10 @@ npm run test:physics   # headless physics runs (demo track + banked turn)
   and turns are **auto-banked** inward like a bobsled run.
 - Start a stroke on another track's endpoint (orange ring) to connect them.
 - Tracks are one-sided: the colored face is solid (draw left → right for a floor).
-- Line types: **Track** (blue), **Boost** (red, accelerates along drawing direction), **Scenery** (green, no collision).
-- Tools: Pencil, Line, Eraser, Bank (drag to tilt a track), Decor (pines, snowmen, cabins…), Start flag, Camera.
+- Line types: **Track** (blue), **Boost** (red, accelerates along drawing direction), **Ice** (no friction, no sideways grip),
+  **Bouncy** (trampoline), **Scenery** (green, no collision).
+- **Boost rings**: place a golden hoop on a track or in the air; riding through it launches Bosh.
+- Tools: Pencil, Line, Eraser, Bank (drag to tilt a track), Decor (pines, snowmen, cabins…), Ring, Start flag, Camera.
 - Timeline scrubbing is exact: the simulation is deterministic at 40 steps/s and every frame is recorded.
 
 ## Code map

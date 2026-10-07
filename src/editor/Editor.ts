@@ -7,7 +7,7 @@ import type { TrackView } from '../render/TrackView';
 import { buildRibbonMesh } from '../render/ribbon';
 import { History } from './History';
 
-export type Tool = 'pencil' | 'line' | 'eraser' | 'bank' | 'decor' | 'start' | 'hand';
+export type Tool = 'pencil' | 'line' | 'eraser' | 'bank' | 'decor' | 'ring' | 'start' | 'hand';
 
 export interface EditorSettings {
   lineType: LineType;
@@ -164,7 +164,7 @@ export class Editor {
 
   /** Called every frame to place the grid and hover feedback. */
   update(visible: boolean) {
-    const drawing = this.tool === 'pencil' || this.tool === 'line' || this.tool === 'start';
+    const drawing = this.tool === 'pencil' || this.tool === 'line' || this.tool === 'start' || this.tool === 'ring';
     this.grid.visible = visible && drawing;
     if (!this.grid.visible) {
       this.snapRing.visible = this.snapRing.visible && visible;
@@ -216,6 +216,13 @@ export class Editor {
     return { stroke, point: hit.point, normal };
   }
 
+  private pickRing(e: PointerEvent) {
+    this.setRay(e);
+    const hit = this.raycaster.intersectObjects(this.view.rings.children, true)[0];
+    if (!hit) return null;
+    return this.track.rings.get(hit.object.userData.ringId) ?? null;
+  }
+
   private pickDecor(e: PointerEvent) {
     this.setRay(e);
     const hit = this.raycaster.intersectObjects(this.view.decor.children, true)[0];
@@ -256,6 +263,9 @@ export class Editor {
       }
       case 'decor':
         this.placeDecor(e);
+        break;
+      case 'ring':
+        this.placeRing(e);
         break;
       case 'start':
         this.placeStart(e);
@@ -442,6 +452,13 @@ export class Editor {
   // ---------------------------------------------------------------- other tools
 
   private eraseAt(e: PointerEvent) {
+    const ring = this.pickRing(e);
+    if (ring) {
+      let r = ring;
+      this.track.removeRing(r);
+      this.history.push({ undo: () => (r = this.track.addRing(r)), redo: () => this.track.removeRing(r) });
+      return;
+    }
     const hit = this.pickStroke(e);
     const decor = hit ? null : this.pickDecor(e);
     if (hit) {
@@ -466,6 +483,42 @@ export class Editor {
       scale: 0.85 + Math.random() * 0.4,
     });
     this.history.push({ undo: () => this.track.removeDecor(d), redo: () => (d = this.track.addDecor(d)) });
+  }
+
+  /**
+   * Places a boost ring: on a track it stands over the surface, facing along
+   * the track; elsewhere it sits on the drawing plane.
+   */
+  private placeRing(e: PointerEvent) {
+    const radius = 1.6;
+    const hit = this.pickStroke(e);
+    let position: THREE.Vector3 | null = null;
+    const axis = new THREE.Vector3();
+    if (hit) {
+      // Direction of the nearest segment.
+      const pts = hit.stroke.points;
+      let best = 0;
+      let bestD = Infinity;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const d = pts[i].distanceToSquared(hit.point) + pts[i + 1].distanceToSquared(hit.point);
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      }
+      axis.subVectors(pts[best + 1], pts[best]).normalize();
+      position = hit.point.clone().addScaledVector(hit.normal, radius * 0.75);
+    } else {
+      this.setRay(e);
+      const { plane, normal } = this.planeThrough(this.controls.target);
+      position = this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+      if (this.settings.mode === 'profile') axis.crossVectors(new THREE.Vector3(0, 1, 0), normal).normalize();
+      else axis.set(this.camera.position.x - this.controls.target.x, 0, this.camera.position.z - this.controls.target.z).normalize().negate();
+      if (axis.lengthSq() < 0.5) axis.set(1, 0, 0);
+    }
+    if (!position) return;
+    let ring = this.track.addRing({ position, axis, radius });
+    this.history.push({ undo: () => this.track.removeRing(ring), redo: () => (ring = this.track.addRing(ring)) });
   }
 
   private placeStart(e: PointerEvent) {

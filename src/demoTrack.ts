@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import type { Track } from './track/Track';
-import type { DecorKind } from './track/types';
+import type { DecorKind, LineType } from './track/types';
 
-function profile(track: Track, fn: (x: number) => number, x0: number, x1: number, type: 'normal' | 'accel' = 'normal') {
+function profile(track: Track, fn: (x: number) => number, x0: number, x1: number, type: LineType = 'normal') {
   const points: THREE.Vector3[] = [];
   for (let x = x0; x <= x1 + 1e-6; x += 0.5) points.push(new THREE.Vector3(x, fn(x), 0));
   return track.addStroke({ type, mode: 'profile', points, planeNormal: new THREE.Vector3(0, 0, 1), bank: 0, width: 2.4 });
@@ -20,10 +20,11 @@ export function buildDemoTrack(track: Track) {
   const arc = (x: number) => 10.05 + 0.59 * (x - 36.2) - 0.0279 * (x - 36.2) ** 2 - 1;
   profile(track, arc, 47, 60);
   const runout = (x: number) => arc(60) - 0.738 * (x - 60) + 0.025 * (x - 60) ** 2;
-  profile(track, runout, 60, 74.5);
+  profile(track, runout, 60, 74.5, 'accel');
   const flat = runout(74.5);
-  profile(track, () => flat, 74.5, 82, 'accel');
-  profile(track, (x) => flat + 0.6 * Math.sin(((x - 82) / 16) * Math.PI) ** 2, 82, 98);
+  profile(track, () => flat, 74.5, 82);
+  track.addRing({ position: new THREE.Vector3(86, flat + 1.2, 0), axis: new THREE.Vector3(1, 0, 0), radius: 1.6 });
+  profile(track, (x) => flat + 0.6 * Math.sin(((x - 82) / 16) * Math.PI) ** 2, 82, 98, 'ice');
   // Glide gently down into the snow at the finish.
   profile(track, (x) => flat * (0.5 + 0.5 * Math.cos((Math.PI * (x - 98)) / 30)), 98, 128);
 

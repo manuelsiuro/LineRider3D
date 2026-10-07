@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export type LineType = 'normal' | 'accel' | 'scenery';
+export type LineType = 'normal' | 'accel' | 'ice' | 'bouncy' | 'scenery';
 
 /**
  * How a stroke was drawn:
@@ -27,6 +27,15 @@ export interface Stroke {
 
 export type DecorKind = 'pine' | 'snowman' | 'cabin' | 'rock' | 'lamp' | 'flag' | 'gift';
 
+/** A ring in space that launches the rider along its axis. */
+export interface Ring {
+  id: number;
+  position: THREE.Vector3;
+  /** Unit vector: the boost direction. */
+  axis: THREE.Vector3;
+  radius: number;
+}
+
 export interface Decor {
   id: number;
   kind: DecorKind;
@@ -50,5 +59,7 @@ export interface Segment {
 export const LINE_COLORS: Record<LineType, number> = {
   normal: 0x2f7fd8,
   accel: 0xe0433a,
+  ice: 0x9fe3f5,
+  bouncy: 0xf0529c,
   scenery: 0x3aa15a,
 };

@@ -221,6 +221,7 @@ renderer.setAnimationLoop((time) => {
   effects.update(dt);
 
   editor.update(!playing);
+  trackView.update(timer.getElapsed(), riderView.pts[6]);
   env.update(dt, controls.target, timer.getElapsed());
   ui.setTime(frame, sim.recorded, sim.rider.crashed, STEPS_PER_SECOND);
   renderer.render(scene, camera);
