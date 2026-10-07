@@ -14,6 +14,7 @@ import { Editor } from './editor/Editor';
 import { UI, overlayOpen } from './ui/UI';
 import { Effects } from './render/Effects';
 import { Trail } from './render/Trail';
+import { SnowTracks } from './render/SnowTracks';
 import { PostFX } from './render/PostFX';
 import { Sound } from './audio/Sound';
 import { RunStats } from './game/RunStats';
@@ -70,6 +71,7 @@ const rig = new CameraRig(camera, controls);
 const effects = new Effects(scene);
 effects.setViewportHeight(innerHeight * renderer.getPixelRatio());
 const trail = new Trail(scene);
+const snowTracks = new SnowTracks(scene);
 const sound = new Sound();
 const runStats = new RunStats();
 const ground = scene.getObjectByName('ground')!;
@@ -149,6 +151,7 @@ function applyVehicle(def: VehicleDef) {
   sim.setVehicle(def);
   riderView.setVehicle(def);
   sound.setRide(def.sound);
+  snowTracks.width = { sled: 0.07, skis: 0.07, snowboard: 0.18, bike: 0.08, moto: 0.12, buggy: 0.17 }[def.id];
   ui.setVehicle(def.id, def.name, lockReason());
   ghost = null;
   resetRun();
@@ -297,6 +300,7 @@ function resetRun() {
   sparkled.clear();
   effects.reset();
   trail.reset();
+  snowTracks.reset();
   runStats.reset();
   ui.hideSummary();
 }
@@ -864,6 +868,7 @@ function loop(time: number) {
     side.subVectors(riderView.pts[P.tailR], riderView.pts[P.tailL]).normalize();
     tail.addVectors(riderView.pts[P.tailL], riderView.pts[P.tailR]).multiplyScalar(0.5);
     trail.push(tail, side, stats.speed);
+    snowTracks.update(frame, rider.pos, rider.contact, rider.crashed);
     if (mode === 'game') handleRideEvents(events, justCrashed);
   }
 
