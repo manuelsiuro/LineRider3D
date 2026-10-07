@@ -13,6 +13,8 @@ export class Simulation {
   readonly rider = new Rider();
   frame = 0;
   private history: Float64Array[] = [];
+  /** Recorded player input per frame (input[f] drives the step f → f+1). */
+  private inputs: number[] = [];
   private revision = -1;
 
   constructor(private track: Track) {}
@@ -59,7 +61,7 @@ export class Simulation {
     if (frame >= this.history.length) {
       this.rider.readState(this.history[this.history.length - 1]);
       while (this.history.length <= frame) {
-        this.rider.step(this.track);
+        this.rider.step(this.track, this.inputs[this.history.length - 1] ?? 0);
         const s = new Float64Array(STATE_SIZE);
         this.rider.writeState(s);
         this.history.push(s);
@@ -81,6 +83,19 @@ export class Simulation {
         a[o + 2] + (b[o + 2] - a[o + 2]) * alpha,
       );
     }
+  }
+
+  /** Records the input for a frame; changing it discards the recording after it. */
+  setInput(frame: number, mask: number) {
+    if ((this.inputs[frame] ?? 0) === mask) return;
+    this.inputs[frame] = mask;
+    if (this.history.length > frame + 1) this.history.length = frame + 1;
+  }
+
+  /** Forgets all recorded input (classic runs and fresh attempts). */
+  clearInputs() {
+    if (this.inputs.some((m) => m)) this.history.length = Math.min(this.history.length, 1);
+    this.inputs = [];
   }
 
   /** Raw recorded state of a frame (see Rider.writeState layout). */

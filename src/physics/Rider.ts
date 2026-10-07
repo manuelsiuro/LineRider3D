@@ -16,12 +16,27 @@ const ACCEL = 0.012;
 const BREAK_STRAIN = 0.3;
 const RUNNER_GRIP = 0.25;
 const GROUND_FRICTION = 0.04;
+/** Most speed the snow can take away in one step (units/step). */
+const SNOW_MAX_DRAG = 0.006;
 /** Bouncy lines return this much of the impact speed... */
 const RESTITUTION = 0.9;
 /** ...and always give at least this little hop. */
 const MIN_BOUNCE = 0.06;
 /** Velocity added (per step) when passing through a boost ring. */
 const RING_BOOST = 0.22;
+
+/** Player input bits for one step (rider mode). */
+export const INPUT = { push: 1, brake: 2 } as const;
+
+/** Push acceleration along the sled while on a track (units/step²). */
+const PUSH_ACCEL = 0.0045;
+/** Pushing stops helping above this speed (units/step, ≈ 50 km/h). */
+const PUSH_MAX_SPEED = 0.58;
+/** Fraction of speed removed per step while braking on a track. */
+const BRAKE = 0.035;
+/** Flip control in the air: angular acceleration and cap (rad/step). */
+const FLIP_ACCEL = 0.025;
+const FLIP_MAX = 0.3;
 
 /** One-off events of a step, for sound and effects. */
 export const EVENT = { ring: 1, bounce: 2 } as const;
@@ -153,7 +168,8 @@ export class Rider {
   /** Strongest bouncy-line hit of this step, applied to the whole rider. */
   private bounce: { up: THREE.Vector3; speed: number } | null = null;
 
-  step(track: Track) {
+  step(track: Track, input = 0) {
+    if (input && !this.crashed) this.control(input);
     this.ringRef.copy(this.pos[P.butt]);
     this.bounce = null;
     this.events = 0;
@@ -167,7 +183,7 @@ export class Rider {
     }
 
     for (let it = 0; it < ITERATIONS; it++) {
-      this.satisfyBones(it % 2 === 0 ? BONES : BONES_MIRRORED, it === 0);
+      this.satisfyBonesSymmetric(it === 0);
       this.collide(track);
     }
     this.applyBounce();
@@ -190,6 +206,51 @@ export class Rider {
     for (let i = 0; i < POINT_COUNT; i++) this.prev[i].addScaledVector(up, -delta);
   }
 
+  /**
+   * Player control: push / brake while the sled touches a track, flips while
+   * airborne. Works on velocities (prev positions) so it stays deterministic.
+   */
+  private control(input: number) {
+    const sledDown = [P.tailL, P.tailR, P.noseL, P.noseR].some((i) => this.contact[i]);
+    const airborne = !this.contact.some((c) => c);
+    const tailMid = tmp.addVectors(this.pos[P.tailL], this.pos[P.tailR]).multiplyScalar(0.5);
+    const fwd = tmp2.addVectors(this.pos[P.noseL], this.pos[P.noseR]).multiplyScalar(0.5).sub(tailMid).normalize();
+
+    if (sledDown) {
+      if (input & INPUT.push) {
+        const speed = vel.subVectors(this.pos[P.butt], this.prev[P.butt]).dot(fwd);
+        if (speed < PUSH_MAX_SPEED) for (let i = 0; i < POINT_COUNT; i++) this.prev[i].addScaledVector(fwd, -PUSH_ACCEL);
+      }
+      if (input & INPUT.brake) {
+        for (let i = 0; i < POINT_COUNT; i++) {
+          vel.subVectors(this.pos[i], this.prev[i]).multiplyScalar(BRAKE);
+          this.prev[i].add(vel);
+        }
+      }
+      return;
+    }
+    if (!airborne) return;
+
+    // Rotate the whole rider around the sled's lateral axis.
+    const dir = input & INPUT.push ? -1 : input & INPUT.brake ? 1 : 0; // push = front flip
+    if (!dir) return;
+    const axis = new THREE.Vector3().subVectors(this.pos[P.tailR], this.pos[P.tailL]).normalize();
+    const com = new THREE.Vector3();
+    for (const p of this.pos) com.add(p);
+    com.divideScalar(POINT_COUNT);
+    // Current spin, measured on the nose.
+    const r = new THREE.Vector3().subVectors(this.pos[P.string], com);
+    const v = new THREE.Vector3().subVectors(this.pos[P.string], this.prev[P.string]);
+    const omega = new THREE.Vector3().crossVectors(r, v).dot(axis) / Math.max(r.lengthSq(), 1e-6);
+    if (omega * dir >= FLIP_MAX) return;
+    const dv = new THREE.Vector3();
+    for (let i = 0; i < POINT_COUNT; i++) {
+      r.subVectors(this.pos[i], com);
+      dv.crossVectors(axis, r).multiplyScalar(dir * FLIP_ACCEL);
+      this.prev[i].sub(dv);
+    }
+  }
+
   /** Boosts the rider when the body crosses a ring's plane inside its radius. */
   private passRings(track: Track, from: THREE.Vector3, to: THREE.Vector3) {
     for (const ring of track.rings.values()) {
@@ -206,6 +267,25 @@ export class Rider {
       this.events |= EVENT.ring;
       for (let i = 0; i < POINT_COUNT; i++) this.prev[i].addScaledVector(ring.axis, -dir * RING_BOOST);
     }
+  }
+
+  private scratch: THREE.Vector3[] = POINTS.map(() => new THREE.Vector3());
+  private original: THREE.Vector3[] = POINTS.map(() => new THREE.Vector3());
+
+  /**
+   * Relaxes the bones in both orders (normal and left/right mirrored) from the
+   * same start and averages the results, so the solver has no left/right bias
+   * and Bosh doesn't slowly drift or tip sideways.
+   */
+  private satisfyBonesSymmetric(checkBreak: boolean) {
+    for (let i = 0; i < POINT_COUNT; i++) this.original[i].copy(this.pos[i]);
+    this.satisfyBones(BONES, checkBreak);
+    for (let i = 0; i < POINT_COUNT; i++) {
+      this.scratch[i].copy(this.pos[i]);
+      this.pos[i].copy(this.original[i]);
+    }
+    this.satisfyBones(BONES_MIRRORED, checkBreak);
+    for (let i = 0; i < POINT_COUNT; i++) this.pos[i].add(this.scratch[i]).multiplyScalar(0.5);
   }
 
   private satisfyBones(bones: Bone[], checkBreak: boolean) {
@@ -288,7 +368,9 @@ export class Rider {
         this.contact[i] = true;
         vel.subVectors(p, this.prev[i]);
         vel.y = 0;
-        vel.multiplyScalar(1 - GROUND_FRICTION);
+        // Snow drag, capped so fast arrivals slow down instead of stopping dead.
+        const speed = vel.length();
+        if (speed > 1e-9) vel.multiplyScalar(Math.max(0, speed - Math.min(speed * GROUND_FRICTION, SNOW_MAX_DRAG)) / speed);
         this.prev[i].set(p.x - vel.x, p.y, p.z - vel.z);
       }
     }

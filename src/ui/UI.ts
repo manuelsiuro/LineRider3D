@@ -21,7 +21,16 @@ export interface UIHandlers {
   focusRider(): void;
   toggleSfx(): boolean;
   toggleMusic(): boolean;
+  toggleRiderMode(): boolean;
+  /** Touch pad input: bit mask from the on-screen buttons. */
+  touchInput(mask: number): void;
   click(): void;
+}
+
+export interface SummaryInfo {
+  best: number;
+  newBest: boolean;
+  riderMode: boolean;
 }
 
 const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
@@ -79,10 +88,13 @@ export class UI {
   private gaugeValue: HTMLElement;
   private airChip: HTMLElement;
   private popups: HTMLElement;
+  private scoreChip: HTMLElement;
+  private touchPad: HTMLElement;
+  private riderBtn: HTMLButtonElement;
   private hintTimer = 0;
   private playing = false;
 
-  constructor(root: HTMLElement, private editor: Editor, private handlers: UIHandlers) {
+  constructor(root: HTMLElement, private editor: Editor, private handlers: UIHandlers, riderMode: boolean) {
     this.root = root;
 
     // ------------------------------------------------------------ top bar
@@ -164,7 +176,14 @@ export class UI {
     this.timeline.setAttribute('aria-label', 'Timeline');
     this.timeline.oninput = () => handlers.seek(Number(this.timeline.value));
     this.timeLabel = h('span', 'time', '0:00.0');
-    player.append(this.playBtn, stopBtn, slowBtn, this.timeline, this.timeLabel);
+    this.riderBtn = button(`btn icon-btn flat rider-btn ${riderMode ? 'active' : ''}`, icon('gamepad', 22), 'Rider mode: control Bosh with the arrow keys');
+    this.riderBtn.onclick = () => {
+      handlers.click();
+      const on = handlers.toggleRiderMode();
+      this.setRiderMode(on);
+      this.flash(on ? 'Rider mode: → push · ← brake · flip in the air' : 'Classic mode');
+    };
+    player.append(this.playBtn, stopBtn, slowBtn, this.riderBtn, this.timeline, this.timeLabel);
 
     // ------------------------------------------------------------ HUD
     this.hud = h(
@@ -177,11 +196,43 @@ export class UI {
         </svg>
         <div class="gauge-text"><b>0</b><span>km/h</span></div>
       </div>
-      <div class="air-chip hidden">AIR <b>0.0s</b></div>`,
+      <div class="hud-chips">
+        <div class="score-chip hidden">${icon('trophy', 16)}<b>0</b></div>
+        <div class="air-chip hidden">AIR <b>0.0s</b></div>
+      </div>`,
     );
     this.gaugeArc = this.hud.querySelector('.gauge-fg')!;
     this.gaugeValue = this.hud.querySelector('.gauge-text b')!;
     this.airChip = this.hud.querySelector('.air-chip')!;
+    this.scoreChip = this.hud.querySelector('.score-chip')!;
+
+    // On-screen controls for touch devices in rider mode.
+    this.touchPad = h(
+      'div',
+      'touch-pad hidden',
+      `<button class="pad pad-brake" data-bit="2" aria-label="Brake / backflip">${icon('chevronLeft', 34)}<span>Brake</span></button>
+       <button class="pad pad-push" data-bit="1" aria-label="Push / frontflip">${icon('chevronRight', 34)}<span>Push</span></button>`,
+    );
+    let mask = 0;
+    const held = new Map<number, number>();
+    const update = () => {
+      mask = 0;
+      for (const bit of held.values()) mask |= bit;
+      handlers.touchInput(mask);
+      this.touchPad.querySelectorAll('.pad').forEach((b) => b.classList.toggle('down', (mask & Number((b as HTMLElement).dataset.bit)) !== 0));
+    };
+    this.touchPad.addEventListener('pointerdown', (e) => {
+      const b = (e.target as HTMLElement).closest('.pad') as HTMLElement | null;
+      if (!b) return;
+      e.preventDefault();
+      held.set(e.pointerId, Number(b.dataset.bit));
+      update();
+    });
+    const release = (e: PointerEvent) => {
+      if (held.delete(e.pointerId)) update();
+    };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
     this.popups = h('div', 'popups');
 
     // ------------------------------------------------------------ tools
@@ -202,7 +253,8 @@ export class UI {
     bottom.append(this.panel, toolbar);
 
     this.hint = h('div', 'hint hidden');
-    root.append(top, player, this.hud, this.popups, bottom, this.hint);
+    root.append(top, player, this.hud, this.popups, this.touchPad, bottom, this.hint);
+    this.setRiderMode(riderMode);
     editor.onHint = (t) => this.flash(t);
 
     this.selectTool('pencil');
@@ -343,9 +395,28 @@ export class UI {
     const frac = Math.min(kmh / 110, 1);
     this.gaugeArc.style.strokeDashoffset = String(1 - frac);
     this.hud.classList.toggle('fast', kmh > 60);
+    this.scoreChip.classList.toggle('hidden', stats.score === 0 && !document.body.classList.contains('rider-mode'));
+    this.scoreChip.querySelector('b')!.textContent = stats.score.toLocaleString();
     const airborne = stats.air > 0.35 && !stats.crashed;
     this.airChip.classList.toggle('hidden', !airborne);
     if (airborne) this.airChip.querySelector('b')!.textContent = `${stats.air.toFixed(1)}s`;
+  }
+
+  setRiderMode(on: boolean) {
+    this.riderBtn.classList.toggle('active', on);
+    document.body.classList.toggle('rider-mode', on);
+  }
+
+  /** Shows the on-screen push/brake buttons (touch devices, rider mode, riding). */
+  setTouchPad(visible: boolean) {
+    this.touchPad.classList.toggle('hidden', !visible);
+  }
+
+  /** Trick callout with points. */
+  trick(name: string, points: number, bailed: boolean) {
+    const el = h('div', `popup ${bailed ? 'crash' : 'trick'}`, bailed ? name : `${name}<small>+${points.toLocaleString()}</small>`);
+    this.popups.append(el);
+    setTimeout(() => el.remove(), 1600);
   }
 
   /** Big animated callout in the middle of the screen. */
@@ -423,7 +494,7 @@ export class UI {
   }
 
   /** End-of-run card. */
-  showSummary(stats: Stats, onReplay: () => void, onEdit: () => void) {
+  showSummary(stats: Stats, info: SummaryInfo, onReplay: () => void, onEdit: () => void, onWatch: () => void) {
     document.querySelector('.summary')?.remove();
     const clean = !stats.crashed;
     const fmt = (n: number, d = 0) => n.toFixed(d);
@@ -434,17 +505,23 @@ export class UI {
         <div class="summary-head ${clean ? 'clean' : 'wipeout'}">
           <span class="badge">${clean ? 'Clean run' : 'Wipeout'}</span>
           <h2>${clean ? 'Nice ride!' : 'Ouch, Bosh!'}</h2>
+          <div class="score-line">
+            <div class="score-big">${stats.score.toLocaleString()}<small>pts</small></div>
+            ${info.newBest ? `<span class="new-best">${icon('trophy', 16)} New best!</span>` : info.best > 0 ? `<span class="best">Best ${info.best.toLocaleString()}</span>` : ''}
+          </div>
+          ${stats.bestTrick ? `<p class="best-trick">Best trick: <b>${stats.bestTrick}</b></p>` : ''}
         </div>
         <div class="stats">
           <div><b>${fmt(stats.time, 1)}<small>s</small></b><span>Time</span></div>
           <div><b>${fmt(stats.distance * METERS)}<small>m</small></b><span>Distance</span></div>
           <div><b>${fmt(stats.topSpeed * KMH)}<small>km/h</small></b><span>Top speed</span></div>
           <div><b>${fmt(stats.bestAir, 1)}<small>s</small></b><span>Best air</span></div>
+          <div><b>${stats.tricks}</b><span>Tricks</span></div>
           <div><b>${stats.rings}</b><span>Rings</span></div>
-          <div><b>${stats.bounces}</b><span>Bounces</span></div>
         </div>
         <div class="actions">
-          <button class="big-btn ghost" data-a="edit">${icon('pencil', 18)} Edit track</button>
+          <button class="big-btn ghost" data-a="edit">${icon('pencil', 18)} Edit</button>
+          ${info.riderMode ? `<button class="big-btn ghost" data-a="watch">${icon('eye', 18)} Replay</button>` : ''}
           <button class="big-btn primary" data-a="replay">${icon('replay', 18)} Ride again</button>
         </div>
       </div>`,
@@ -457,6 +534,7 @@ export class UI {
       setTimeout(() => overlay.remove(), 250);
       if (a === 'replay') onReplay();
       else if (a === 'edit') onEdit();
+      else if (a === 'watch') onWatch();
     };
     document.body.append(overlay);
   }
@@ -476,10 +554,11 @@ export class UI {
           <div>${icon('line')}<p>Start a stroke on the <b>end of another track</b> (orange ring) to connect them. The <b>colored side</b> is solid: draw left → right for a floor.</p></div>
           <div>${icon('ring')}<p><b>Boost</b> speeds up, <b>Ice</b> has no grip, <b>Bouncy</b> is a trampoline. <b>Rings</b> launch Bosh through them.</p></div>
           <div>${icon('play')}<p>Press <b>Play</b> and watch Bosh ride. Scrub the timeline, try slow-mo and switch cameras.</p></div>
+          <div>${icon('gamepad')}<p><b>Rider mode</b>: <b>→</b> pushes and <b>←</b> brakes on the track. In the air they <b>flip</b> Bosh forward or backward. Land clean to score!</p></div>
         </div>
         <p class="keys"><b>Desktop</b> left-drag draw · right-drag orbit · middle-drag pan · wheel zoom<br/>
         <b>Touch</b> one finger draw · two fingers orbit &amp; zoom · Camera tool to pan<br/>
-        <b>Keys</b> Space play · Esc stop · Q W E B R D S H tools · C camera · F focus · Ctrl+Z undo</p>
+        <b>Keys</b> ← → ride · Space play · Esc stop · Q W E B R D S H tools · C camera · F focus · Ctrl+Z undo</p>
         <div class="actions"><button class="big-btn primary">Let's ride!</button></div>
       </div>`,
     );

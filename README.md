@@ -24,6 +24,18 @@ npm run test:physics   # headless physics runs (demo track + banked turn)
 - Tools: Pencil, Line, Eraser, Bank (drag to tilt a track), Decor (pines, snowmen, cabins…), Ring, Start flag, Camera.
 - Timeline scrubbing is exact: the simulation is deterministic at 40 steps/s and every frame is recorded.
 
+## Rider mode
+
+Toggle the 🎮 button in the player bar to control Bosh:
+
+- **→ / ↑** push (on a track, up to ~50 km/h) · **← / ↓** brake
+- In the air the same keys **flip** Bosh forward / backward. Land clean to score:
+  Frontflip / Backflip 1000, Double 4000, Triple 9000 (+ airtime), Big Air, rings +250.
+- Touch screens get on-screen Push / Brake buttons.
+- Inputs are recorded per frame, so runs stay deterministic: **Replay** shows exactly what you did,
+  and rewinding the timeline then playing lets you retry from that moment.
+- Best score is kept per track.
+
 ## Presentation
 
 - Title screen with a live demo run and cinematic camera behind it

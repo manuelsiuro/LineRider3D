@@ -6,7 +6,7 @@ import { TrackView } from './render/TrackView';
 import { RiderView } from './render/RiderView';
 import { CameraRig, CAMERA_LABELS, type CameraMode } from './render/CameraRig';
 import { Simulation, STEPS_PER_SECOND } from './physics/Simulation';
-import { EVENT, P } from './physics/Rider';
+import { EVENT, INPUT, P } from './physics/Rider';
 import { Environment } from './world/Environment';
 import { terrainHeight } from './world/terrain';
 import { Editor } from './editor/Editor';
@@ -72,6 +72,37 @@ let acc = 0;
 let summaryShown = false;
 let crashClock = 0;
 let flash = 0;
+
+// ------------------------------------------------------------------ rider mode input
+let riderMode = false;
+try {
+  riderMode = localStorage.getItem('lr3d.riderMode') === '1';
+} catch {
+  /* storage unavailable */
+}
+/** Watching a recorded run: inputs are played back, not taken live. */
+let replaying = false;
+let keyMask = 0;
+let touchMask = 0;
+const isTouch = matchMedia('(pointer: coarse)').matches;
+
+const KEY_BITS: Record<string, number> = {
+  ArrowRight: INPUT.push,
+  ArrowUp: INPUT.push,
+  ArrowLeft: INPUT.brake,
+  ArrowDown: INPUT.brake,
+};
+addEventListener('keydown', (e) => {
+  const bit = KEY_BITS[e.key];
+  if (!bit || mode !== 'game') return;
+  e.preventDefault();
+  keyMask |= bit;
+});
+addEventListener('keyup', (e) => {
+  const bit = KEY_BITS[e.key];
+  if (bit) keyMask &= ~bit;
+});
+addEventListener('blur', () => (keyMask = 0));
 
 // ------------------------------------------------------------------ saving
 
@@ -175,6 +206,8 @@ function resetRun() {
 
 function play() {
   if (summaryShown) resetRun();
+  // A fresh attempt (or a classic run) starts with no recorded input.
+  if (frame === 0 && !replaying) sim.clearInputs();
   if (frame === 0) focusRider();
   else rig.snapTo(sim.rider.center(riderCenter));
   playing = true;
@@ -188,7 +221,32 @@ function pause() {
 
 function stop() {
   pause();
+  replaying = false;
   resetRun();
+}
+
+/** Best score per track, keyed by a hash of its content. */
+function trackKey() {
+  const json = JSON.stringify({ s: track.serialize().strokes, r: track.serialize().rings, t: track.start.toArray() });
+  let h = 5381;
+  for (let i = 0; i < json.length; i++) h = ((h << 5) + h + json.charCodeAt(i)) | 0;
+  return String(h >>> 0);
+}
+
+function recordBest(score: number): { best: number; newBest: boolean } {
+  try {
+    const all = JSON.parse(localStorage.getItem('lr3d.best') ?? '{}') as Record<string, number>;
+    const key = trackKey();
+    const best = all[key] ?? 0;
+    if (score > best) {
+      all[key] = score;
+      localStorage.setItem('lr3d.best', JSON.stringify(all));
+      return { best: score, newBest: best > 0 || score > 0 };
+    }
+    return { best, newBest: false };
+  } catch {
+    return { best: 0, newBest: false };
+  }
 }
 
 const cameraModes: CameraMode[] = ['follow', 'chase', 'side'];
@@ -261,8 +319,20 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
     sound.setMusic(!sound.musicOn);
     return sound.musicOn;
   },
+  toggleRiderMode() {
+    riderMode = !riderMode;
+    try {
+      localStorage.setItem('lr3d.riderMode', riderMode ? '1' : '0');
+    } catch {
+      /* storage unavailable */
+    }
+    return riderMode;
+  },
+  touchInput(mask) {
+    touchMask = mask;
+  },
   click: () => sound.click(),
-});
+}, riderMode);
 
 function startNewTrack() {
   loadInto(() => {
@@ -279,6 +349,7 @@ function startNewTrack() {
 function enterTitle() {
   mode = 'title';
   resetRun();
+  sim.clearInputs();
   playing = true;
   ui.showTitle(savedTrack() !== null).then(onTitleChoice);
 }
@@ -337,11 +408,9 @@ const STEP = 1 / STEPS_PER_SECOND;
 const MAX_FRAME = STEPS_PER_SECOND * 60 * 10 - 2;
 const side = new THREE.Vector3();
 const tail = new THREE.Vector3();
-let lastAir = 0;
 let booted = false;
 
 function handleRideEvents(events: number, justCrashed: boolean) {
-  const s = runStats.stats;
   if (events & EVENT.ring) {
     sound.ring();
     ui.popup('BOOST!', 'boost');
@@ -356,11 +425,11 @@ function handleRideEvents(events: number, justCrashed: boolean) {
     ui.popup('WIPEOUT!', 'crash');
     rig.shake(0.6);
   }
-  // Landing after a big jump.
-  if (lastAir > 1.2 && s.air === 0 && !s.crashed) {
-    ui.popup(`BIG AIR ${lastAir.toFixed(1)}s`, 'air');
+  for (const trick of runStats.takeTricks()) {
+    ui.trick(trick.name, trick.points, trick.bailed);
+    if (!trick.bailed && trick.points >= 1000) sound.success();
+    else if (!trick.bailed) sound.click(true);
   }
-  lastAir = s.air;
 }
 
 function checkRunEnd(dt: number) {
@@ -371,14 +440,24 @@ function checkRunEnd(dt: number) {
   if (!ended) return;
   summaryShown = true;
   pause();
-  if (!s.crashed) sound.success();
+  if (!s.crashed && s.tricks === 0) sound.success();
+  const wasReplay = replaying;
+  replaying = false;
+  const best = wasReplay ? { best: recordBest(0).best, newBest: false } : recordBest(s.score);
   ui.showSummary(
     { ...s },
+    { ...best, riderMode },
     () => {
       resetRun();
       play();
     },
     () => stop(),
+    () => {
+      // Watch the run just recorded, with the player's inputs played back.
+      replaying = true;
+      resetRun();
+      play();
+    },
   );
 }
 
@@ -387,6 +466,7 @@ renderer.setAnimationLoop((time) => {
   const dt = Math.min(timer.getDelta(), 0.1);
   const t = timer.getElapsed();
 
+  const startFrame = frame;
   if (playing) {
     acc += dt * (slowMo && mode === 'game' ? 0.25 : 1);
     while (acc >= STEP) {
@@ -394,6 +474,12 @@ renderer.setAnimationLoop((time) => {
       frame++;
     }
     if (frame >= MAX_FRAME) frame = MAX_FRAME;
+  }
+  // Rider mode: record the live input for every step we are about to simulate
+  // (including the look-ahead step used for interpolation).
+  if (playing && mode === 'game' && riderMode && !replaying) {
+    const mask = keyMask | touchMask;
+    for (let f = startFrame; f <= frame; f++) sim.setInput(f, mask);
   }
 
   // Always make sure the next frame exists so we can interpolate.
@@ -457,6 +543,7 @@ renderer.setAnimationLoop((time) => {
   env.update(dt, controls.target, t);
   ui.setTime(frame, sim.recorded, STEPS_PER_SECOND);
   ui.setHud(mode === 'game' && (playing || frame > 0) && !summaryShown, stats);
+  ui.setTouchPad(isTouch && riderMode && mode === 'game' && playing && !replaying);
   postfx.render(dt);
 
   if (!booted) {
@@ -467,4 +554,4 @@ renderer.setAnimationLoop((time) => {
   }
 });
 
-if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats } });
+if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, keys: (m: number) => (keyMask = m) } });
