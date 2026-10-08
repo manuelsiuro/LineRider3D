@@ -737,7 +737,7 @@ export class UI {
               <button class="big-btn ghost" data-c="garage">${icon('garage', 18)} Garage</button>
               <button class="big-btn ghost" data-c="wardrobe">${icon('sled', 18)} Wardrobe</button>
               <button class="big-btn ghost" data-c="trophies">${icon('trophy', 18)} Trophies</button>
-              <button class="big-btn ghost icon-only" data-c="settings" title="Settings" aria-label="Settings">${icon('gear', 18)}</button>
+              <button class="big-btn ghost" data-c="settings">${icon('gear', 18)} Settings</button>
               ${hasSave ? `<button class="big-btn ghost" data-c="new">${icon('plus', 18)} New track</button>` : ''}
             </div>
           </div>
