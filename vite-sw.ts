@@ -31,13 +31,16 @@ export function serviceWorker(): Plugin {
       for (const f of files) hash.update(f).update(readFileSync(join(out, f)));
       const version = hash.digest('hex').slice(0, 12);
       const assets = ['./', ...files.map((f) => `./${f}`)];
-      writeFileSync(join(out, 'sw.js'), SW.replace('__VERSION__', version).replace('__ASSETS__', JSON.stringify(assets)));
+      const app = JSON.parse(readFileSync(join(config.root, 'package.json'), 'utf8')).version as string;
+      writeFileSync(join(out, 'sw.js'), SW.replace('__VERSION__', version).replace('__APP__', app).replace('__ASSETS__', JSON.stringify(assets)));
     },
   };
 }
 
 const SW = `// Generated at build time (vite-sw.ts).
 const CACHE = 'lr3d-__VERSION__';
+/** The game version this worker serves (shown in the "new version" banner). */
+const APP = '__APP__';
 const FONTS = 'lr3d-fonts';
 const ASSETS = __ASSETS__;
 
@@ -54,9 +57,11 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// The page asks for a waiting update to take over (only right after it loads).
+// The page asks for a waiting update to take over (right after it loads, or when the player restarts).
+// The page asks a waiting update which version it brings (answered on the given port).
 self.addEventListener('message', (e) => {
   if (e.data === 'skipWaiting') self.skipWaiting();
+  else if (e.data === 'version' && e.ports[0]) e.ports[0].postMessage(APP);
 });
 
 self.addEventListener('fetch', (e) => {

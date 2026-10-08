@@ -19,8 +19,16 @@ export const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html 
   return el;
 };
 
+const ua = navigator.userAgent;
+/** A phone or tablet by its own word (some, like a Samsung with an S Pen, report a fine pointer). */
+export const MOBILE =
+  /Android|iPhone|iPad|iPod|Mobile/i.test(ua) ||
+  ((navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData?.mobile ?? false) ||
+  // iPadOS asks for desktop sites and says "Macintosh", but has a touch screen.
+  (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+
 /** Phones and tablets: no keyboard, no hover. Set once (the `touch` class on body mirrors it). */
-export const TOUCH = matchMedia('(pointer: coarse)').matches;
+export const TOUCH = MOBILE || matchMedia('(pointer: coarse)').matches;
 document.body.classList.toggle('touch', TOUCH);
 
 /** Drops a trailing shortcut like " (Ctrl+Z)" or " (P)" on touch, where there's no keyboard. */

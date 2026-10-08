@@ -1,5 +1,5 @@
 import { TIMES, biomeById } from '../../world/worlds';
-import { TOUCH, h } from '../dom';
+import { MOBILE, TOUCH, h } from '../dom';
 import { icon } from '../icons';
 import type { BiomeId, WorldConfig } from '../../world/worlds';
 import type { DailyCard, ScreenCtx, TitleChoice } from '../types';
@@ -66,7 +66,7 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
 }
 
 /** Already on a phone or tablet: no need to offer the QR code. */
-const onPhone = () => TOUCH && matchMedia('(hover: none)').matches;
+const onPhone = () => MOBILE || (TOUCH && matchMedia('(hover: none)').matches);
 
 export function worldCaption(w: WorldConfig) {
   return `${icon(w.time, 15)}<span>${biomeById(w.biome).name}</span>·<span>${TIMES.find((t) => t.id === w.time)!.name}</span>`;

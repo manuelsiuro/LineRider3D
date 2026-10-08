@@ -36,6 +36,7 @@ import { Rides } from './app/Rides';
 import { Quality } from './app/Quality';
 import { recordBest, runKey } from './app/records';
 import { registerServiceWorker } from './app/pwa';
+import { showUpdate } from './ui/screens/update';
 import { SEASON_END, halloweenSeason, seasonOn, type SeasonPref } from './game/season';
 
 /** Favicon during the Halloween season. */
@@ -48,7 +49,13 @@ const PUMPKIN_ICON =
 // Upgrade saves from older builds before anything reads them.
 migrateStorage();
 // Installed app: the game stays on the device for offline play.
-registerServiceWorker();
+// A new version found while playing: offered once no run is on (the editor track is saved first).
+registerServiceWorker((version, restart) =>
+  showUpdate(version, () => {
+    flushSave();
+    restart();
+  }),
+);
 
 // ------------------------------------------------------------------ setup
 const stage = createStage(document.getElementById('app')!);

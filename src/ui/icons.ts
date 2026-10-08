@@ -36,6 +36,7 @@ const P: Record<string, string> = {
   music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
   download: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
   upload: '<path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/>',
   sled: '<path d="M3 15h15a3 3 0 0 0 3-3"/><path d="M6 15v-3h9v3"/><path d="M2 19h17a3 3 0 0 0 3-3"/><path d="M8 19v-4M14 19v-4"/>',

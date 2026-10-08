@@ -46,6 +46,7 @@ body.touch.is-playing:not(.replaying):not(.photo) .float-pause {
 body.touch .hud {
   left: 50%;
   bottom: calc(max(16px, env(safe-area-inset-bottom)) + 8px);
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 6px;
@@ -55,12 +56,9 @@ body.touch .hud {
   animation: none;
 }
 
+/* The chips join the speed in one row that wraps as a whole. */
 body.touch .hud-chips {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  display: contents;
 }
 
 body.touch .gauge {
@@ -256,4 +254,31 @@ body.touch.is-playing:not(.replaying) .toast-text em {
     opacity: 0;
     transform: translateX(24px);
   }
+}
+
+/* Help, "Take control": on touch the controls look like the round on-screen pads, not keys. */
+body.touch .help-arrows .key {
+  border-radius: 50%;
+  color: white;
+  background: rgba(14, 30, 52, 0.82);
+  box-shadow: 0 6px 16px -6px rgba(14, 30, 52, 0.6), inset 0 0 0 2px rgba(255, 255, 255, 0.4);
+}
+
+body.touch .help-arrows .key.left {
+  background: #c4532a;
+}
+
+body.touch .help-arrows .key.right {
+  background: #1b8f63;
+}
+
+body.touch .help-arrows .key.up {
+  background: #4f3fd1;
+}
+
+/* Help, "Gestures": the icons are the game's buttons, drawn flat like them (no key caps). */
+body.touch .help-short .key {
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 2px 6px -2px rgba(18, 35, 58, 0.3), inset 0 0 0 1px rgba(18, 35, 58, 0.1);
 }
