@@ -1490,70 +1490,147 @@ export class UI {
     document.querySelector('.summary')?.remove();
   }
 
+  /** How to play: a short visual walkthrough, one idea per page. */
   showHelp() {
-    const overlay = h(
-      'div',
-      'modal',
-      `<div class="card help">
-        <h2>How to play</h2>
-        <div class="help-cols">
-          <div class="help-grid">
-            <div style="--tone:#2f7fd8">${icon('pencil')}<p><b>Draw</b> tracks on the grid. <b>Profile</b> draws like classic Line Rider (orbit to turn the plane); <b>Path</b> draws winding, auto-banked descents from above.</p></div>
-            <div style="--tone:#7466f0">${icon('line')}<p>Start on the <b>end of a track</b> (orange ring) to connect. The <b>colored side</b> is solid: draw left to right for a floor.</p></div>
-            <div style="--tone:#e2602a">${icon('ring')}<p><b>Boost</b> speeds up, <b>Ice</b> has no grip, <b>Bouncy</b> is a trampoline. <b>Items</b> adds stars, boost rings and a finish gate.</p></div>
-            <div style="--tone:#1b8f63">${icon('play')}<p>Press <b>Play</b> and watch Bosh ride. Scrub the timeline, try slow-mo, switch cameras.</p></div>
-            <div style="--tone:#c92f74">${icon('gamepad')}<p><b>Rider mode</b>: you steer. Push and brake on the track, flip in the air, spin on skis and the snowboard. <b>Let go before landing</b> and touch down flat.</p></div>
-            <div style="--tone:#0b7fa3">${icon('globe')}<p><b>Garage</b> has six rides; <b>World</b> picks the landscape, time of day and weather of your track.</p></div>
-          </div>
-          <div class="help-keys">
-            ${this.keyGroup('Ride', 'gamepad', [
-              [['→'], 'Push · pedal · gas'],
-              [['←'], 'Brake'],
-              [['←', '→'], 'Flip in the air'],
-              [['↑'], 'Spin (skis, snowboard)'],
-            ])}
+    const cap = (k: string, cls = '') => `<kbd class="key big ${cls}">${k}</kbd>`;
+    const pages: { title: string; art: string; text: string }[] = [
+      {
+        title: 'Draw a track',
+        art: `<svg class="help-art" viewBox="0 0 320 150" aria-hidden="true">
+            <defs><pattern id="hg" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#d6e1ee" stroke-width="1"/></pattern></defs>
+            <rect width="320" height="150" rx="18" fill="url(#hg)"/>
+            <path d="M24 34 C 90 40, 110 118, 190 112 S 280 70, 300 88" fill="none" stroke="#2f7fd8" stroke-width="12" stroke-linecap="round"/>
+            <path d="M24 30 C 90 36, 110 114, 190 108 S 280 66, 300 84" fill="none" stroke="#9fd0ff" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="24" cy="34" r="9" fill="#ffffff" stroke="#ff8a3d" stroke-width="4"/>
+            <g transform="translate(286 52) rotate(35)"><rect x="-6" y="-26" width="12" height="34" rx="3" fill="#ffc23d"/><path d="M-6 8 0 20 6 8Z" fill="#f2c9a0"/><rect x="-6" y="-30" width="12" height="6" rx="2" fill="#f0529c"/></g>
+          </svg>
+          <div class="help-chips">${(
+            [
+              ['#2f7fd8', 'Track'],
+              ['#e0433a', 'Boost'],
+              ['#5ec8e6', 'Ice'],
+              ['#f0529c', 'Bouncy'],
+            ] as const
+          )
+            .map(([c, n]) => `<span><i style="background:${c}"></i>${n}</span>`)
+            .join('')}</div>`,
+        text: 'Drag to draw. The <b>colored side</b> is the floor, so draw <b>left to right</b>. Start on the end of a track (orange ring) to join them.',
+      },
+      {
+        title: 'Watch Bosh ride',
+        art: `<div class="help-play">
+            <span class="help-play-btn">${icon('play', 40)}</span>
+            <div class="help-timeline"><i></i><b></b></div>
+            <div class="help-keys-row">${cap('Space')}<span>play / pause</span></div>
+          </div>`,
+        text: 'Press <b>Play</b>. Drag the timeline to rewind, try slow-mo and other cameras, then fix your track and go again.',
+      },
+      {
+        title: 'Take control',
+        art: `<div class="help-arrows">
+            <div class="arrow-cluster">
+              <span class="up">${cap('↑', 'up')}<small>Spin</small></span>
+              <span class="left">${cap('←', 'left')}<small>Brake</small></span>
+              <span class="right">${cap('→', 'right')}<small>Push</small></span>
+            </div>
+            <div class="air-hint">${icon('replay', 16)} In the air, <b>←</b> and <b>→</b> flip</div>
+          </div>`,
+        text: 'Turn on <b>rider mode</b> to steer Bosh. <b>Let go before landing</b> and touch down flat for a Perfect.',
+      },
+      {
+        title: 'Rides and worlds',
+        art: `<div class="help-explore">
+            <div class="row">${['sled', 'skis', 'snowboard', 'bike', 'moto', 'buggy'].map((v) => `<span class="ride">${icon(v, 24)}</span>`).join('')}</div>
+            <div class="row">${BIOMES.map((b) => `<span class="world" data-world="${b.id}">${icon(BADGE[b.id], 22)}</span>`).join('')}</div>
+          </div>`,
+        text: 'Pick one of six rides in the <b>Garage</b>. In the editor, <b>World</b> sets the landscape, time of day and weather of your track.',
+      },
+      {
+        title: 'Shortcuts',
+        art: `<div class="help-short">
             ${this.keyGroup('Play', 'play', [
-              [['Space'], 'Play / pause'],
-              [['Esc'], 'Pause menu'],
-              [['Enter'], 'Confirm'],
-              [['V'], 'Next ride'],
+              [['Space'], 'Play'],
+              [['Esc'], 'Pause'],
               [['C'], 'Camera'],
               [['F'], 'Find Bosh'],
-              [['P'], 'Photo mode'],
+              [['V'], 'Next ride'],
+              [['P'], 'Photo'],
             ])}
             ${this.keyGroup('Build', 'pencil', [
               [['Q'], 'Pencil'],
               [['W'], 'Line'],
               [['E'], 'Eraser'],
-              [['B'], 'Bank'],
-              [['R'], 'Items'],
               [['D'], 'Decor'],
-              [['S'], 'Start'],
-              [['H'], 'Camera'],
               [['G'], 'World'],
               [['Ctrl', 'Z'], 'Undo'],
-              [['Ctrl', 'Y'], 'Redo'],
             ])}
-            ${this.keyGroup('Mouse & touch', 'move', [
-              [['Left drag'], 'Draw'],
-              [['Right drag'], 'Orbit'],
-              [['Middle drag'], 'Pan'],
-              [['Wheel'], 'Zoom'],
-              [['1 finger'], 'Draw'],
-              [['2 fingers'], 'Orbit & zoom'],
-            ])}
+          </div>`,
+        text: 'Right-drag to orbit, wheel to zoom. On touch: one finger draws, two fingers orbit and zoom.',
+      },
+    ];
+    const overlay = h(
+      'div',
+      'modal',
+      `<div class="card help" data-pager>
+        <div class="help-pages">${pages
+          .map(
+            (p, i) => `<section class="help-page" data-page="${i}">
+              <span class="help-step">${i < pages.length - 1 ? `Step ${i + 1} of ${pages.length - 1}` : 'Reference'}</span>
+              <h2>${p.title}</h2>
+              <div class="help-visual">${p.art}</div>
+              <p class="help-text">${p.text}</p>
+            </section>`,
+          )
+          .join('')}</div>
+        <div class="help-foot">
+          <div class="help-dots">${pages.map((_, i) => `<button class="dot" data-go="${i}" aria-label="Page ${i + 1}"></button>`).join('')}</div>
+          <div class="actions">
+            <button class="big-btn ghost" data-nav="-1">${icon('chevronLeft', 18)} Back</button>
+            <button class="big-btn primary" data-nav="1">Next ${icon('chevronRight', 18)}</button>
           </div>
         </div>
-        <div class="actions"><button class="big-btn primary">Let's ride!</button></div>
       </div>`,
     );
-    overlay.onclick = (e) => {
-      if (e.target === overlay || (e.target as HTMLElement).closest('button')) {
+    let page = 0;
+    const back = overlay.querySelector('[data-nav="-1"]') as HTMLButtonElement;
+    const next = overlay.querySelector('[data-nav="1"]') as HTMLButtonElement;
+    const close = () => {
+      window.removeEventListener('keydown', onKey, true);
+      overlay.classList.add('leaving');
+      setTimeout(() => overlay.remove(), 200);
+    };
+    const show = (i: number) => {
+      page = Math.max(0, Math.min(pages.length - 1, i));
+      overlay.querySelectorAll<HTMLElement>('.help-page').forEach((el, k) => el.classList.toggle('on', k === page));
+      overlay.querySelectorAll('.dot').forEach((el, k) => el.classList.toggle('on', k === page));
+      back.style.visibility = page === 0 ? 'hidden' : 'visible';
+      // The last tutorial step starts riding; the shortcuts page is only a reference.
+      next.innerHTML = page >= pages.length - 2 ? "Let's ride!" : `Next ${icon('chevronRight', 18)}`;
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (!overlay.isConnected) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
         this.handlers.click();
-        overlay.classList.add('leaving');
-        setTimeout(() => overlay.remove(), 200);
+        show(page + (e.key === 'ArrowRight' ? 1 : -1));
+      } else if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        close();
       }
     };
+    window.addEventListener('keydown', onKey, true);
+    overlay.onclick = (e) => {
+      const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+      if (e.target === overlay) return close();
+      if (!b) return;
+      this.handlers.click();
+      if (b.dataset.go) return show(Number(b.dataset.go));
+      if (b.dataset.nav === '-1') return show(page - 1);
+      if (page >= pages.length - 2) return close();
+      show(page + 1);
+    };
+    show(0);
     document.body.append(overlay);
   }
 
@@ -1577,6 +1654,8 @@ export class UI {
         if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
         const layer = [...document.querySelectorAll('.modal, .summary')].filter((l) => !l.classList.contains('leaving')).pop();
         if (!layer) return;
+        // Paged cards (How to play) turn pages with the arrows themselves.
+        if (e.key !== 'Enter' && layer.querySelector('[data-pager]')) return;
         const buttons = [...layer.querySelectorAll<HTMLButtonElement>('.big-btn')].filter((b) => !b.disabled && b.offsetParent !== null);
         const main = layer.querySelector<HTMLButtonElement>('.big-btn.primary');
         const sel = layer.querySelector<HTMLButtonElement>('.big-btn.kb-sel') ?? main;
