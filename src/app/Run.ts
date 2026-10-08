@@ -242,12 +242,12 @@ export class Run {
     const { sound, ui, track, sim, effects, rig, runStats } = this.c;
     if (events & EVENT.ring) {
       sound.ring();
-      ui.popup('BOOST!', 'boost');
+      ui.popup('BOOST!', 'boost', true);
       this.flash = 0.35;
     }
     if (events & EVENT.bounce) {
       sound.bounce();
-      if (Math.random() < 0.5) ui.popup('BOING!', 'bounce');
+      if (Math.random() < 0.5) ui.popup('BOING!', 'bounce', true);
     }
     if (events & EVENT.star) {
       sound.star();
@@ -292,7 +292,7 @@ export class Run {
     }
     for (const c of runStats.takeCombos()) {
       const label = `x${c.combo % 1 ? c.combo.toFixed(1) : c.combo}`;
-      if (c.lost) ui.popup(`COMBO ${label} LOST`, 'crash');
+      if (c.lost) ui.popup(`COMBO ${label} LOST`, 'crash', true);
       else {
         ui.popup(`COMBO ${label} · ${c.points.toLocaleString()} PTS`, 'finish');
         sound.success();

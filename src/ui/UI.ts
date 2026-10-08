@@ -220,6 +220,9 @@ export class UI {
       handlers.cycleVehicle();
     };
     player.append(this.playBtn, stopBtn, testBtn, slowBtn, this.riderBtn, this.vehicleBtn, this.timeline, this.timeLabel);
+    // Touch riding hides both bars for a clear view: this little button pauses (and brings them back).
+    const floatPause = button('float-pause', icon('pause', 22), 'Pause');
+    floatPause.onclick = () => handlers.pause();
 
     // ------------------------------------------------------------ HUD
     this.hud = h(
@@ -306,7 +309,7 @@ export class UI {
 
     this.hint = h('div', 'hint hidden');
     const replayTag = h('div', 'replay-tag', '<i></i>REPLAY');
-    root.append(h('div', 'letterbox'), top, player, this.hud, this.popups, this.touchPad, bottom, this.hint, replayTag);
+    root.append(h('div', 'letterbox'), top, player, floatPause, this.hud, this.popups, this.touchPad, bottom, this.hint, replayTag);
     this.setRiderMode(riderMode);
     editor.onHint = (t) => this.flash(t);
     editor.selection.onChange = () => {
@@ -649,13 +652,15 @@ export class UI {
   /** Callouts stack in a column (newest on top), never on top of each other. */
   private addPopup(el: HTMLElement, life: number) {
     this.popups.prepend(el);
-    // Keep the stack short: the oldest go first.
-    while (this.popups.children.length > 3) this.popups.lastElementChild!.remove();
+    // Keep the stack short: the oldest go first (touch screens show one at a time).
+    while (this.popups.children.length > (TOUCH ? 1 : 3)) this.popups.lastElementChild!.remove();
     setTimeout(() => el.remove(), life);
   }
 
   /** Big animated callout in the middle of the screen. */
-  popup(text: string, kind: 'boost' | 'bounce' | 'air' | 'crash' | 'finish' = 'boost') {
+  popup(text: string, kind: 'boost' | 'bounce' | 'air' | 'crash' | 'finish' = 'boost', minor = false) {
+    // Small screens keep only the callouts that matter, so the ride stays visible.
+    if (minor && TOUCH) return;
     this.addPopup(h('div', `popup ${kind}`, text), 1400);
   }
 

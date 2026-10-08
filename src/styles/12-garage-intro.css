@@ -203,16 +203,6 @@
   background: rgba(255, 138, 61, 0.78);
 }
 
-/* Touch riding: the HUD moves up under the player bar so the pads stay clear. */
-body.rider-mode .touch-pad:not(.hidden) ~ .hud {
-  left: 50%;
-  bottom: auto;
-  top: calc(max(12px, env(safe-area-inset-top)) + 118px);
-  transform: translateX(-50%) scale(0.82);
-  transform-origin: top center;
-  opacity: 0.92;
-}
-
 /* Phones: garage and wardrobe are a short sheet at the bottom with one sideways row of cards,
    so the ride (or outfit) previews live above it. The header stays pinned at the top. */
 @media (max-width: 720px), (max-height: 500px) {
