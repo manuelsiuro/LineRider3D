@@ -466,6 +466,10 @@ async function titleFlow() {
       await openSettings();
       continue;
     }
+    if (choice === 'phone') {
+      await ui.showPhone();
+      continue;
+    }
     if (choice === 'trophies') {
       const got = unlockedAchievements();
       await ui.showTrophies(

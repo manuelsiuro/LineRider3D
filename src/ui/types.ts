@@ -1,7 +1,7 @@
 import type { WorldConfig } from '../world/worlds';
 import type { BiomeId } from '../world/worlds';
 
-export type TitleChoice = 'daily' | 'puzzles' | 'gallery' | 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies';
+export type TitleChoice = 'daily' | 'puzzles' | 'gallery' | 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies' | 'phone';
 export type PauseChoice = 'resume' | 'restart' | 'settings' | 'levels' | 'menu';
 
 export interface UIHandlers {

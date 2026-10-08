@@ -18,6 +18,7 @@ import { showDailyIntro, showLevelIntro, showSharedIntro } from './screens/intro
 import { hideSummary, showSummary } from './screens/summary';
 import { showPause, showPhotoMode, showSettings } from './screens/menus';
 import { showHelp } from './screens/help';
+import { showPhone } from './screens/phone';
 import { showPuzzleIntro, showPuzzles } from './screens/puzzles';
 import { showGallery } from './screens/gallery';
 
@@ -879,6 +880,9 @@ export class UI {
   }
   showHelp() {
     showHelp(this.ctx);
+  }
+  showPhone() {
+    return showPhone(this.ctx);
   }
   showGallery(...a: Rest<typeof showGallery>) {
     return showGallery(this.ctx, ...a);
