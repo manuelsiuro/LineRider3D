@@ -5,8 +5,8 @@ import { bakedDecor, flatMaterial, mounds, peaks, ring, scatter, type Backdrop, 
 const rockColor = new THREE.Color(0x6e7c8c);
 const snowColor = new THREE.Color(0xf6f9ff);
 
-/** Tiny sparkles on the snow that twinkle around the camera focus. */
-function glints(count: number) {
+/** Tiny sparkles on the ground (snow, sand) that twinkle around the camera focus. */
+export function glints(count: number, color = new THREE.Color(1, 1, 1), strength = 1) {
   const positions = new Float32Array(count * 3);
   const phase = new Float32Array(count);
   let seed = 13;
@@ -23,7 +23,7 @@ function glints(count: number) {
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-    uniforms: { time: { value: 0 }, focus: { value: new THREE.Vector3() }, strength: { value: 1 } },
+    uniforms: { time: { value: 0 }, focus: { value: new THREE.Vector3() }, strength: { value: strength }, tint: { value: color } },
     vertexShader: `
       attribute float phase; uniform float time; uniform vec3 focus; varying float vA;
       void main() {
@@ -38,17 +38,28 @@ function glints(count: number) {
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: `
-      uniform float strength; varying float vA;
+      uniform float strength; uniform vec3 tint; varying float vA;
       void main() {
         vec2 c = gl_PointCoord - 0.5;
         float star = max(0.0, 1.0 - abs(c.x) * 12.0) + max(0.0, 1.0 - abs(c.y) * 12.0);
         star *= 1.0 - length(c) * 2.0;
-        gl_FragColor = vec4(1.0, 1.0, 1.0, clamp(star, 0.0, 1.0) * vA * strength);
+        gl_FragColor = vec4(tint, clamp(star, 0.0, 1.0) * vA * strength);
       }`,
   });
   const points = new THREE.Points(geo, mat);
   points.frustumCulled = false;
   return points;
+}
+
+/** Glints for a world: added to its group, animated by the returned update. */
+export function groundGlints(group: THREE.Group, count: number, color: THREE.Color, strength: number) {
+  const g = glints(Math.round(count), color, strength);
+  group.add(g);
+  const u = (g.material as THREE.ShaderMaterial).uniforms;
+  return (focus: THREE.Vector3, time: number) => {
+    u.time.value = time;
+    u.focus.value.copy(focus);
+  };
 }
 
 /** The original winter landscape: snowy peaks, pine forest, drifts and glints. */

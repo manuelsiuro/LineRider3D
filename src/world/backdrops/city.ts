@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { groundGlints } from './alpine';
 import { M } from '../models';
 import { terrainHeight } from '../terrain';
 import { dotTexture } from '../textures';
@@ -384,6 +385,8 @@ export function city(ctx: BackdropCtx): Backdrop {
     return c;
   });
 
+  const glint = ctx.cfg.weather === 'snow' ? groundGlints(group, 600 * ctx.detail, new THREE.Color(1, 1, 1), (1 - ctx.atm.night * 0.6) * (1 - ctx.atm.overcast * 0.7)) : null;
+
   return {
     group,
     ground: 'concrete',
@@ -394,7 +397,8 @@ export function city(ctx: BackdropCtx): Backdrop {
       const k = (r < RING_R - 10 ? 1.05 : 0.72) + n;
       out.setRGB(k, k, k * 1.02);
     },
-    update(dt, _focus, time) {
+    update(dt, focus, time) {
+      glint?.(focus, time);
       traffic.update(dt);
       beaconMat.opacity = Math.sin(time * 3) > 0.2 ? 1 : 0.15;
       for (const c of cranes) c.getObjectByName('jib')!.rotation.y = c.userData.phase + Math.sin(time * Math.abs(c.userData.speed) + c.userData.phase) * 1.2;

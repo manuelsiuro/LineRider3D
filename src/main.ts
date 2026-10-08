@@ -17,6 +17,7 @@ import { loadSettings, resetProgress, saveSettings, type Quality, type Settings 
 import { Effects } from './render/Effects';
 import { Trail } from './render/Trail';
 import { SurfaceTracks } from './render/SurfaceTracks';
+import { fxStyle } from './render/fxStyles';
 import { PostFX } from './render/PostFX';
 import { Sound } from './audio/Sound';
 import { RunStats } from './game/RunStats';
@@ -154,7 +155,9 @@ function applyWorld(w: Partial<WorldConfig>, force = false) {
   postfx.setGrade(env.atm.grade);
   trackView.setWorld(env.config, env.atm.night, env.atm.wet);
   const ground = surfaceOf(env.config);
-  effects.setSurface(ground, env.atm.night);
+  const fx = fxStyle(env.config, env.atm.wet);
+  effects.setStyle(fx, env.atm.night);
+  trail.setColor(fx.trail);
   groundMarks.setSurface(ground, env.atm.wet, env.atm.night);
   sim.setGroundDrag(SURFACES[ground].drag);
   // The title's demo run restarts on the new ground (no mid-run re-simulation).
@@ -1348,7 +1351,7 @@ async function enterShared(data: SerializedTrack, challenge: number, vehicleId: 
 }
 
 let devClock = performance.now();
-if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, env, renderer,
+if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, env, renderer, effects, trail,
   shot: (biome: string, time = 'day', weather = 'clear', p?: number[], t?: number[]) => {
     document.body.classList.add('dev-shot');
     applyWorld({ biome, time, weather } as Partial<WorldConfig>);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { groundGlints } from './alpine';
 import { terrainHeight } from '../terrain';
 import { Birds, Drifters, bakedDecor, flatMaterial, peaks, ring, scatter, smooth, type Backdrop, type BackdropCtx } from './common';
 import { Water } from './water';
@@ -96,6 +97,8 @@ export function forest(ctx: BackdropCtx): Backdrop {
       : { color: 0xc8a43a, size: 0.22, box: 40, fall: 0.8 });
   if (drift) group.add(drift.points);
 
+  const glint = ctx.cfg.weather === 'snow' ? groundGlints(group, 600 * ctx.detail, new THREE.Color(1, 1, 1), (1 - ctx.atm.night * 0.6) * (1 - ctx.atm.overcast * 0.7)) : null;
+
   return {
     group,
     ground: 'grass',
@@ -117,6 +120,7 @@ export function forest(ctx: BackdropCtx): Backdrop {
     },
     onGround: (h, seg, ext) => water.setHeights(h, seg, ext),
     update(dt, focus, time) {
+      glint?.(focus, time);
       water.update(time);
       birds.update(time);
       drift?.update(dt, focus, time);

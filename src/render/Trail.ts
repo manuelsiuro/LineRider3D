@@ -28,11 +28,17 @@ export class Trail {
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
       vertexShader: `attribute float alpha; varying float vA; void main(){ vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `varying float vA; void main(){ gl_FragColor = vec4(vec3(0.75, 0.9, 1.0) * vA, vA); }`,
+      uniforms: { tint: { value: new THREE.Color(0.75, 0.9, 1) } },
+      fragmentShader: `uniform vec3 tint; varying float vA; void main(){ gl_FragColor = vec4(tint * vA, vA); }`,
     });
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.frustumCulled = false;
     scene.add(this.mesh);
+  }
+
+  /** Trail color of the world (icy blue, neon, amber...). */
+  setColor(c: THREE.Color) {
+    ((this.mesh.material as THREE.ShaderMaterial).uniforms.tint.value as THREE.Color).copy(c);
   }
 
   reset() {

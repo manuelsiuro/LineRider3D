@@ -1,23 +1,18 @@
 import * as THREE from 'three';
 import { P } from '../physics/Rider';
 import { terrainHeight } from '../world/terrain';
-import type { SurfaceId } from '../world/worlds';
+import { fxStyle, type FxStyle } from './fxStyles';
+import { DEFAULT_WORLD } from '../world/worlds';
 
-/** Particle colors kicked up from each ground (two tones mixed at random). */
-const DUST: Record<SurfaceId, [THREE.Color, THREE.Color]> = {
-  snow: [new THREE.Color(1, 1, 1), new THREE.Color(0.94, 0.97, 1)],
-  sand: [new THREE.Color(0.95, 0.8, 0.56), new THREE.Color(0.82, 0.64, 0.42)],
-  grass: [new THREE.Color(0.42, 0.31, 0.2), new THREE.Color(0.36, 0.56, 0.24)],
-  asphalt: [new THREE.Color(0.62, 0.62, 0.64), new THREE.Color(0.45, 0.45, 0.48)],
-};
 const SPARK = new THREE.Color(2.2, 1.3, 0.45);
 
 const MAX = 1500;
 const GRAVITY = -6;
 
 /**
- * Snow particles: spray from the sled runners while riding and a burst when
- * Bosh crashes or plows into the snow.
+ * Ground and track particles in the style of the world: powder, dirt and
+ * leaves, sand, red dust or grit kicked up by the ride, spray and landing
+ * puffs on the track, sparks, and sparkles when a star is collected.
  */
 export class Effects {
   private points: THREE.Points;
@@ -28,6 +23,10 @@ export class Effects {
   private size = new Float32Array(MAX);
   private alpha = new Float32Array(MAX);
   private color = new Float32Array(MAX * 3).fill(1);
+  private grav = new Float32Array(MAX);
+  private drag = new Float32Array(MAX);
+  private style: FxStyle = fxStyle(DEFAULT_WORLD, 0);
+  private airFrames = 0;
   private next = 0;
   private wasCrashed = false;
   private lastFrame = -1;
@@ -66,25 +65,30 @@ export class Effects {
     scene.add(this.points);
   }
 
-  private surface: SurfaceId = 'snow';
-
-  /** Ground the particles come from, and how dark the world is (0..1). */
-  setSurface(surface: SurfaceId, night: number) {
-    this.surface = surface;
+  /** The world's particle style, and how dark it is (0..1). */
+  setStyle(style: FxStyle, night: number) {
+    this.style = style;
     (this.points.material as THREE.ShaderMaterial).uniforms.light.value = 1 - night * 0.65;
   }
 
-  private dust() {
-    const [a, b] = DUST[this.surface];
+  private pick([a, b]: [THREE.Color, THREE.Color]) {
     return Math.random() < 0.5 ? a : b;
+  }
+
+  /** Ground color, now and then a fleck (leaf, shell). */
+  private dust() {
+    const s = this.style;
+    return s.bits && Math.random() < 0.3 ? this.pick(s.bits) : this.pick(s.ground);
   }
 
   setViewportHeight(h: number) {
     (this.points.material as THREE.ShaderMaterial).uniforms.scale.value = h * 0.5;
   }
 
-  private emit(p: THREE.Vector3, v: THREE.Vector3, size: number, life: number, color?: THREE.Color) {
+  private emit(p: THREE.Vector3, v: THREE.Vector3, size: number, life: number, color?: THREE.Color, gravity = GRAVITY, drag = 2.5) {
     const i = this.next;
+    this.grav[i] = gravity;
+    this.drag[i] = drag;
     this.color[i * 3] = color ? color.r : 1;
     this.color[i * 3 + 1] = color ? color.g : 1;
     this.color[i * 3 + 2] = color ? color.b : 1;
@@ -96,21 +100,47 @@ export class Effects {
     this.size[i] = size;
   }
 
+  /** Ground particles in the world's style (dust behavior included). */
+  private puff(at: THREE.Vector3, v: THREE.Vector3, size: number, life: number) {
+    const f = this.style.puff;
+    this.emit(at, v, size * f.size, life * f.life, this.dust(), f.gravity, f.drag);
+  }
+
+  private spark(at: THREE.Vector3, v: THREE.Vector3) {
+    this.emit(at, v, 0.08 + Math.random() * 0.08, 0.3 + Math.random() * 0.3, SPARK, -9, 1.5);
+  }
+
   private burst(at: THREE.Vector3, count: number, speed: number) {
     const v = new THREE.Vector3();
     for (let k = 0; k < count; k++) {
-      v.set(Math.random() - 0.5, Math.random() * 0.9 + 0.2, Math.random() - 0.5).normalize().multiplyScalar(speed * (0.4 + Math.random()));
-      this.emit(at, v, 0.25 + Math.random() * 0.35, 0.6 + Math.random() * 0.8, this.dust());
+      v.set(Math.random() - 0.5, Math.random() * 0.9 + 0.2, Math.random() - 0.5).normalize().multiplyScalar(speed * (0.4 + Math.random()) * this.style.puff.rise);
+      this.puff(at, v, 0.25 + Math.random() * 0.35, 0.6 + Math.random() * 0.8);
     }
+    if (this.style.sparks)
+      for (let k = 0; k < 24; k++) {
+        v.set(Math.random() - 0.5, Math.random() * 0.8 + 0.3, Math.random() - 0.5).normalize().multiplyScalar(speed * (0.8 + Math.random()));
+        this.spark(at, v);
+      }
+  }
+
+  /** A soft ring of spray where the ride touches down on the track. */
+  private landing(at: THREE.Vector3, impact: number) {
+    const v = new THREE.Vector3();
+    const n = Math.min(30, Math.round(8 + impact * 3));
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2;
+      v.set(Math.cos(a) * (1.5 + impact * 0.4), 0.6 + Math.random() * 1.2, Math.sin(a) * (1.5 + impact * 0.4));
+      this.emit(at, v, 0.18 + Math.random() * 0.22, 0.4 + Math.random() * 0.4, this.pick(this.style.spray), GRAVITY, 3);
+    }
+    if (this.style.sparks && impact > 6) for (let k = 0; k < 10; k++) this.spark(at, v.set((Math.random() - 0.5) * 6, 1 + Math.random() * 2, (Math.random() - 0.5) * 6));
   }
 
   /** Golden sparkles, e.g. when a star is collected. */
   sparkle(at: THREE.Vector3, count = 40) {
     const v = new THREE.Vector3();
-    const gold = new THREE.Color(1.6, 1.25, 0.4);
     for (let k = 0; k < count; k++) {
       v.set(Math.random() - 0.5, Math.random() - 0.3, Math.random() - 0.5).normalize().multiplyScalar(2 + Math.random() * 4);
-      this.emit(at, v, 0.12 + Math.random() * 0.15, 0.5 + Math.random() * 0.6, gold);
+      this.emit(at, v, 0.12 + Math.random() * 0.15, 0.5 + Math.random() * 0.6, this.pick(this.style.sparkle), GRAVITY * 0.5, 2.5);
     }
   }
 
@@ -135,33 +165,37 @@ export class Effects {
     this.wasCrashed = crashed;
 
     const v = new THREE.Vector3();
+    // Touchdown on the track after a real jump.
+    const grounded = contact.some((c) => c);
+    if (grounded && this.airFrames > 10 && !crashed) {
+      const at = pts.find((_, i) => contact[i] && i <= P.noseR) ?? pts[P.butt];
+      if (at.y - terrainHeight(at.x, at.z) > 0.05) this.landing(at, Math.abs(vel.y));
+    }
+    this.airFrames = grounded ? 0 : this.airFrames + 1;
     for (const i of [P.tailL, P.tailR, P.noseL, P.noseR, P.butt, P.shoulder]) {
       if (!contact[i]) continue;
       const p = pts[i];
       const onSnow = p.y - terrainHeight(p.x, p.z) < 0.05;
       if (onSnow) {
-        // Plowing through powder.
+        // Plowing through the ground.
         if (speed < 1) continue;
         const n = Math.min(6, Math.ceil(speed / 4));
         for (let k = 0; k < n; k++) {
           v.copy(vel).multiplyScalar(0.25 + Math.random() * 0.2);
-          v.y = 1.5 + Math.random() * 2.5 + speed * 0.1;
+          v.y = (1.5 + Math.random() * 2.5 + speed * 0.1) * this.style.puff.rise;
           v.x += (Math.random() - 0.5) * 3;
           v.z += (Math.random() - 0.5) * 3;
-          this.emit(p, v, 0.25 + Math.random() * 0.3, 0.5 + Math.random() * 0.6, this.dust());
+          this.puff(p, v, 0.25 + Math.random() * 0.3, 0.5 + Math.random() * 0.6);
           // Sparks when metal scrapes the road.
-          if (this.surface === 'asphalt' && i === P.shoulder && Math.random() < 0.5) {
-            v.multiplyScalar(1.4);
-            this.emit(p, v, 0.07 + Math.random() * 0.06, 0.25 + Math.random() * 0.25, SPARK);
-          }
+          if (this.style.sparks && i === P.shoulder && Math.random() < 0.5) this.spark(p, v.multiplyScalar(1.4));
         }
       } else if (i <= P.noseR && speed > 6 && Math.random() < 0.6) {
-        // Fine ice spray from the runners on a track.
+        // Fine spray from the runners or tyres on a track (ice, sawdust, sand, grit, rain water).
         v.copy(vel).multiplyScalar(-0.08);
         v.x += (Math.random() - 0.5) * 1.5;
         v.y += Math.random() * 1.5;
         v.z += (Math.random() - 0.5) * 1.5;
-        this.emit(p, v, 0.12 + Math.random() * 0.12, 0.3 + Math.random() * 0.3);
+        this.emit(p, v, 0.12 + Math.random() * 0.12, 0.3 + Math.random() * 0.3, this.pick(this.style.spray));
       }
     }
     return justCrashed;
@@ -171,6 +205,7 @@ export class Effects {
     this.life.fill(0);
     this.lastFrame = -1;
     this.wasCrashed = false;
+    this.airFrames = 0;
   }
 
   update(dt: number) {
@@ -181,8 +216,8 @@ export class Effects {
       }
       this.life[i] -= dt;
       const o = i * 3;
-      this.vel[o + 1] += GRAVITY * dt;
-      const drag = Math.exp(-dt * 2.5);
+      this.vel[o + 1] += this.grav[i] * dt;
+      const drag = Math.exp(-dt * this.drag[i]);
       this.vel[o] *= drag;
       this.vel[o + 2] *= drag;
       this.pos[o] += this.vel[o] * dt;

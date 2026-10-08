@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { groundGlints } from './alpine';
 import { M } from '../models';
 import { terrainHeight } from '../terrain';
 import { Birds, bakedDecor, flatMaterial, mounds, peaks, rng, scatter, smooth, type Backdrop, type BackdropCtx } from './common';
@@ -205,6 +206,8 @@ export function beach(ctx: BackdropCtx): Backdrop {
   const gulls = new Birds(16, 12, 0xf4f4f4, [0, SHORE - 30], [40, 140], [18, 40], 0.9);
   group.add(gulls.mesh);
 
+  const glint = true ? groundGlints(group, 600 * ctx.detail, new THREE.Color(1, 0.95, 0.8), (1 - ctx.atm.night) * (1 - ctx.atm.overcast) * 0.7) : null;
+
   return {
     group,
     ground: 'sand',
@@ -220,7 +223,8 @@ export function beach(ctx: BackdropCtx): Backdrop {
     },
     farShape,
     onGround: (h, seg, ext) => water.setHeights(h, seg, ext),
-    update(_dt, _focus, time) {
+    update(_dt, focus, time) {
+      glint?.(focus, time);
       water.update(time);
       gulls.update(time);
       lh.beam.rotation.y = time * 0.6;

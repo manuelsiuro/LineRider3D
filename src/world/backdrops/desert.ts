@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { groundGlints } from './alpine';
 import { M } from '../models';
 import { terrainHeight } from '../terrain';
 import { Birds, bakedDecor, blocked, flatMaterial, mounds, peaks, ring, rng, scatter, type Backdrop, type BackdropCtx } from './common';
@@ -132,6 +133,8 @@ export function desert(ctx: BackdropCtx): Backdrop {
   const vultures = new Birds(6, 21, 0x1e1a18, [40, 80], [90, 180], [60, 90], 1.8);
   group.add(vultures.mesh);
 
+  const glint = ctx.cfg.weather === 'snow' ? groundGlints(group, 600 * ctx.detail, new THREE.Color(1, 1, 1), (1 - ctx.atm.night * 0.6) * (1 - ctx.atm.overcast * 0.7)) : null;
+
   return {
     group,
     ground: 'redsand',
@@ -142,6 +145,7 @@ export function desert(ctx: BackdropCtx): Backdrop {
       out.setRGB(k, k * (1 + n * 0.04), k * (1 + n * 0.08));
     },
     update(dt, focus, time) {
+      glint?.(focus, time);
       weeds?.update(dt, focus, time);
       vultures.update(time);
       for (const t of turbines.children) t.getObjectByName('rotor')!.rotation.x = time * (t.userData.speed as number);
