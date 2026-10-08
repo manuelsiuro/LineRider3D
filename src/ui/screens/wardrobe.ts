@@ -42,8 +42,13 @@ export function showWardrobe(ctx: ScreenCtx, outfits: OutfitCard[], stars: numbe
       const id = btn.dataset.id;
       if (!id) return;
       onPick(id);
-      overlay.querySelector('.outfit-grid')!.innerHTML = render(id);
+      // On phones the outfits are a sideways carousel: keep its place when a pick redraws it.
+      const x = grid.scrollLeft;
+      grid.innerHTML = render(id);
+      grid.scrollLeft = x;
     };
+    const grid = overlay.querySelector<HTMLElement>('.outfit-grid')!;
     document.body.append(overlay);
+    grid.querySelector('.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   });
 }

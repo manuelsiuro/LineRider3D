@@ -176,3 +176,70 @@
     display: none;
   }
 }
+
+/* A phone on its side: logo on the left, the menu on the right, everything in one screen. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .title-screen {
+    padding: max(12px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  }
+  .title-inner {
+    flex-direction: row;
+    justify-content: center;
+    gap: clamp(20px, 5vw, 56px);
+    width: 100%;
+  }
+  .logo {
+    flex: 0 1 auto;
+  }
+  .logo h1 {
+    font-size: clamp(40px, 7.5vw, 64px);
+  }
+  .logo-mark,
+  .tagline {
+    display: flex;
+  }
+  .logo-mark {
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+  }
+  .tagline {
+    margin-top: 10px;
+    font-size: 15px;
+  }
+  .title-actions {
+    width: min(400px, 52vw);
+    gap: 8px;
+  }
+  .title-actions > .big-btn {
+    height: 46px;
+    font-size: 17px;
+  }
+  .title-actions .big-btn.daily-btn {
+    min-height: 0;
+    height: 52px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .title-actions .daily-btn .daily-ic {
+    width: 34px;
+    height: 34px;
+  }
+  .title-actions .daily-btn .daily-text b {
+    font-size: 16px;
+  }
+  .title-row {
+    gap: 6px;
+  }
+  .title-row .big-btn {
+    height: 40px;
+    font-size: 14.5px;
+  }
+  .title-row .menu-ic {
+    width: 30px;
+    height: 30px;
+  }
+  .title-foot {
+    display: none;
+  }
+}

@@ -91,7 +91,9 @@
 
 .pill {
   display: inline-flex;
+  flex: none;
   align-items: center;
+  white-space: nowrap;
   gap: 4px;
   padding: 3px 9px;
   border-radius: 999px;

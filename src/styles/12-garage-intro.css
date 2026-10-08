@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------ garage */
+/* A bottom sheet (the ride shows above it); the auto margin, unlike flex-end, keeps a tall sheet scrollable. */
 .screen.garage {
-  align-items: flex-end;
   background: linear-gradient(to top, rgba(220, 235, 250, 0.96) 0%, rgba(220, 235, 250, 0.88) 55%, rgba(220, 235, 250, 0) 82%);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -211,4 +211,110 @@ body.rider-mode .touch-pad:not(.hidden) ~ .hud {
   transform: translateX(-50%) scale(0.82);
   transform-origin: top center;
   opacity: 0.92;
+}
+
+/* Phones: garage and wardrobe are a short sheet at the bottom with one sideways row of cards,
+   so the ride (or outfit) previews live above it. The header stays pinned at the top. */
+@media (max-width: 720px), (max-height: 500px) {
+  .screen.garage,
+  .screen.wardrobe {
+    padding: 0;
+    background: linear-gradient(to top, rgba(220, 235, 250, 0.95) 0%, rgba(220, 235, 250, 0.8) 30%, rgba(220, 235, 250, 0) 52%);
+  }
+  .screen.garage .screen-inner,
+  .screen.wardrobe .screen-inner {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+  }
+  .screen.garage .screen-head,
+  .screen.wardrobe .screen-head {
+    margin: 0;
+    padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
+    border-bottom: 1px solid var(--stroke);
+  }
+  .screen.garage .screen-head h2,
+  .screen.wardrobe .screen-head h2 {
+    font-size: 26px;
+  }
+  .screen.garage .screen-sub,
+  .screen.wardrobe .screen-sub {
+    display: none;
+  }
+  .ride-grid,
+  .outfit-grid {
+    display: flex;
+    gap: 10px;
+    margin-top: auto;
+    padding: 14px max(16px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 16px;
+    scrollbar-width: none;
+  }
+  .ride-grid::-webkit-scrollbar,
+  .outfit-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .ride-card {
+    flex: 0 0 min(80vw, 320px);
+    scroll-snap-align: center;
+    padding: 12px;
+    border-radius: 18px;
+  }
+  .ride-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+  .ride-icon svg {
+    width: 32px;
+    height: 32px;
+  }
+  .ride-name {
+    font-size: 17px;
+  }
+  .ride-blurb {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    font-size: 12px;
+  }
+  .ride-stats {
+    margin-top: 6px;
+  }
+  .ride-paints {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+  .outfit {
+    flex: 0 0 min(42vw, 170px);
+    scroll-snap-align: center;
+    padding: 12px;
+  }
+  .outfit-name {
+    font-size: 16px;
+  }
+  .swatches i {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* A phone on its side: little height, so the blurb goes and the cards stay short. */
+@media (max-height: 500px) {
+  .ride-card {
+    flex-basis: 300px;
+    grid-template-areas: 'icon name' 'stats stats';
+  }
+  .ride-blurb {
+    display: none;
+  }
 }

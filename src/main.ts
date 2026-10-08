@@ -235,7 +235,8 @@ const cameraModes: CameraMode[] = ['cinematic', 'chase', 'side', 'follow'];
 
 const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('div'), { className: 'ui' })), editor, {
   play: () => run.play(),
-  pause: () => run.pause(),
+  // Touch has no Esc: in a game, the pause button opens the pause menu.
+  pause: () => (stage.isTouch && playingGame() && run.playing && !run.replaying ? openPause() : run.pause()),
   stop: () => stopRun(),
   seek: (f) => run.seek(f),
   cycleCamera() {

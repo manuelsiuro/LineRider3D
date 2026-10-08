@@ -21,6 +21,11 @@
   width: min(880px, 100%);
 }
 
+.screen.garage .screen-inner,
+.screen.wardrobe .screen-inner {
+  margin-top: auto;
+}
+
 .screen-head {
   display: flex;
   align-items: center;
@@ -212,6 +217,48 @@
   opacity: 0.85;
 }
 
+/* Phones: two compact cards a row, so a world's levels fit in a screen or two. */
+@media (max-width: 480px) {
+  .level-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .level-card {
+    gap: 4px;
+    min-height: 0;
+    padding: 12px;
+    border-radius: 18px;
+  }
+  .level-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 11px;
+    font-size: 18px;
+  }
+  .level-ride {
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+  }
+  .level-name {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 17px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .level-best {
+    font-size: 11.5px;
+  }
+  .chapter-head h3 {
+    font-size: 21px;
+  }
+  .chapter-head p {
+    font-size: 12px;
+  }
+}
+
 /* Wardrobe */
 .outfit-grid {
   display: grid;
@@ -346,7 +393,6 @@ body.level-mode .top-right .btn-group:first-child {
 
 /* Wardrobe: a bottom sheet so Bosh stays visible for the live preview. */
 .screen.wardrobe {
-  align-items: flex-end;
   background: linear-gradient(to top, rgba(220, 235, 250, 0.95) 0%, rgba(220, 235, 250, 0.85) 45%, rgba(220, 235, 250, 0) 75%);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;

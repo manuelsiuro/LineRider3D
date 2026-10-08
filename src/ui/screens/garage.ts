@@ -21,7 +21,7 @@ export function showGarage(ctx: ScreenCtx, cards: VehicleCard[], selected: strin
               ${c.paints
                 .map((p) => {
                   const bg = p.colors.length ? `background:linear-gradient(135deg,#${hex(p.colors[0])} 55%,#${hex(p.colors[1])} 55%)` : '';
-                  return `<i class="paint ${p.id === c.paint ? 'on' : ''} ${p.unlocked ? '' : 'locked'} ${p.colors.length ? '' : 'outfit'}" data-ride="${c.id}" data-paint="${p.id}" title="${p.unlocked ? p.name : `${p.name}: complete ${p.need} ride challenge${p.need > 1 ? 's' : ''}`}" style="${bg}">${p.unlocked ? '' : icon('lock', 11)}</i>`;
+                  return `<i class="paint ${p.id === c.paint ? 'on' : ''} ${p.unlocked ? '' : 'locked'} ${p.colors.length ? '' : 'paint-outfit'}" data-ride="${c.id}" data-paint="${p.id}" title="${p.unlocked ? p.name : `${p.name}: complete ${p.need} ride challenge${p.need > 1 ? 's' : ''}`}" style="${bg}">${p.unlocked ? '' : icon('lock', 11)}</i>`;
                 })
                 .join('')}
             </span>
@@ -58,15 +58,23 @@ export function showGarage(ctx: ScreenCtx, cards: VehicleCard[], selected: strin
         cards = onPaint(paint.dataset.ride!, paint.dataset.paint!);
         selected = paint.dataset.ride!;
         onPick(selected);
-        overlay.querySelector('.ride-grid')!.innerHTML = render(selected);
+        rerender(selected);
         return;
       }
       const id = btn.dataset.id;
       if (!id) return;
       selected = id;
       onPick(id);
-      overlay.querySelector('.ride-grid')!.innerHTML = render(id);
+      rerender(id);
+    };
+    const grid = overlay.querySelector<HTMLElement>('.ride-grid')!;
+    // On phones the cards are a sideways carousel: keep its place when a pick redraws it.
+    const rerender = (sel: string) => {
+      const x = grid.scrollLeft;
+      grid.innerHTML = render(sel);
+      grid.scrollLeft = x;
     };
     document.body.append(overlay);
+    grid.querySelector('.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   });
 }

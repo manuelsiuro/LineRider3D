@@ -225,3 +225,71 @@
   padding: 18px 22px 22px;
   margin: 0;
 }
+
+/* A phone on its side: the result on the left, goals, stats and buttons on the right. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .summary {
+    padding: 8px;
+  }
+  .summary .card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: 'head goals' 'head stats' 'head actions';
+    width: min(820px, 100%);
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+  }
+  .summary-head {
+    grid-area: head;
+    padding: 16px 18px;
+  }
+  .summary-head h2 {
+    margin-top: 4px;
+    font-size: 26px;
+  }
+  .rating {
+    margin-top: 8px;
+  }
+  .rating .ic {
+    width: 32px;
+    height: 32px;
+  }
+  .score-big {
+    font-size: 36px;
+  }
+  .summary .goals {
+    grid-area: goals;
+    padding: 14px 16px 6px;
+    gap: 6px;
+  }
+  .goals li {
+    font-size: 13.5px;
+  }
+  .summary .stats {
+    grid-area: stats;
+    align-self: start;
+    margin-top: 6px;
+  }
+  .stats > div {
+    padding: 8px 6px;
+  }
+  .stats b {
+    font-size: 21px;
+  }
+  .stats small {
+    font-size: 11px;
+  }
+  .stats span {
+    font-size: 10px;
+  }
+  .summary .actions {
+    grid-area: actions;
+    padding: 10px 14px 14px;
+  }
+  .summary .actions .big-btn {
+    height: 44px;
+    padding: 0 14px;
+    font-size: 16px;
+  }
+}

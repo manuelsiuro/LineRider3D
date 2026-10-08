@@ -90,6 +90,8 @@ body.photo .ui * {
   justify-content: center;
   gap: 12px;
   padding: 10px 12px 10px 18px;
+  /* Without it, starting at left: 50% caps the bar at half the window and it wraps early. */
+  width: max-content;
   max-width: calc(100vw - 32px);
   border-radius: 22px;
   background: var(--glass-strong);
@@ -122,7 +124,7 @@ body.photo .ui * {
   accent-color: var(--accent);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 480px), (max-height: 500px) {
   .photo-hint {
     display: none;
   }
