@@ -1,4 +1,6 @@
 import { LEVELS, chapterOf } from '../levels/levels';
+import { unlockedAchievements } from './achievements';
+import type { BiomeId } from '../world/worlds';
 
 export interface LevelProgress {
   stars: number;
@@ -51,6 +53,10 @@ export interface Outfit {
   name: string;
   /** Total stars needed. */
   stars: number;
+  /** Achievement needed (world outfits). */
+  achievement?: string;
+  /** How to unlock it, when locked. */
+  hint?: string;
   jacket: number;
   pants: number;
   scarf: number;
@@ -65,13 +71,34 @@ export const OUTFITS: Outfit[] = [
   { id: 'forest', name: 'Forest Ranger', stars: 12, jacket: 0x2e7d4f, pants: 0x4a3b2a, scarf: 0xff8a3d, hat: 0xff8a3d, sled: 0x8a5a36 },
   { id: 'midnight', name: 'Midnight', stars: 16, jacket: 0x2b2a5e, pants: 0x14142a, scarf: 0xb48cff, hat: 0xb48cff, sled: 0x3b3970 },
   { id: 'golden', name: 'Golden Legend', stars: 22, jacket: 0xf2c94c, pants: 0x3a2a12, scarf: 0xffffff, hat: 0xf2c94c, sled: 0xf2c94c },
+  // World outfits: 3 stars on every level of a world.
+  { id: 'ranger', name: 'Woodland Ranger', stars: 0, achievement: 'champ-forest', hint: 'Forest', jacket: 0x5a7a2e, pants: 0x3b2f22, scarf: 0xc9a227, hat: 0x7a4b25, sled: 0x6e4529 },
+  { id: 'lifeguard', name: 'Lifeguard', stars: 0, achievement: 'champ-beach', hint: 'Beach', jacket: 0xe0332b, pants: 0xf2c94c, scarf: 0xffffff, hat: 0xf2c94c, sled: 0x18b6c9 },
+  { id: 'nomad', name: 'Desert Nomad', stars: 0, achievement: 'champ-desert', hint: 'Desert', jacket: 0xd9b26a, pants: 0x8a5a36, scarf: 0x2f6fd0, hat: 0xf4ecd8, sled: 0xc4532a },
+  { id: 'courier', name: 'Neon Courier', stars: 0, achievement: 'champ-city', hint: 'City', jacket: 0x1d1f24, pants: 0x2a2d33, scarf: 0xff3da6, hat: 0x39e6f0, sled: 0x7466f0 },
 ];
+
+/** Is an outfit available (enough stars, and its world mastered)? */
+export function outfitUnlocked(o: Outfit, stars = totalStars(), got = unlockedAchievements()) {
+  return stars >= o.stars && (!o.achievement || !!got[o.achievement]);
+}
+
+/** Worlds whose levels all have 3 stars. */
+export function champions(progress = loadProgress()): Partial<Record<BiomeId, boolean>> {
+  const out: Partial<Record<BiomeId, boolean>> = {};
+  for (const l of LEVELS) {
+    const b = chapterOf(l);
+    const three = (progress[l.id]?.stars ?? 0) >= 3;
+    out[b] = (out[b] ?? true) && three;
+  }
+  return out;
+}
 
 export function selectedOutfit(): Outfit {
   try {
     const id = localStorage.getItem(OUTFIT_KEY);
     const o = OUTFITS.find((x) => x.id === id);
-    if (o && totalStars() >= o.stars) return o;
+    if (o && outfitUnlocked(o)) return o;
   } catch {
     /* storage unavailable */
   }

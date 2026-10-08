@@ -1,4 +1,5 @@
 import type { VehicleId } from '../physics/vehicles';
+import type { BiomeId, WorldConfig } from '../world/worlds';
 import type { Stats } from './RunStats';
 
 /** What an achievement can look at. */
@@ -20,6 +21,13 @@ export interface RunContext {
   beatChallenge: boolean;
   /** Finished a track the player built (not a level or shared track). */
   ownTrack: boolean;
+  /** The world of the run. */
+  world: WorldConfig;
+  /** Distinct worlds ridden in / finished a level in, across all play. */
+  worldsRidden: number;
+  worldsFinished: number;
+  /** Worlds whose levels all have 3 stars. */
+  champion: Partial<Record<BiomeId, boolean>>;
 }
 
 export interface Achievement {
@@ -50,6 +58,21 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'yard-sale', title: 'Yard Sale', desc: 'Wipe out 10 times. It happens.', check: (c) => c.wipeouts >= 10 },
   { id: 'architect', title: 'Architect', desc: 'Finish a track you built yourself.', check: (c) => c.ended && c.ownTrack && c.stats.finished },
   { id: 'rival', title: 'Rival', desc: "Beat a friend's challenge score.", check: (c) => c.ended && c.beatChallenge },
+
+  // ---------------------------------------------------------------- worlds
+  { id: 'tourist', title: 'Tourist', desc: 'Ride in all five worlds.', check: (c) => c.worldsRidden >= 5 },
+  { id: 'globetrotter', title: 'Globetrotter', desc: 'Finish a level in every world.', check: (c) => c.worldsFinished >= 5 },
+  { id: 'night-owl', title: 'Night Owl', desc: 'Finish a level at night.', check: (c) => c.ended && c.stats.finished && !c.stats.crashed && c.levelId !== null && c.world.time === 'night' },
+  {
+    id: 'storm-chaser',
+    title: 'Storm Chaser',
+    desc: 'Earn 3 stars on a level in a storm or sandstorm.',
+    check: (c) => c.ended && c.rating === 3 && c.levelId !== null && (c.world.weather === 'storm' || c.world.weather === 'sandstorm'),
+  },
+  { id: 'champ-forest', title: 'King of the Woods', desc: '3 stars on every Forest level.', check: (c) => !!c.champion.forest },
+  { id: 'champ-beach', title: 'Beach Legend', desc: '3 stars on every Beach level.', check: (c) => !!c.champion.beach },
+  { id: 'champ-desert', title: 'Desert Fox', desc: '3 stars on every Desert level.', check: (c) => !!c.champion.desert },
+  { id: 'champ-city', title: 'City Slicker', desc: '3 stars on every City level.', check: (c) => !!c.champion.city },
 
   // ---------------------------------------------------------------- sled
   { id: 'sled-legend', ride: 'sled', title: 'Old School', desc: 'Earn 3 stars on a level with the sled.', check: (c) => on(c, 'sled') && c.ended && c.rating === 3 && c.levelId !== null },
@@ -102,22 +125,53 @@ export function evaluate(c: RunContext): Achievement[] {
   return fresh;
 }
 
-export function loadCounters(): { wipeouts: number } {
+interface Counters {
+  wipeouts: number;
+  /** Worlds ridden in, and worlds where a level was finished. */
+  rode: string[];
+  finished: string[];
+}
+
+export function loadCounters(): Counters {
+  const base: Counters = { wipeouts: 0, rode: [], finished: [] };
   try {
-    return { wipeouts: 0, ...(JSON.parse(localStorage.getItem(COUNTERS) ?? '{}') as object) };
+    const c = { ...base, ...(JSON.parse(localStorage.getItem(COUNTERS) ?? '{}') as Partial<Counters>) };
+    if (!Array.isArray(c.rode)) c.rode = [];
+    if (!Array.isArray(c.finished)) c.finished = [];
+    return c;
   } catch {
-    return { wipeouts: 0 };
+    return base;
   }
 }
 
-export function bumpWipeouts(): number {
-  const c = loadCounters();
-  c.wipeouts++;
+function saveCounters(c: Counters) {
   try {
     localStorage.setItem(COUNTERS, JSON.stringify(c));
   } catch {
     /* storage unavailable */
   }
+}
+
+/** Remembers that the player rode in (and maybe finished a level in) a world. */
+export function noteWorld(biome: BiomeId, finishedLevel: boolean) {
+  const c = loadCounters();
+  let changed = false;
+  if (!c.rode.includes(biome)) {
+    c.rode.push(biome);
+    changed = true;
+  }
+  if (finishedLevel && !c.finished.includes(biome)) {
+    c.finished.push(biome);
+    changed = true;
+  }
+  if (changed) saveCounters(c);
+  return c;
+}
+
+export function bumpWipeouts(): number {
+  const c = loadCounters();
+  c.wipeouts++;
+  saveCounters(c);
   return c.wipeouts;
 }
 

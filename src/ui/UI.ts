@@ -140,6 +140,9 @@ export interface OutfitCard {
   name: string;
   stars: number;
   colors: number[];
+  unlocked: boolean;
+  /** World to master, for world outfits. */
+  world?: string;
 }
 
 const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
@@ -824,12 +827,12 @@ export class UI {
       const render = (sel: string) =>
         outfits
           .map((o) => {
-            const unlocked = stars >= o.stars;
+            const unlocked = o.unlocked;
             const swatch = o.colors.map((c) => `<i style="background:#${c.toString(16).padStart(6, '0')}"></i>`).join('');
             return `<button class="outfit ${o.id === sel ? 'active' : ''} ${unlocked ? '' : 'locked'}" data-id="${o.id}" ${unlocked ? '' : 'disabled'}>
               <span class="swatches">${swatch}</span>
               <span class="outfit-name">${o.name}</span>
-              <span class="outfit-req">${unlocked ? (o.id === sel ? 'Wearing' : 'Wear') : `${icon('lock', 13)} ${o.stars} ${icon('star', 13)}`}</span>
+              <span class="outfit-req">${unlocked ? (o.id === sel ? 'Wearing' : 'Wear') : o.world ? `${icon('lock', 13)} 3${icon('star', 13)} all ${o.world}` : `${icon('lock', 13)} ${o.stars} ${icon('star', 13)}`}</span>
             </button>`;
           })
           .join('');
@@ -842,7 +845,7 @@ export class UI {
             <h2>Wardrobe</h2>
             <span class="pill big">${icon('star', 16)} ${stars}</span>
           </div>
-          <p class="screen-sub">Earn stars in the levels to unlock new looks for Bosh.</p>
+          <p class="screen-sub">Earn stars to unlock new looks for Bosh. Master a world (3 stars on all its levels) for its outfit.</p>
           <div class="outfit-grid">${render(selected)}</div>
         </div>`,
       );

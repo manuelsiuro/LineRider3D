@@ -25,9 +25,9 @@ import { readSharedLink, shareLink } from './game/share';
 import { rateRun } from './game/rating';
 import { GhostRun, beats, encodeInputs, loadGhost, saveGhost } from './game/Ghost';
 import { LEVELS, chapterOf } from './levels/levels';
-import { OUTFITS, isUnlocked, loadProgress, saveLevelResult, selectOutfit, selectVehicle, selectedOutfit, selectedVehicleId, totalStars } from './game/progress';
+import { OUTFITS, champions, isUnlocked, outfitUnlocked, loadProgress, saveLevelResult, selectOutfit, selectVehicle, selectedOutfit, selectedVehicleId, totalStars } from './game/progress';
 import { applyOutfit, applyPaint } from './render/RiderView';
-import { ACHIEVEMENTS, PAINTS, bumpWipeouts, evaluate, loadCounters, paintFor, rideProgress, selectPaint, unlockedAchievements, type RunContext } from './game/achievements';
+import { ACHIEVEMENTS, PAINTS, bumpWipeouts, evaluate, loadCounters, noteWorld, paintFor, rideProgress, selectPaint, unlockedAchievements, type RunContext } from './game/achievements';
 
 const STORAGE_KEY = 'lr3d.track';
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency ?? 8) <= 4;
@@ -666,7 +666,7 @@ async function titleFlow() {
       playing = false;
       resetRun();
       await ui.showWardrobe(
-        OUTFITS.map((o) => ({ id: o.id, name: o.name, stars: o.stars, colors: [o.jacket, o.scarf, o.hat, o.sled] })),
+        OUTFITS.map((o) => ({ id: o.id, name: o.name, stars: o.stars, colors: [o.jacket, o.scarf, o.hat, o.sled], unlocked: outfitUnlocked(o, stars), world: o.hint })),
         stars,
         selectedOutfit().id,
         (id) => {
@@ -907,6 +907,8 @@ function applyQuality(q: Exclude<Quality, 'auto'>) {
   postfx.setSize(innerWidth, innerHeight);
   postfx.bloomEnabled = q !== 'low';
   env.setShadows({ low: 0, medium: 1024, high: 2048 }[q]);
+  // Landscape density and weather particles follow the quality too.
+  env.setDetail(q);
   effects.setViewportHeight(innerHeight * renderer.getPixelRatio());
   ui.setQualityNote(settings.quality === 'auto' ? `Auto: ${q[0].toUpperCase()}${q.slice(1)}` : '');
 }
@@ -1077,6 +1079,8 @@ let wipeouts = loadCounters().wipeouts;
 function checkAchievements(ended: boolean, rating = 0) {
   if (mode !== 'game' || replaying) return;
   const s = runStats.stats;
+  const levelDone = ended && s.finished && !s.crashed && currentLevel !== null;
+  const worlds = noteWorld(env.config.biome, levelDone);
   const ctx: RunContext = {
     stats: s,
     vehicle: vehicle.id,
@@ -1088,6 +1092,10 @@ function checkAchievements(ended: boolean, rating = 0) {
     wipeouts,
     beatChallenge: ended && challengeScore > 0 && s.score >= challengeScore,
     ownTrack: currentLevel === null && challengeScore === 0 && !pristine,
+    world: env.config,
+    worldsRidden: worlds.rode.length,
+    worldsFinished: worlds.finished.length,
+    champion: ended ? champions() : {},
   };
   for (const a of evaluate(ctx)) {
     ui.toast(a.title, a.desc, a.ride);
