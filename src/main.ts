@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import './style.css';
-import { Track, type SerializedTrack } from './track/Track';
+import { Track, TrackFormatError, validateTrack, type SerializedTrack } from './track/Track';
 import { TrackView } from './render/TrackView';
 import { RiderView } from './render/RiderView';
 import { CameraRig, CAMERA_LABELS, type CameraMode } from './render/CameraRig';
@@ -29,8 +29,11 @@ import { LEVELS, chapterOf } from './levels/levels';
 import { OUTFITS, champions, isUnlocked, outfitUnlocked, loadProgress, saveLevelResult, selectOutfit, selectVehicle, selectedOutfit, selectedVehicleId, totalStars } from './game/progress';
 import { applyOutfit, applyPaint } from './render/RiderView';
 import { ACHIEVEMENTS, PAINTS, bumpWipeouts, evaluate, loadCounters, noteWorld, paintFor, rideProgress, selectPaint, unlockedAchievements, type RunContext } from './game/achievements';
+import { KEYS, migrateStorage, readFlag, readJSON, readText, writeFlag, writeJSON, writeText } from './game/storage';
 
-const STORAGE_KEY = 'lr3d.track';
+// Upgrade saves from older builds before anything reads them.
+migrateStorage();
+
 const lowPower = matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency ?? 8) <= 4;
 
 // ------------------------------------------------------------------ renderer
@@ -109,12 +112,7 @@ const sparkled = new Set<number>();
 let flash = 0;
 
 // ------------------------------------------------------------------ rider mode input
-let riderMode = false;
-try {
-  riderMode = localStorage.getItem('lr3d.riderMode') === '1';
-} catch {
-  /* storage unavailable */
-}
+let riderMode = readFlag(KEYS.riderMode);
 /** Watching a recorded run: inputs are played back, not taken live. */
 let replaying = false;
 let keyMask = 0;
@@ -349,19 +347,14 @@ track.on((e) => {
   pristine = false;
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(track.serialize()));
-    } catch {
-      /* storage full or unavailable */
-    }
+    writeJSON(KEYS.track, track.serialize());
   }, 400);
 });
 
 function savedTrack(): SerializedTrack | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const data = raw ? (JSON.parse(raw) as SerializedTrack) : null;
-    return data && data.strokes.length > 0 ? data : null;
+    const data = validateTrack(readJSON<unknown>(KEYS.track, null));
+    return data.strokes.length > 0 ? data : null;
   } catch {
     return null;
   }
@@ -501,14 +494,7 @@ interface BestRecord {
 }
 
 function loadBests(): Record<string, BestRecord> {
-  try {
-    const raw = JSON.parse(localStorage.getItem('lr3d.best') ?? '{}') as Record<string, BestRecord | number>;
-    const out: Record<string, BestRecord> = {};
-    for (const [k, v] of Object.entries(raw)) out[k] = typeof v === 'number' ? { score: v, stars: 0 } : v;
-    return out;
-  } catch {
-    return {};
-  }
+  return readJSON<Record<string, BestRecord>>(KEYS.best, {});
 }
 
 /** Keeps the best score and star rating of the current track. */
@@ -518,11 +504,7 @@ function recordBest(score: number, stars: number): { best: number; newBest: bool
   const prev = all[key] ?? { score: 0, stars: 0 };
   const newBest = score > prev.score && score > 0;
   all[key] = { score: Math.max(prev.score, score), stars: Math.max(prev.stars, stars) };
-  try {
-    localStorage.setItem('lr3d.best', JSON.stringify(all));
-  } catch {
-    /* storage unavailable */
-  }
+  writeJSON(KEYS.best, all);
   return { best: all[key].score, newBest };
 }
 
@@ -644,11 +626,7 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
   },
   toggleRiderMode() {
     riderMode = !riderMode;
-    try {
-      localStorage.setItem('lr3d.riderMode', riderMode ? '1' : '0');
-    } catch {
-      /* storage unavailable */
-    }
+    writeFlag(KEYS.riderMode, riderMode);
     return riderMode;
   },
   touchInput(mask) {
@@ -775,13 +753,8 @@ async function titleFlow() {
       flyTo(v.pos, v.target);
     } else {
       startNewTrack();
-      let seen = false;
-      try {
-        seen = !!localStorage.getItem('lr3d.helpSeen');
-        localStorage.setItem('lr3d.helpSeen', '1');
-      } catch {
-        /* storage unavailable */
-      }
+      const seen = readText(KEYS.helpSeen) !== null;
+      writeText(KEYS.helpSeen, '1');
       if (!seen) setTimeout(() => ui.showHelp(), 900);
     }
     return;
@@ -1340,8 +1313,8 @@ function loop(time: number) {
     // A share link opens its track directly; otherwise show the title.
     readSharedLink()
       .then((shared) => (shared ? enterShared(shared.data, shared.challenge, shared.vehicle) : enterTitle()))
-      .catch(() => {
-        ui.flash('That share link looks broken');
+      .catch((e) => {
+        ui.flash(e instanceof TrackFormatError ? e.message : 'That share link looks broken', 4500);
         enterTitle();
       });
   }

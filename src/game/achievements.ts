@@ -1,6 +1,7 @@
 import type { VehicleId } from '../physics/vehicles';
 import type { BiomeId, WorldConfig } from '../world/worlds';
 import type { Stats } from './RunStats';
+import { KEYS, readJSON, writeJSON } from './storage';
 
 /** What an achievement can look at. */
 export interface RunContext {
@@ -100,15 +101,9 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'buggy-3', ride: 'buggy', title: 'Quarry Master', desc: 'Earn 3 stars on Quarry Run.', check: (c) => on(c, 'buggy') && finishedLevel(c, 'quarry-run') && c.rating === 3 },
 ];
 
-const KEY = 'lr3d.achievements';
-const COUNTERS = 'lr3d.counters';
 
 export function unlockedAchievements(): Record<string, number> {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, number>;
-  } catch {
-    return {};
-  }
+  return readJSON<Record<string, number>>(KEYS.achievements, {});
 }
 
 /** Checks every locked achievement; saves and returns the newly unlocked ones. */
@@ -117,11 +112,7 @@ export function evaluate(c: RunContext): Achievement[] {
   const fresh = ACHIEVEMENTS.filter((a) => !got[a.id] && a.check(c));
   if (fresh.length === 0) return [];
   for (const a of fresh) got[a.id] = Date.now();
-  try {
-    localStorage.setItem(KEY, JSON.stringify(got));
-  } catch {
-    /* storage unavailable */
-  }
+  writeJSON(KEYS.achievements, got);
   return fresh;
 }
 
@@ -134,22 +125,15 @@ interface Counters {
 
 export function loadCounters(): Counters {
   const base: Counters = { wipeouts: 0, rode: [], finished: [] };
-  try {
-    const c = { ...base, ...(JSON.parse(localStorage.getItem(COUNTERS) ?? '{}') as Partial<Counters>) };
-    if (!Array.isArray(c.rode)) c.rode = [];
-    if (!Array.isArray(c.finished)) c.finished = [];
-    return c;
-  } catch {
-    return base;
-  }
+  const c = { ...base, ...readJSON<Partial<Counters>>(KEYS.counters, {}) };
+  if (!Array.isArray(c.rode)) c.rode = [];
+  if (!Array.isArray(c.finished)) c.finished = [];
+  if (typeof c.wipeouts !== 'number') c.wipeouts = 0;
+  return c;
 }
 
 function saveCounters(c: Counters) {
-  try {
-    localStorage.setItem(COUNTERS, JSON.stringify(c));
-  } catch {
-    /* storage unavailable */
-  }
+  writeJSON(KEYS.counters, c);
 }
 
 /** Remembers that the player rode in (and maybe finished a level in) a world. */
@@ -225,14 +209,8 @@ export const PAINTS: Record<VehicleId, Paint[]> = {
   ],
 };
 
-const PAINT_KEY = 'lr3d.paint';
-
 export function selectedPaints(): Partial<Record<VehicleId, string>> {
-  try {
-    return JSON.parse(localStorage.getItem(PAINT_KEY) ?? '{}') as Partial<Record<VehicleId, string>>;
-  } catch {
-    return {};
-  }
+  return readJSON<Partial<Record<VehicleId, string>>>(KEYS.paint, {});
 }
 
 /** The paint a ride wears (falls back to the outfit match if it's locked). */
@@ -246,9 +224,5 @@ export function paintFor(ride: VehicleId): Paint {
 export function selectPaint(ride: VehicleId, id: string) {
   const all = selectedPaints();
   all[ride] = id;
-  try {
-    localStorage.setItem(PAINT_KEY, JSON.stringify(all));
-  } catch {
-    /* storage unavailable */
-  }
+  writeJSON(KEYS.paint, all);
 }

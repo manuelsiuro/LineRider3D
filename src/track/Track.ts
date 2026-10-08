@@ -23,8 +23,14 @@ export type TrackEvent =
   | { kind: 'worldChanged' }
   | { kind: 'cleared' };
 
+/** The newest track format this build reads and writes. */
+export const TRACK_VERSION = 1;
+
+/** Why a track could not be read (the message is shown to the player). */
+export class TrackFormatError extends Error {}
+
 interface SerializedTrack {
-  version: 1;
+  version: typeof TRACK_VERSION;
   start: number[];
   strokes: {
     type: LineType;
@@ -293,7 +299,7 @@ export class Track {
   serialize(): SerializedTrack {
     const r = (n: number) => Math.round(n * 1000) / 1000;
     return {
-      version: 1,
+      version: TRACK_VERSION,
       start: this.start.toArray().map(r),
       strokes: [...this.strokes.values()].map((s) => ({
         type: s.type,
@@ -373,3 +379,67 @@ export class Track {
 }
 
 export type { SerializedTrack };
+
+const LINE_TYPES = new Set<string>(['normal', 'accel', 'ice', 'bouncy', 'scenery']);
+/** Generous caps that keep a hostile or corrupt link from freezing the game. */
+const MAX_STROKES = 4000;
+const MAX_NUMBERS = 600_000;
+
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const isVec = (v: unknown, n = 3): v is number[] => Array.isArray(v) && v.length === n && v.every(isNum);
+
+/**
+ * Checks untrusted track data (share links, saved slots) and returns a clean
+ * copy: bad strokes and items are dropped, a newer format or a broken shape
+ * throws a TrackFormatError with a message for the player.
+ */
+export function validateTrack(raw: unknown): SerializedTrack {
+  if (!raw || typeof raw !== 'object') throw new TrackFormatError('That is not a track');
+  const d = raw as Record<string, unknown>;
+  const version = d.version ?? 1;
+  if (!isNum(version) || version > TRACK_VERSION) throw new TrackFormatError('This track was made with a newer version of the game: reload the page to update');
+  if (!Array.isArray(d.strokes)) throw new TrackFormatError('That is not a track');
+  if (d.strokes.length > MAX_STROKES) throw new TrackFormatError('That track is too big to open');
+  let numbers = 0;
+  const strokes: SerializedTrack['strokes'] = [];
+  for (const s of d.strokes as Record<string, unknown>[]) {
+    if (!s || typeof s !== 'object') continue;
+    const pts = s.points;
+    if (!Array.isArray(pts) || pts.length < 6 || pts.length % 3 !== 0 || !pts.every(isNum)) continue;
+    numbers += pts.length;
+    if (numbers > MAX_NUMBERS) throw new TrackFormatError('That track is too big to open');
+    strokes.push({
+      type: (LINE_TYPES.has(s.type as string) ? s.type : 'normal') as LineType,
+      mode: s.mode === 'path' ? 'path' : 'profile',
+      points: pts as number[],
+      planeNormal: isVec(s.planeNormal) ? (s.planeNormal as number[]) : [0, 0, 1],
+      bank: isNum(s.bank) ? s.bank : 0,
+      autoBank: s.autoBank === true ? true : undefined,
+      walls: s.walls === true ? true : undefined,
+      width: isNum(s.width) && s.width > 0 && s.width < 50 ? s.width : 2.4,
+    });
+  }
+  const list = (v: unknown) => (Array.isArray(v) ? (v as Record<string, unknown>[]).filter((x) => x && typeof x === 'object') : []);
+  const decor = list(d.decor)
+    .filter((x) => typeof x.kind === 'string' && isVec(x.position))
+    .map((x) => ({ kind: x.kind as DecorKind, position: x.position as number[], rotation: isNum(x.rotation) ? x.rotation : 0, scale: isNum(x.scale) && x.scale > 0 ? x.scale : 1 }));
+  const rings = list(d.rings)
+    .filter((x) => isVec(x.position) && isVec(x.axis) && isNum(x.radius) && x.radius > 0)
+    .map((x) => ({ position: x.position as number[], axis: x.axis as number[], radius: x.radius as number }));
+  const stars = (Array.isArray(d.stars) ? d.stars : []).filter((p) => isVec(p)) as number[][];
+  const f = d.finish as Record<string, unknown> | null | undefined;
+  const finish = f && typeof f === 'object' && isVec(f.position) && isVec(f.axis) && isNum(f.halfWidth) ? { position: f.position as number[], axis: f.axis as number[], halfWidth: f.halfWidth as number } : null;
+  const w = d.world as Record<string, unknown> | undefined;
+  return {
+    version: TRACK_VERSION,
+    start: isVec(d.start) ? (d.start as number[]) : [0, 12, 0],
+    strokes,
+    decor,
+    rings,
+    stars,
+    finish,
+    targetScore: isNum(d.targetScore) ? d.targetScore : undefined,
+    name: typeof d.name === 'string' ? d.name.slice(0, 80) : undefined,
+    world: w && typeof w === 'object' ? { biome: String(w.biome ?? ''), time: String(w.time ?? ''), weather: String(w.weather ?? '') } : undefined,
+  };
+}

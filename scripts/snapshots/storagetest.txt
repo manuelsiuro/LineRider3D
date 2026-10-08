@@ -1,0 +1,2 @@
+migrated to 1 {"track-a":{"score":1200,"stars":0},"track-b":{"score":50,"stars":2}}
+corrupt and blocked storage handled

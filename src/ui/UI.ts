@@ -722,11 +722,11 @@ export class UI {
     this.addPopup(h('div', `popup ${kind}`, text), 1400);
   }
 
-  flash(text: string) {
+  flash(text: string, ms = 1500) {
     this.hint.textContent = text;
     this.hint.classList.remove('hidden');
     clearTimeout(this.hintTimer);
-    this.hintTimer = window.setTimeout(() => this.hint.classList.add('hidden'), 1500);
+    this.hintTimer = window.setTimeout(() => this.hint.classList.add('hidden'), ms);
   }
 
   // ---------------------------------------------------------------- overlays

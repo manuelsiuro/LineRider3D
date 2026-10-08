@@ -1,21 +1,15 @@
 import { LEVELS, chapterOf } from '../levels/levels';
 import { unlockedAchievements } from './achievements';
 import type { BiomeId } from '../world/worlds';
+import { KEYS, readJSON, readText, writeJSON, writeText } from './storage';
 
 export interface LevelProgress {
   stars: number;
   score: number;
 }
 
-const KEY = 'lr3d.progress';
-const OUTFIT_KEY = 'lr3d.outfit';
-
 export function loadProgress(): Record<string, LevelProgress> {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, LevelProgress>;
-  } catch {
-    return {};
-  }
+  return readJSON<Record<string, LevelProgress>>(KEYS.progress, {});
 }
 
 /** Records a level result; returns whether it improved the stars. */
@@ -23,11 +17,7 @@ export function saveLevelResult(id: string, stars: number, score: number): boole
   const all = loadProgress();
   const prev = all[id] ?? { stars: 0, score: 0 };
   all[id] = { stars: Math.max(prev.stars, stars), score: Math.max(prev.score, score) };
-  try {
-    localStorage.setItem(KEY, JSON.stringify(all));
-  } catch {
-    /* storage unavailable */
-  }
+  writeJSON(KEYS.progress, all);
   return stars > prev.stars;
 }
 
@@ -95,39 +85,20 @@ export function champions(progress = loadProgress()): Partial<Record<BiomeId, bo
 }
 
 export function selectedOutfit(): Outfit {
-  try {
-    const id = localStorage.getItem(OUTFIT_KEY);
-    const o = OUTFITS.find((x) => x.id === id);
-    if (o && outfitUnlocked(o)) return o;
-  } catch {
-    /* storage unavailable */
-  }
-  return OUTFITS[0];
+  const id = readText(KEYS.outfit);
+  const o = OUTFITS.find((x) => x.id === id);
+  return o && outfitUnlocked(o) ? o : OUTFITS[0];
 }
 
 export function selectOutfit(id: string) {
-  try {
-    localStorage.setItem(OUTFIT_KEY, id);
-  } catch {
-    /* storage unavailable */
-  }
+  writeText(KEYS.outfit, id);
 }
-
-const VEHICLE_KEY = 'lr3d.vehicle';
 
 /** The player's chosen ride (all rides are available from the start). */
 export function selectedVehicleId(): string {
-  try {
-    return localStorage.getItem(VEHICLE_KEY) ?? 'sled';
-  } catch {
-    return 'sled';
-  }
+  return readText(KEYS.vehicle) ?? 'sled';
 }
 
 export function selectVehicle(id: string) {
-  try {
-    localStorage.setItem(VEHICLE_KEY, id);
-  } catch {
-    /* storage unavailable */
-  }
+  writeText(KEYS.vehicle, id);
 }

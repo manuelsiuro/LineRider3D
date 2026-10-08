@@ -1,6 +1,7 @@
 import type { Track } from '../track/Track';
 import { Simulation } from '../physics/Simulation';
 import { SLED, type VehicleDef } from '../physics/vehicles';
+import { KEYS, readJSON, writeJSON } from './storage';
 
 /** A saved best run: the inputs that produced it, and how it went. */
 export interface GhostRecord {
@@ -28,28 +29,19 @@ export function decodeInputs(rle: number[]): number[] {
   return out;
 }
 
-const KEY = 'lr3d.ghosts';
+type Ghosts = Record<string, GhostRecord>;
 
 export function loadGhost(trackKey: string): GhostRecord | null {
-  try {
-    const all = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, GhostRecord>;
-    return all[trackKey] ?? null;
-  } catch {
-    return null;
-  }
+  return readJSON<Ghosts>(KEYS.ghosts, {})[trackKey] ?? null;
 }
 
 export function saveGhost(trackKey: string, g: GhostRecord) {
-  try {
-    const all = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, GhostRecord>;
-    all[trackKey] = { ...g, savedAt: Date.now() };
-    // Keep storage bounded: drop the least recently saved beyond 40 ghosts.
-    const keys = Object.keys(all).sort((a, b) => (all[a].savedAt ?? 0) - (all[b].savedAt ?? 0));
-    for (const k of keys.slice(0, Math.max(0, keys.length - 40))) delete all[k];
-    localStorage.setItem(KEY, JSON.stringify(all));
-  } catch {
-    /* storage full or unavailable */
-  }
+  const all = readJSON<Ghosts>(KEYS.ghosts, {});
+  all[trackKey] = { ...g, savedAt: Date.now() };
+  // Keep storage bounded: drop the least recently saved beyond 40 ghosts.
+  const keys = Object.keys(all).sort((a, b) => (all[a].savedAt ?? 0) - (all[b].savedAt ?? 0));
+  for (const k of keys.slice(0, Math.max(0, keys.length - 40))) delete all[k];
+  writeJSON(KEYS.ghosts, all);
 }
 
 /** Is the new run better than the saved ghost? Higher score, then faster finish. */

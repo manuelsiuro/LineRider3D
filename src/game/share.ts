@@ -1,9 +1,11 @@
-import type { SerializedTrack } from '../track/Track';
+import { TrackFormatError, validateTrack, type SerializedTrack } from '../track/Track';
 
 /**
  * Track share links: the whole track lives in the URL hash, compressed with
  * deflate (when the browser supports it) and base64url-encoded.
  *   #t=<code>[&c=<score to beat>][&v=<ride id>]
+ * The code's first letter is the encoding (z: deflate, j: plain JSON); the
+ * track inside carries its format version, checked by validateTrack.
  */
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -44,11 +46,22 @@ export async function encodeTrack(data: SerializedTrack): Promise<string> {
 
 export async function decodeTrack(code: string): Promise<SerializedTrack> {
   const kind = code[0];
-  const bytes = fromBase64Url(code.slice(1));
-  const json = kind === 'z' ? await pipe(bytes, new DecompressionStream('deflate-raw')) : bytes;
-  const data = JSON.parse(new TextDecoder().decode(json)) as SerializedTrack;
-  if (!data || !Array.isArray(data.strokes)) throw new Error('Not a track');
-  return data;
+  if (kind !== 'z' && kind !== 'j') throw new TrackFormatError('That share link looks broken');
+  let text: string;
+  try {
+    const bytes = fromBase64Url(code.slice(1));
+    const json = kind === 'z' ? await pipe(bytes, new DecompressionStream('deflate-raw')) : bytes;
+    text = new TextDecoder().decode(json);
+  } catch {
+    throw new TrackFormatError('That share link is incomplete: was it cut off when copied?');
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new TrackFormatError('That share link looks broken');
+  }
+  return validateTrack(raw);
 }
 
 export async function shareLink(data: SerializedTrack, challenge = 0, vehicle = 'sled'): Promise<string> {

@@ -6,6 +6,7 @@
  * - A soft generative ambient pad with bells for music.
  */
 
+import { KEYS, readFlag, writeFlag } from '../game/storage';
 import type { BiomeId, SurfaceId, TimeId, WeatherId } from '../world/worlds';
 
 type Voice = 'bell' | 'pluck' | 'marimba' | 'twang' | 'keys';
@@ -87,12 +88,8 @@ export class Sound {
   musicVolume = 0.6;
 
   constructor() {
-    try {
-      this.sfxOn = localStorage.getItem('lr3d.sfx') !== '0';
-      this.musicOn = localStorage.getItem('lr3d.music') !== '0';
-    } catch {
-      /* storage unavailable */
-    }
+    this.sfxOn = readFlag(KEYS.sfx, true);
+    this.musicOn = readFlag(KEYS.music, true);
     // Audio can only start after a user gesture.
     const unlock = () => {
       this.start();
@@ -217,12 +214,8 @@ export class Sound {
   }
 
   private persist() {
-    try {
-      localStorage.setItem('lr3d.sfx', this.sfxOn ? '1' : '0');
-      localStorage.setItem('lr3d.music', this.musicOn ? '1' : '0');
-    } catch {
-      /* storage unavailable */
-    }
+    writeFlag(KEYS.sfx, this.sfxOn);
+    writeFlag(KEYS.music, this.musicOn);
   }
 
   /** Muffles the mix during slow motion (timeScale < 1). */

@@ -1,4 +1,5 @@
 import type { CameraMode } from '../render/CameraRig';
+import { KEYS, PROGRESS_KEYS, readJSON, removeKey, writeJSON } from './storage';
 
 export type Quality = 'auto' | 'low' | 'medium' | 'high';
 
@@ -16,7 +17,6 @@ export interface Settings {
   reducedMotion: boolean;
 }
 
-const KEY = 'lr3d.settings';
 
 export const DEFAULT_SETTINGS: Settings = {
   quality: 'auto',
@@ -28,27 +28,14 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export function loadSettings(): Settings {
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>;
-    return { ...DEFAULT_SETTINGS, ...raw };
-  } catch {
-    return { ...DEFAULT_SETTINGS };
-  }
+  return { ...DEFAULT_SETTINGS, ...readJSON<Partial<Settings>>(KEYS.settings, {}) };
 }
 
 export function saveSettings(s: Settings) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(s));
-  } catch {
-    /* storage unavailable */
-  }
+  writeJSON(KEYS.settings, s);
 }
 
 /** Wipes stars, bests, ghosts and unlocks (keeps settings and the editor track). */
 export function resetProgress() {
-  try {
-    for (const k of ['lr3d.progress', 'lr3d.best', 'lr3d.ghosts', 'lr3d.outfit', 'lr3d.achievements', 'lr3d.paint', 'lr3d.counters']) localStorage.removeItem(k);
-  } catch {
-    /* storage unavailable */
-  }
+  for (const k of PROGRESS_KEYS) removeKey(k);
 }

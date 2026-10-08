@@ -23,3 +23,9 @@ OK   Sandstorm Rally json 9481 chars → link code 3384 chars
 OK   Rooftop Run    json 9284 chars → link code 3167 chars
 OK   Downtown Drift json 13618 chars → link code 5516 chars
 OK   Neon Nights    json 8799 chars → link code 3209 chars
+cut off          → That share link is incomplete: was it cut off when copied?
+garbage          → That share link is incomplete: was it cut off when copied?
+unknown encoding → That share link looks broken
+plain non-track  → That is not a track
+newer version    → This track was made with a newer version of the game: reload the page to update
+junk dropped    → strokes 2 decor 0 stars 1
