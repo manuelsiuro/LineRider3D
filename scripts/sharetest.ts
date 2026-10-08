@@ -12,10 +12,11 @@ for (const level of LEVELS) {
   const t2 = new Track();
   t2.load(back);
   const json = JSON.stringify(data).length;
-  // The exact compressed size depends on the zlib in Node, so it goes to stderr (not the snapshot).
+  // Sizes go to stderr (not the snapshot): zlib versions compress differently, and a
+  // last-digit float difference between CPUs can change how long a number prints.
   const ok = t2.strokes.size === t.strokes.size && t2.stars.size === t.stars.size && !!t2.finish === !!t.finish && t2.rings.size === t.rings.size && code.length < json * 0.7;
-  console.log(`${ok ? 'OK  ' : 'FAIL'} ${level.name.padEnd(14)} json ${json} chars → round trip, compressed`);
-  console.error(`${level.name}: link code ${code.length} chars`);
+  console.log(`${ok ? 'OK  ' : 'FAIL'} ${level.name.padEnd(14)} round trip, compressed`);
+  console.error(`${level.name}: json ${json} chars → link code ${code.length} chars`);
   if (!ok) process.exitCode = 1;
 }
 
