@@ -120,7 +120,34 @@ export interface RidePicker {
   selected: string;
   /** Level made for one ride: no choice. */
   locked: boolean;
-  onPick(id: string): string;
+  /** Picks a ride; returns its controls. */
+  onPick(id: string): Controls;
+}
+
+/** A ride's controls, drawn as key caps. */
+export interface Controls {
+  /** Touch device: name the on-screen buttons instead of keys. */
+  touch: boolean;
+  ground: { key: 'left' | 'right' | 'up'; label: string }[];
+  air: { key: 'left' | 'right' | 'up'; label: string }[];
+  note: string;
+}
+
+const KEYCAP = { left: '←', right: '→', up: '↑' };
+const PADNAME = { left: 'Brake', right: 'Push', up: 'Spin' };
+
+/** The controls panel of an intro card. */
+function controlsHtml(c: Controls) {
+  const row = (title: string, ic: string, items: Controls['ground']) =>
+    `<div class="ctl-group"><span class="ctl-title">${icon(ic, 14)} ${title}</span><div class="ctl-items">${items
+      .map(
+        (it) =>
+          `<span class="ctl"><kbd class="key ${it.key}">${c.touch ? icon(it.key === 'up' ? 'replay' : it.key === 'left' ? 'chevronLeft' : 'chevronRight', 14) : KEYCAP[it.key]}</kbd>${
+            c.touch ? `<em>${PADNAME[it.key]}</em>` : ''
+          }<span>${it.label}</span></span>`,
+      )
+      .join('')}</div></div>`;
+  return `${row('On the ground', 'sled', c.ground)}${row('In the air', 'replay', c.air)}<p class="ctl-note">${icon('target', 13)} ${c.note}</p>`;
 }
 
 export interface LevelCard {
@@ -997,7 +1024,7 @@ export class UI {
       e.stopPropagation();
       this.handlers.click();
       const keys = ride.onPick(b.dataset.ride!);
-      if (keysEl) keysEl.innerHTML = `${icon('gamepad', 14)} ${keys}`;
+      if (keysEl) keysEl.innerHTML = controlsHtml(keys);
       render(b.dataset.ride!);
     });
   }
@@ -1286,7 +1313,7 @@ export class UI {
   }
 
   /** Intro for a track opened from a share link. */
-  showSharedIntro(challenge: number, goals: string[], keys: string, ride?: RidePicker, world?: WorldPicker): Promise<void> {
+  showSharedIntro(challenge: number, goals: string[], keys: Controls, ride?: RidePicker, world?: WorldPicker): Promise<void> {
     return new Promise((resolve) => {
       const overlay = h(
         'div',
@@ -1298,7 +1325,7 @@ export class UI {
           <ul class="intro-goals">${goals.map((g) => `<li>${icon('star', 18)}${g}</li>`).join('')}</ul>
           <div class="ride-pick"></div>
           <div class="world-pick"></div>
-          <p class="keys">${icon('gamepad', 14)} ${keys}</p>
+          <div class="keys controls">${controlsHtml(keys)}</div>
           <div class="actions"><button class="big-btn primary">${icon('play', 18)} Ride!</button></div>
         </div>`,
       );
@@ -1316,7 +1343,7 @@ export class UI {
   }
 
   /** Level intro card with its goals. */
-  showLevelIntro(number: number, name: string, tip: string, goals: string[], stars: number, keys: string, ride?: RidePicker, world?: WorldPicker): Promise<void> {
+  showLevelIntro(number: number, name: string, tip: string, goals: string[], stars: number, keys: Controls, ride?: RidePicker, world?: WorldPicker): Promise<void> {
     return new Promise((resolve) => {
       const overlay = h(
         'div',
@@ -1328,7 +1355,7 @@ export class UI {
           <ul class="intro-goals">${goals.map((g, i) => `<li class="${i < stars ? 'done' : ''}">${icon('star', 18)}${g}</li>`).join('')}</ul>
           <div class="ride-pick"></div>
           <div class="world-pick"></div>
-          <p class="keys">${icon('gamepad', 14)} ${keys}</p>
+          <div class="keys controls">${controlsHtml(keys)}</div>
           <div class="actions"><button class="big-btn primary">${icon('play', 18)} Ride!</button></div>
         </div>`,
       );

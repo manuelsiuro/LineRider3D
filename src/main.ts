@@ -12,7 +12,7 @@ import { Environment } from './world/Environment';
 import { terrainHeight } from './world/terrain';
 import { DEFAULT_WORLD, SURFACES, normalizeWorld, sameWorld, surfaceOf, type WorldConfig } from './world/worlds';
 import { Editor } from './editor/Editor';
-import { UI, overlayOpen, type SettingsView } from './ui/UI';
+import { UI, overlayOpen, type Controls, type SettingsView } from './ui/UI';
 import { loadSettings, resetProgress, saveSettings, type Quality, type Settings } from './game/settings';
 import { Effects } from './render/Effects';
 import { Trail } from './render/Trail';
@@ -292,11 +292,24 @@ function cycleVehicle() {
   ui.flash(`Ride: ${next.name}`);
 }
 
-/** Control hints for a ride. */
-function keysFor(def: VehicleDef) {
-  const flips = def.handling.flipSign > 0 ? '←/→ flip' : '→ backflip · ← frontflip';
-  const push = { sled: 'push', skis: 'skate', snowboard: 'push', bike: 'pedal', moto: 'throttle', buggy: 'gas' }[def.id];
-  return `→ ${push} · ← brake · in the air: ${flips}${def.handling.yaw ? ' · ↑ spin' : ''}, release to land`;
+/** Controls of a ride, shown as key caps on the intro cards. */
+function keysFor(def: VehicleDef): Controls {
+  const push = { sled: 'Push', skis: 'Skate', snowboard: 'Push', bike: 'Pedal', moto: 'Throttle', buggy: 'Gas' }[def.id];
+  // Sled-style rides flip back with ←; wheels flip back with → (like pulling a wheelie).
+  const back = def.handling.flipSign > 0 ? 'left' : 'right';
+  return {
+    touch: isTouch,
+    ground: [
+      { key: 'right', label: push },
+      { key: 'left', label: 'Brake' },
+    ],
+    air: [
+      { key: back, label: 'Backflip' },
+      { key: back === 'left' ? 'right' : 'left', label: 'Frontflip' },
+      ...(def.handling.yaw ? [{ key: 'up' as const, label: 'Spin' }] : []),
+    ],
+    note: 'Let go before you land, and touch down flat for a Perfect.',
+  };
 }
 
 /** Intro ride picker: free choice, or the level's own ride. */
