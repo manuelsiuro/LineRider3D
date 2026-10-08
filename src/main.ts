@@ -10,6 +10,7 @@ import { EVENT, INPUT, P } from './physics/Rider';
 import { VEHICLES, vehicleById, type VehicleDef } from './physics/vehicles';
 import { Environment } from './world/Environment';
 import { terrainHeight } from './world/terrain';
+import type { WorldConfig } from './world/worlds';
 import { Editor } from './editor/Editor';
 import { UI, overlayOpen, type SettingsView } from './ui/UI';
 import { loadSettings, resetProgress, saveSettings, type Quality, type Settings } from './game/settings';
@@ -55,8 +56,7 @@ controls.maxDistance = 250;
 controls.minDistance = 2;
 controls.update();
 
-const env = new Environment(scene, lowPower);
-env.bakeEnvironment(renderer, scene);
+const env = new Environment(scene, renderer, lowPower);
 const postfx = new PostFX(renderer, scene, camera, lowPower);
 postfx.setSize(innerWidth, innerHeight);
 
@@ -76,7 +76,7 @@ const trail = new Trail(scene);
 const snowTracks = new SnowTracks(scene);
 const sound = new Sound();
 const runStats = new RunStats();
-const ground = scene.getObjectByName('ground')!;
+const ground = env.ground;
 const editor = new Editor(renderer.domElement, camera, scene, controls, track, trackView, ground);
 
 let mode: 'title' | 'game' = 'title';
@@ -143,6 +143,19 @@ addEventListener('keydown', (e) => {
     cycleVehicle();
   }
 });
+
+// ------------------------------------------------------------------ worlds
+/** Shows a world: landscape, sky, decor style, grade. */
+function applyWorld(w: Partial<WorldConfig>, force = false) {
+  const footprint: THREE.Vector3[] = [];
+  for (const s of track.strokes.values()) for (let i = 0; i < s.points.length; i += 2) footprint.push(s.points[i]);
+  footprint.push(track.start);
+  if (!env.setWorld(w, footprint, force)) return false;
+  postfx.setGrade(env.atm.grade);
+  trackView.setWorld(env.config);
+  return true;
+}
+postfx.setGrade(env.atm.grade);
 
 // ------------------------------------------------------------------ rides
 /** The ride in use (the player's choice, or the one a level or challenge sets). */
@@ -265,6 +278,7 @@ function savedTrack(): SerializedTrack | null {
 }
 
 loadInto(() => buildDemoTrack(track));
+applyWorld(env.config);
 dressRider();
 
 // ------------------------------------------------------------------ camera moves
@@ -727,6 +741,9 @@ async function backToLevels() {
   else startLevel(idx);
 }
 
+/** Dev screenshots: a fixed title camera [position, target]. */
+let devView: [THREE.Vector3, THREE.Vector3] | null = null;
+
 /** Wardrobe preview: the title camera moves in close on Bosh. */
 let closeUp = false;
 
@@ -1133,7 +1150,11 @@ function loop(time: number) {
   if (mode === 'title') {
     // Loop the demo run behind the title.
     if (stats.still > 1 || stats.crashed || frame > 900) resetRun();
-    attractCamera(t, dt);
+    if (devView) {
+      camera.position.copy(devView[0]);
+      camera.lookAt(devView[1]);
+      controls.target.copy(devView[1]);
+    } else attractCamera(t, dt);
     rig.settle(dt);
   } else if (tween) {
     updateTween(dt);
@@ -1156,7 +1177,7 @@ function loop(time: number) {
 
   editor.update(!playing && mode === 'game' && currentLevel === null);
   trackView.update(t, riderCenter, sim.rider.stars);
-  env.update(dt, controls.target, t);
+  env.update(dt, controls.target, t, camera.position);
   ui.setTime(frame, sim.recorded, STEPS_PER_SECOND);
   ui.setHud(mode === 'game' && (playing || frame > 0) && !summaryShown, stats, track.stars.size);
   ui.setTouchPad(isTouch && riderOn() && mode === 'game' && playing && !replaying, vehicle.handling.yaw !== null);
@@ -1198,7 +1219,15 @@ async function enterShared(data: SerializedTrack, challenge: number, vehicleId: 
 }
 
 let devClock = performance.now();
-if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, keys: (m: number) => (keyMask = m),
+if (import.meta.env.DEV) Object.assign(window, { lr3d: { track, editor, sim, camera, controls, scene, trackView, ui, runStats, env, renderer,
+  shot: (biome: string, time = 'day', weather = 'clear', p?: number[], t?: number[]) => {
+    document.body.classList.add('dev-shot');
+    applyWorld({ biome, time, weather } as Partial<WorldConfig>);
+    if (p && t) devView = [new THREE.Vector3(...p), new THREE.Vector3(...t)];
+    return env.config;
+  },
+  view: (p?: number[], t?: number[]) => (devView = p && t ? [new THREE.Vector3(...p), new THREE.Vector3(...t)] : null),
+  world: (biome: string, time?: string, weather?: string) => applyWorld({ biome, time, weather } as Partial<WorldConfig>), keys: (m: number) => (keyMask = m),
     /** Dev: advance the game loop by hand (hidden tabs get no animation frames). */
     tick: (n = 1, ms = 1000 / 60) => {
       timer.disconnect();

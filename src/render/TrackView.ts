@@ -3,7 +3,8 @@ import type { Track } from '../track/Track';
 import type { Decor, Ring, Star } from '../track/types';
 import { animateStar, buildFinish, buildStar } from './goalModels';
 import { animateRing, buildRing } from './ringModel';
-import { buildDecor, M } from '../world/models';
+import { buildDecor, decorFor, M } from '../world/models';
+import { DEFAULT_WORLD, biomeById, isSnowy, type WorldConfig } from '../world/worlds';
 import { buildRibbonMesh } from './ribbon';
 import { buildSupports, supportMaterial } from './supports';
 
@@ -22,6 +23,7 @@ export class TrackView {
   private supportById = new Map<number, THREE.Mesh>();
   private decorById = new Map<number, THREE.Object3D>();
   private ringById = new Map<number, THREE.Object3D>();
+  private world: WorldConfig = { ...DEFAULT_WORLD };
 
   constructor(scene: THREE.Scene, private track: Track) {
     scene.add(this.ribbons, this.decor, this.supports, this.rings, this.stars, this.goals);
@@ -105,8 +107,19 @@ export class TrackView {
     this.ribbonById.delete(id);
   }
 
+  /** Restyles decor (and track skin) for a world: a pine becomes a palm on the beach. */
+  setWorld(w: WorldConfig) {
+    this.world = w;
+    for (const id of [...this.decorById.keys()]) {
+      const d = this.track.decor.get(id);
+      this.removeDecor(id);
+      if (d) this.addDecor(d);
+    }
+  }
+
   private addDecor(d: Decor) {
-    const obj = buildDecor(d.kind);
+    const biome = biomeById(this.world.biome);
+    const obj = buildDecor(decorFor(d.kind, biome.id, d.id, biome.decor), { snowy: isSnowy(this.world), variant: d.id });
     obj.position.copy(d.position);
     obj.rotation.y = d.rotation;
     obj.scale.setScalar(d.scale);

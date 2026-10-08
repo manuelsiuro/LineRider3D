@@ -14,10 +14,12 @@ const GradeShader = {
     contrast: { value: 1.08 },
     flash: { value: 0 },
     impact: { value: 0 },
+    shadowTint: { value: new THREE.Vector3(-0.012, 0, 0.02) },
+    highlightTint: { value: new THREE.Vector3(0.02, 0.01, -0.01) },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float vignette; uniform float saturation; uniform float contrast; uniform float flash; uniform float impact;
+    uniform sampler2D tDiffuse; uniform float vignette; uniform float saturation; uniform float contrast; uniform float flash; uniform float impact; uniform vec3 shadowTint; uniform vec3 highlightTint;
     varying vec2 vUv;
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
@@ -25,8 +27,8 @@ const GradeShader = {
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(vec3(l), col, saturation * (1.0 - 0.75 * impact));
       col = (col - 0.5) * contrast + 0.5;
-      // Cool shadows, warm highlights.
-      col += vec3(-0.012, 0.0, 0.02) * (1.0 - l) + vec3(0.02, 0.01, -0.01) * l;
+      // Cool shadows, warm highlights (per world).
+      col += shadowTint * (1.0 - l) + highlightTint * l;
       vec2 d = vUv - 0.5;
       float v = smoothstep(0.85, 0.2, length(d * vec2(1.1, 1.0)));
       col *= mix(1.0 - vignette - 0.35 * impact, 1.0, v);
@@ -68,6 +70,16 @@ export class PostFX {
   /** Bloom is the most expensive pass: off on low quality. */
   set bloomEnabled(on: boolean) {
     if (this.bloom) this.bloom.enabled = on;
+  }
+
+  /** Color grade of the current world. */
+  setGrade(g: { saturation: number; contrast: number; vignette: number; shadows: THREE.Vector3; highlights: THREE.Vector3 }) {
+    const u = this.grade.uniforms;
+    u.saturation.value = g.saturation;
+    u.contrast.value = g.contrast;
+    u.vignette.value = g.vignette;
+    u.shadowTint.value.copy(g.shadows);
+    u.highlightTint.value.copy(g.highlights);
   }
 
   /** White flash (0..1), e.g. when passing through a ring. */

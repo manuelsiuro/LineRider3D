@@ -32,7 +32,12 @@ export interface Stroke {
   width: number;
 }
 
-export type DecorKind = 'pine' | 'snowman' | 'cabin' | 'rock' | 'lamp' | 'flag' | 'gift';
+export type DecorKind =
+  | 'pine' | 'snowman' | 'cabin' | 'rock' | 'lamp' | 'flag' | 'gift'
+  | 'oak' | 'birch' | 'bush' | 'log' | 'mushroom' | 'sign'
+  | 'palm' | 'umbrella' | 'surfboard' | 'hut' | 'lifeguard' | 'deckchair'
+  | 'cactus' | 'barrel' | 'mesa' | 'tumbleweed' | 'skull' | 'windmill'
+  | 'tower' | 'streetlight' | 'cone' | 'billboard' | 'car' | 'planter';
 
 /** A ring in space that launches the rider along its axis. */
 export interface Ring {
