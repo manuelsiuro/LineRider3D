@@ -745,25 +745,30 @@ body.rider-mode.is-playing .hud {
 }
 
 /* Popups: big callouts */
+/* Callouts stack in a column high on screen, above the rider (who sits near the middle). */
 .popups {
   position: absolute;
   inset: 0;
   pointer-events: none !important;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding-top: max(110px, 13vh);
 }
 
 .popup {
-  position: absolute;
-  top: 30%;
+  position: relative;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: clamp(34px, 7vw, 64px);
+  font-size: clamp(30px, 6vw, 56px);
   letter-spacing: 0.02em;
   color: white;
-  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.08);
-  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.12), 0 10px 30px rgba(0, 0, 0, 0.25);
+  /* A dark outline keeps it readable over snow, sand and sky. */
+  -webkit-text-stroke: 1.5px rgba(10, 18, 32, 0.55);
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 rgba(10, 18, 32, 0.35), 0 8px 24px rgba(10, 18, 32, 0.4);
   animation: popup 1.4s var(--ease) forwards;
   white-space: nowrap;
 }

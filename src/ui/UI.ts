@@ -700,15 +700,20 @@ export class UI {
       t.repeat ? '<span class="tag">Repeat ½</span>' : '',
     ].join('');
     const el = h('div', `popup trick ${grade}`, `<div class="tags">${tags}</div>${t.name}<small>+${t.points.toLocaleString()}</small>`);
-    this.popups.append(el);
-    setTimeout(() => el.remove(), 1700);
+    this.addPopup(el, 1700);
+  }
+
+  /** Callouts stack in a column (newest on top), never on top of each other. */
+  private addPopup(el: HTMLElement, life: number) {
+    this.popups.prepend(el);
+    // Keep the stack short: the oldest go first.
+    while (this.popups.children.length > 3) this.popups.lastElementChild!.remove();
+    setTimeout(() => el.remove(), life);
   }
 
   /** Big animated callout in the middle of the screen. */
   popup(text: string, kind: 'boost' | 'bounce' | 'air' | 'crash' | 'finish' = 'boost') {
-    const el = h('div', `popup ${kind}`, text);
-    this.popups.append(el);
-    setTimeout(() => el.remove(), 1400);
+    this.addPopup(h('div', `popup ${kind}`, text), 1400);
   }
 
   flash(text: string) {
