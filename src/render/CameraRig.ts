@@ -94,14 +94,14 @@ export class CameraRig {
         this.direct(dt, speed, airborne);
         break;
       case 'cinematic': {
-        // 3/4 chase: behind and a little to the side, pulling back with speed
+        // 3/4 chase: behind and a little to the right (so the ride runs left to right on screen, matching ← brake / → push), pulling back with speed
         // and in the air, looking ahead of the rider.
         const dist = (6 + THREE.MathUtils.clamp(speed * 0.09, 0, 4.5) + this.airPull * 3) * this.distanceScale;
         const side = new THREE.Vector3(-this.heading.z, 0, this.heading.x);
         const desired = this.smoothed
           .clone()
           .addScaledVector(this.heading, -dist)
-          .addScaledVector(side, -dist * 0.42)
+          .addScaledVector(side, dist * 0.42)
           .add(new THREE.Vector3(0, 1.6 + dist * 0.22 + this.airPull * 1.5, 0));
         // Never dip under the snow.
         desired.y = Math.max(desired.y, terrainHeight(desired.x, desired.z) + 1.2);
@@ -124,7 +124,7 @@ export class CameraRig {
       }
       case 'side': {
         const side = new THREE.Vector3(-this.heading.z, 0, this.heading.x);
-        const desired = this.smoothed.clone().addScaledVector(side, -16).add(new THREE.Vector3(0, 2, 0));
+        const desired = this.smoothed.clone().addScaledVector(side, 16).add(new THREE.Vector3(0, 2, 0));
         this.camera.position.lerp(desired, 1 - Math.exp(-dt * 3));
         this.controls.target.copy(this.smoothed);
         break;
@@ -176,7 +176,7 @@ export class CameraRig {
         desired.copy(this.smoothed).addScaledVector(this.heading, -4.5).addScaledVector(side, 1.2).add(new THREE.Vector3(0, 0.7, 0));
         break;
       case 'side':
-        desired.copy(this.smoothed).addScaledVector(side, -11 - speed * 0.12).add(new THREE.Vector3(0, 1.5, 0));
+        desired.copy(this.smoothed).addScaledVector(side, 11 + speed * 0.12).add(new THREE.Vector3(0, 1.5, 0));
         break;
       case 'aerial':
         desired.copy(this.smoothed).addScaledVector(this.heading, -7).add(new THREE.Vector3(0, 13, 0));
