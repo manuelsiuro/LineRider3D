@@ -7,6 +7,7 @@ import { P } from './physics/Rider';
 import { vehicleById, type VehicleDef } from './physics/vehicles';
 import { DEFAULT_WORLD, normalizeWorld, sameWorld, surfaceOf, worldLabel, type WorldConfig } from './world/worlds';
 import { UI, type SettingsView, type SummaryInfo } from './ui/UI';
+import { METERS } from './ui/dom';
 import { resetProgress, saveSettings, type Quality as QualitySetting } from './game/settings';
 import { buildDemoTrack } from './demoTrack';
 import { dailyLink, readSharedLink, shareLink } from './game/share';
@@ -19,7 +20,9 @@ import { ACHIEVEMENTS, evaluate, loadCounters, noteWorld, selectPaint, unlockedA
 import { KEYS, migrateStorage, readFlag, readJSON, readText, writeFlag, writeJSON, writeText } from './game/storage';
 import { createStage, fitToWindow } from './app/stage';
 import { createCore, type Core } from './app/core';
-import { EDIT, TITLE, challengeOf, fixedTrack, freeEdit, inGame, levelOf, type Session } from './app/session';
+import { EDIT, TITLE, autosaves, challengeOf, editing, fixedTrack, freeEdit, inGame, levelOf, type Session } from './app/session';
+import { PUZZLES } from './levels/puzzles';
+import { loadPuzzles, savePuzzle } from './game/puzzleProgress';
 import { dailyInfo, dayKey } from './levels/daily';
 import { loadDaily, recordDaily, streakOn } from './game/dailyRecords';
 import { dailyTrack } from './app/dailyTrack';
@@ -48,7 +51,7 @@ const playingGame = () => inGame(session);
 let friendGhost: GhostRecord | null = null;
 /** Rider controls: always on in levels, dailies and challenges, a toggle in the editor. */
 let riderMode = readFlag(KEYS.riderMode);
-const riderOn = () => fixedTrack(session) || challenge() > 0 || riderMode;
+const riderOn = () => session.kind !== 'puzzle' && (fixedTrack(session) || challenge() > 0 || riderMode);
 
 const moves = new CameraMoves(camera, controls);
 const input = new Input(playingGame, () => freeEdit(session), cycleVehicle);
@@ -81,6 +84,12 @@ const rides = new Rides(core, {
     run.reset();
   },
 });
+
+/** Stops the run; in a puzzle the camera goes back to the side view to fix the track. */
+function stopRun() {
+  run.stop();
+  if (session.kind === 'puzzle') moves.showSide(track, 0.8);
+}
 
 /** Ghosts and bests are per track, ride and ground. */
 function ghostKey() {
@@ -117,7 +126,7 @@ function loadInto(fn: () => void) {
 }
 
 track.on((e) => {
-  if (loading || e.kind === 'cleared' || fixedTrack(session)) return;
+  if (loading || e.kind === 'cleared' || !autosaves(session)) return;
   pristine = false;
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => writeJSON(KEYS.track, track.serialize()), 400);
@@ -142,7 +151,7 @@ const cameraModes: CameraMode[] = ['cinematic', 'chase', 'side', 'follow'];
 const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('div'), { className: 'ui' })), editor, {
   play: () => run.play(),
   pause: () => run.pause(),
-  stop: () => run.stop(),
+  stop: () => stopRun(),
   seek: (f) => run.seek(f),
   cycleCamera() {
     rig.mode = cameraModes[(cameraModes.indexOf(rig.mode) + 1) % cameraModes.length];
@@ -200,7 +209,7 @@ const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('di
   settings: () => openSettings(),
   escape() {
     if (playingGame() && run.playing) openPause();
-    else run.stop();
+    else stopRun();
   },
   photo: () => openPhoto(),
   async share(score = 0) {
@@ -275,11 +284,17 @@ function enter(next: Session, lockedRide: VehicleDef | null = null, ghost: numbe
     ui.setPlaying(false);
   }
   const index = levelOf(next);
-  const fixed = index !== null ? LEVELS[index].vehicle : next.kind === 'daily' ? dailyInfo(next.day).vehicle : undefined;
+  // Puzzles are tuned (and tested) for the sled.
+  const fixed = index !== null ? LEVELS[index].vehicle : next.kind === 'daily' ? dailyInfo(next.day).vehicle : next.kind === 'puzzle' ? 'sled' : undefined;
   rides.lock(fixed ? vehicleById(fixed) : lockedRide);
-  editor.enabled = next.kind === 'edit';
+  editor.enabled = editing(next);
+  if (next.kind !== 'puzzle' && editor.rules) {
+    editor.setRules(null);
+    ui.setPuzzle(false);
+  }
   document.body.classList.toggle('level-mode', fixedTrack(next));
-  ui.setRiderMode(fixedTrack(next) || challenge() > 0 ? true : riderMode);
+  document.body.classList.toggle('puzzle-mode', next.kind === 'puzzle');
+  ui.setRiderMode(next.kind === 'puzzle' ? false : fixedTrack(next) || challenge() > 0 ? true : riderMode);
 }
 
 /**
@@ -379,6 +394,12 @@ async function titleFlow() {
         ),
       );
       continue;
+    }
+    if (choice === 'puzzles') {
+      const idx = await pickPuzzle();
+      if (idx === null) continue;
+      startPuzzle(idx);
+      return;
     }
     if (choice === 'daily') {
       enterDaily(dayKey());
@@ -504,9 +525,53 @@ async function enterDaily(day: string, score = 0, ghost: number[] | null = null)
   run.play();
 }
 
+function pickPuzzle(): Promise<number | null> {
+  const done = loadPuzzles();
+  return ui.showPuzzles(PUZZLES.map((p) => ({ name: p.name, tip: p.tip, stars: done[p.id]?.stars ?? 0, ink: (done[p.id]?.ink ?? 0) * METERS, par: p.par * METERS })));
+}
+
+async function startPuzzle(index: number) {
+  const p = PUZZLES[index];
+  enter({ kind: 'puzzle', index });
+  loadInto(() => {
+    track.clear();
+    p.build(track);
+    for (const s of track.strokes.values()) s.locked = true;
+  });
+  editor.setRules({ ink: p.ink, tools: ['pencil', 'line', 'eraser', 'hand'], types: p.types });
+  ui.setPuzzle(true);
+  worlds.change(normalizeWorld(p.world ?? { biome: 'alpine', time: 'day', weather: 'clear' }));
+  pristine = true;
+  editor.history.clear();
+  run.stop();
+  moves.showSide(track, 1.3);
+  await ui.showPuzzleIntro({
+    number: index + 1,
+    name: p.name,
+    tip: p.tip,
+    ink: p.ink * METERS,
+    par: p.par * METERS,
+    types: p.types,
+    stars: loadPuzzles()[p.id]?.stars ?? 0,
+    starsTotal: track.stars.size,
+  });
+}
+
+async function backToPuzzles() {
+  run.stop();
+  const idx = await pickPuzzle();
+  if (idx === null) enterTitle();
+  else startPuzzle(idx);
+}
+
 // ------------------------------------------------------------------ end of a run, achievements
 
 let worldsSeen = loadCounters();
+
+function puzzleCounts() {
+  const all = Object.values(loadPuzzles());
+  return { puzzlesSolved: all.filter((p) => p.stars > 0).length, puzzlesPerfect: all.filter((p) => p.stars >= 3).length };
+}
 
 /** Unlocks achievements for the current run state (mid-run or at the end). */
 function checkAchievements(ended: boolean, rating = 0) {
@@ -532,6 +597,7 @@ function checkAchievements(ended: boolean, rating = 0) {
     worldsFinished: worldsSeen.finished.length,
     // Read at the end only (this runs every few frames mid-run).
     dailyStreak: ended ? streakOn(dayKey()) : 0,
+    ...(ended ? puzzleCounts() : { puzzlesSolved: 0, puzzlesPerfect: 0 }),
     champion: ended ? champions() : {},
   };
   for (const a of evaluate(ctx)) {
@@ -542,6 +608,7 @@ function checkAchievements(ended: boolean, rating = 0) {
 
 /** Saves the result (stars, best, ghost) and shows the run summary. */
 function showSummary(wasReplay: boolean) {
+  if (session.kind === 'puzzle') return showPuzzleSummary(session.index);
   const s = runStats.stats;
   const index = levelIndex();
   const rating = rateRun(track, s);
@@ -610,6 +677,43 @@ function showSummary(wasReplay: boolean) {
     () => {
       if (index !== null) startLevel(index + 1);
     },
+  );
+}
+
+/** Puzzle result: a star for finishing, one for every star, one within par. */
+function showPuzzleSummary(index: number) {
+  const p = PUZZLES[index];
+  const s = runStats.stats;
+  const ink = track.inkUsed();
+  const clean = s.finished && !s.crashed;
+  const goals = [
+    { label: 'Reach the finish', done: clean },
+    { label: track.stars.size ? `Collect all ${track.stars.size} stars` : 'Finish without a crash', done: clean && s.stars === track.stars.size },
+    { label: `Use ${(p.par * METERS).toFixed(1)} m of ink or less`, done: clean && ink <= p.par + 1e-6 },
+  ];
+  const stars = clean ? goals.filter((g) => g.done).length : 0;
+  if (clean) savePuzzle(p.id, stars, ink);
+  if (stars === 3) setTimeout(() => sound.perfect(), 700);
+  checkAchievements(true, stars);
+  ui.showSummary(
+    { ...s },
+    {
+      best: 0,
+      newBest: false,
+      riderMode: false,
+      goals,
+      rating: stars,
+      starsTotal: track.stars.size,
+      puzzle: { number: index + 1, name: p.name, ink: ink * METERS, par: p.par * METERS, hasNext: index + 1 < PUZZLES.length },
+    },
+    () => {
+      run.reset();
+      run.play();
+    },
+    () => stopRun(),
+    () => run.watchReplay(),
+    () => backToPuzzles(),
+    () => startPuzzle(index + 1),
   );
 }
 
@@ -682,7 +786,7 @@ async function openPause() {
   run.pause();
   const index = levelIndex();
   const title =
-    index !== null ? LEVELS[index].name : session.kind === 'daily' ? `Daily ride #${dailyInfo(session.day).number}` : challenge() > 0 ? 'Challenge' : 'Your track';
+    index !== null ? LEVELS[index].name : session.kind === 'puzzle' ? `Puzzle ${session.index + 1}` : session.kind === 'daily' ? `Daily ride #${dailyInfo(session.day).number}` : challenge() > 0 ? 'Challenge' : 'Your track';
   for (;;) {
     const choice = await ui.showPause(title, session.kind !== 'daily');
     if (choice === 'settings') {
@@ -693,7 +797,10 @@ async function openPause() {
     else if (choice === 'restart') {
       run.stop();
       run.play();
-    } else if (choice === 'levels') backToLevels();
+    } else if (choice === 'levels') {
+      if (session.kind === 'puzzle') backToPuzzles();
+      else backToLevels();
+    }
     else {
       run.stop();
       enterTitle();
@@ -744,7 +851,8 @@ function loop(time: number) {
   quality.govern(rawDt);
 
   const game = playingGame();
-  editor.update(!run.playing && session.kind === 'edit');
+  editor.update(!run.playing && editing(session));
+  if (session.kind === 'puzzle' && editor.rules) ui.setInk(editor.inkLeft(), editor.rules.ink, PUZZLES[session.index].par);
   core.trackView.update(t, riderCenter, rider.stars);
   env.update(dt, controls.target, t, camera.position);
   worlds.updateHeadlight(game);

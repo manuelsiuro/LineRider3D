@@ -38,10 +38,23 @@ interface DrawState {
   preview: THREE.Mesh | null;
 }
 
+/** Puzzle limits: a fixed amount of ink, and only some tools and line types. */
+export interface EditRules {
+  /** Ink available (world units of track). */
+  ink: number;
+  tools: Tool[];
+  types: LineType[];
+}
+
 export class Editor {
   tool: Tool = 'pencil';
   /** Off while playing built-in levels. */
   enabled = true;
+  /** Puzzle limits (null: free editing). */
+  rules: EditRules | null = null;
+  /** Ink already used by finished strokes (kept up to date while rules apply). */
+  private inkSpent = 0;
+  private savedSettings: EditorSettings | null = null;
   settings: EditorSettings = {
     lineType: 'normal',
     mode: 'profile',
@@ -95,6 +108,9 @@ export class Editor {
     this.snapRing.visible = false;
     scene.add(this.snapRing);
 
+    track.on((e) => {
+      if (this.rules && (e.kind === 'strokeAdded' || e.kind === 'strokeRemoved' || e.kind === 'cleared')) this.inkSpent = track.inkUsed();
+    });
     dom.addEventListener('pointerdown', this.onDown);
     window.addEventListener('pointermove', this.onMove);
     window.addEventListener('pointerup', this.onUp);
@@ -103,7 +119,38 @@ export class Editor {
     this.setTool('pencil');
   }
 
+  /** Puzzle mode on (side view, locked plane, limited ink) or off (null). */
+  setRules(rules: EditRules | null) {
+    // The player's own drawing settings come back after a puzzle.
+    if (rules && !this.rules) this.savedSettings = { ...this.settings };
+    if (!rules && this.savedSettings) {
+      Object.assign(this.settings, this.savedSettings);
+      this.savedSettings = null;
+    }
+    this.rules = rules;
+    this.inkSpent = this.track.inkUsed();
+    if (!rules) return;
+    this.settings.mode = 'profile';
+    this.settings.lockPlane = true;
+    this.settings.bank = 0;
+    this.settings.width = 2.4;
+    this.lockedNormal.set(0, 0, 1);
+    if (!rules.types.includes(this.settings.lineType)) this.settings.lineType = rules.types[0];
+    if (!rules.tools.includes(this.tool)) this.setTool(rules.tools[0]);
+  }
+
+  /** Ink left, counting the stroke being drawn (Infinity without rules). */
+  inkLeft() {
+    if (!this.rules) return Infinity;
+    return Math.max(0, this.rules.ink - this.inkSpent - (this.draw ? pathLength(this.draw.points) : 0));
+  }
+
+  allows(tool: Tool) {
+    return !this.rules || this.rules.tools.includes(tool);
+  }
+
   setTool(tool: Tool) {
+    if (!this.allows(tool)) return;
     this.cancelDraw();
     this.tool = tool;
     const c = this.controls;
@@ -400,19 +447,39 @@ export class Editor {
 
   private extendStroke(e: PointerEvent) {
     const d = this.draw!;
+    // Puzzles: the stroke stops where the ink runs out.
+    const budget = this.rules ? this.rules.ink - this.inkSpent : Infinity;
     if (this.tool === 'pencil') {
       const last = d.points[d.points.length - 1];
       const hit = this.planeHit(e, last);
       if (!hit) return;
       if (hit.distanceTo(last) < MIN_SEG) return;
+      const room = budget - pathLength(d.points);
+      if (room < MIN_SEG) {
+        this.outOfInk();
+        return;
+      }
+      if (hit.distanceTo(last) > room) hit.sub(last).setLength(room).add(last);
       d.points.push(hit);
     } else {
       const hit = this.planeHit(e, d.start);
       if (!hit) return;
-      d.points = this.lineThrough(d.points[0], hit);
+      const from = d.points[0];
+      if (hit.distanceTo(from) > budget) {
+        hit.sub(from).setLength(Math.max(0, budget)).add(from);
+        this.outOfInk();
+      }
+      d.points = this.lineThrough(from, hit);
     }
     this.showSnap(this.findSnap(e));
     this.updatePreview();
+  }
+
+  private inkHinted = 0;
+  private outOfInk() {
+    const now = performance.now();
+    if (now - this.inkHinted > 1500) this.onHint?.('Out of ink! Erase a line to get some back.');
+    this.inkHinted = now;
   }
 
   private lineThrough(a: THREE.Vector3, b: THREE.Vector3) {
@@ -481,6 +548,15 @@ export class Editor {
   // ---------------------------------------------------------------- other tools
 
   private eraseAt(e: PointerEvent) {
+    if (this.rules) {
+      // Puzzles: only the player's own lines can go (the ink comes back).
+      const hit = this.pickStroke(e);
+      if (!hit || hit.stroke.locked) return;
+      let stroke = hit.stroke;
+      this.track.removeStroke(stroke);
+      this.history.push({ undo: () => (stroke = this.track.addStroke(stroke)), redo: () => this.track.removeStroke(stroke) });
+      return;
+    }
     const star = this.pickStar(e);
     if (star) {
       let st = star;
@@ -639,4 +715,10 @@ function smooth(pts: THREE.Vector3[]): THREE.Vector3[] {
     cur = next;
   }
   return cur;
+}
+
+function pathLength(points: THREE.Vector3[]) {
+  let n = 0;
+  for (let i = 1; i < points.length; i++) n += points[i].distanceTo(points[i - 1]);
+  return n;
 }

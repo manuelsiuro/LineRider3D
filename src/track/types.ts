@@ -30,6 +30,8 @@ export interface Stroke {
   /** Bobsled side walls along both edges (collide like the track). */
   walls?: boolean;
   width: number;
+  /** Part of a puzzle: can't be erased (never saved or shared). */
+  locked?: boolean;
 }
 
 export type DecorKind =

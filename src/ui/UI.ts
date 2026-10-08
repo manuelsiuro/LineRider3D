@@ -6,7 +6,7 @@ import type { Stats, Trick } from '../game/RunStats';
 import { GRADE_LABEL } from '../game/RunStats';
 import { icon } from './icons';
 import { BIOMES, DEFAULT_WORLD, TIMES, WEATHERS, biomeById, type WorldConfig } from '../world/worlds';
-import { KMH, button, h, overlayOpen, setText } from './dom';
+import { KMH, METERS, button, h, overlayOpen, setText } from './dom';
 import type { ScreenCtx, UIHandlers } from './types';
 import { confirm, showLink } from './screens/dialogs';
 import { BADGE, showTitle, worldCaption } from './screens/title';
@@ -18,6 +18,7 @@ import { showDailyIntro, showLevelIntro, showSharedIntro } from './screens/intro
 import { hideSummary, showSummary } from './screens/summary';
 import { showPause, showPhotoMode, showSettings } from './screens/menus';
 import { showHelp } from './screens/help';
+import { showPuzzleIntro, showPuzzles } from './screens/puzzles';
 
 export type * from './types';
 export { overlayOpen };
@@ -79,6 +80,7 @@ export class UI {
   private worldOpen = false;
   /** Decor palette shows every kind, not only the world's. */
   private allDecor = false;
+  private inkMeter!: HTMLElement;
   private toastQueue: { title: string; desc: string; ride?: string }[] = [];
   private toasting = false;
   /** What the screens need from the shell. */
@@ -285,7 +287,9 @@ export class UI {
     };
     toolbar.append(this.worldBtn);
     const bottom = h('div', 'bottom');
-    bottom.append(this.panel, toolbar);
+    // Puzzles: how much ink is left (the par mark is the three-star line).
+    this.inkMeter = h('div', 'ink-meter hidden', `<span class="ink-label">${icon('pencil', 14)} Ink</span><div class="ink-bar"><i class="ink-fill"></i><i class="ink-par"></i></div><b class="ink-left">0 m</b>`);
+    bottom.append(this.inkMeter, this.panel, toolbar);
 
     this.hint = h('div', 'hint hidden');
     const replayTag = h('div', 'replay-tag', '<i></i>REPLAY');
@@ -299,6 +303,30 @@ export class UI {
 
   // ---------------------------------------------------------------- tools
 
+  /** Puzzle mode: only the allowed tools, and the ink meter. */
+  setPuzzle(on: boolean) {
+    const rules = on ? this.editor.rules : null;
+    for (const [id, b] of this.toolButtons) b.classList.toggle('hidden', !!rules && !rules.tools.includes(id));
+    this.worldBtn.classList.toggle('hidden', !!rules);
+    this.inkMeter.classList.toggle('hidden', !rules);
+    if (this.worldOpen) this.toggleWorldPanel();
+    this.selectTool(rules ? rules.tools[0] : this.editor.tool);
+  }
+
+  /** Ink left of `total`, with the par mark (all in world units, shown in meters). */
+  setInk(left: number, total: number, par: number) {
+    const used = total - left;
+    setText(this.inkMeter.querySelector('.ink-left')!, `${(left * METERS).toFixed(1)} m`);
+    const fill = this.inkMeter.querySelector<HTMLElement>('.ink-fill')!;
+    const width = `${((left / total) * 100).toFixed(1)}%`;
+    if (fill.style.width !== width) fill.style.width = width;
+    const parMark = this.inkMeter.querySelector<HTMLElement>('.ink-par')!;
+    const parAt = `${(((total - par) / total) * 100).toFixed(1)}%`;
+    if (parMark.style.left !== parAt) parMark.style.left = parAt;
+    this.inkMeter.classList.toggle('over-par', used > par + 1e-6);
+    this.inkMeter.classList.toggle('empty', left < 0.3);
+  }
+
   toggleWorldPanel() {
     this.worldOpen = !this.worldOpen;
     this.panel.classList.remove('folded');
@@ -308,6 +336,7 @@ export class UI {
   }
 
   selectTool(tool: Tool) {
+    if (!this.editor.allows(tool)) return;
     this.editor.setTool(tool);
     this.worldOpen = false;
     this.worldBtn?.classList.remove('active');
@@ -393,7 +422,15 @@ export class UI {
       return;
     }
 
-    if (tool === 'pencil' || tool === 'line') {
+    const rules = this.editor.rules;
+    if (rules && (tool === 'pencil' || tool === 'line')) {
+      // Puzzles: just the allowed line types (side view, fixed width).
+      const r1 = row();
+      seg(r1, LINE_TYPES.filter((t) => rules.types.includes(t.id)).map((t) => ({ ...t, color: LINE_COLORS[t.id] })), s.lineType, (v) => (s.lineType = v));
+      r1.append(h('span', 'tip', 'Draw from left to right: the colored side is the floor. Press Play to test.'));
+    } else if (rules && tool === 'eraser') {
+      row().append(h('span', 'tip', 'Erase your own lines to get the ink back. The given track stays.'));
+    } else if (tool === 'pencil' || tool === 'line') {
       const r1 = row();
       seg(r1, LINE_TYPES.map((t) => ({ ...t, color: LINE_COLORS[t.id] })), s.lineType, (v) => (s.lineType = v));
       const r2 = row();
@@ -795,5 +832,11 @@ export class UI {
   }
   showHelp() {
     showHelp(this.ctx);
+  }
+  showPuzzles(...a: Rest<typeof showPuzzles>) {
+    return showPuzzles(this.ctx, ...a);
+  }
+  showPuzzleIntro(...a: Rest<typeof showPuzzleIntro>) {
+    return showPuzzleIntro(this.ctx, ...a);
   }
 }

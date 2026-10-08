@@ -91,6 +91,16 @@ export class Track {
     return stroke;
   }
 
+  /** Length of the player's own strokes (puzzle ink: locked pieces are free). */
+  inkUsed() {
+    let total = 0;
+    for (const s of this.strokes.values()) {
+      if (s.locked) continue;
+      for (let i = 1; i < s.points.length; i++) total += s.points[i].distanceTo(s.points[i - 1]);
+    }
+    return total;
+  }
+
   removeStroke(stroke: Stroke) {
     if (!this.strokes.has(stroke.id)) return;
     this.unindex(stroke);

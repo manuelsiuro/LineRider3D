@@ -58,6 +58,22 @@ export class CameraMoves {
     this.flyTo(v.pos, v.target, duration);
   }
 
+  /** A straight side view of the whole track (puzzles are drawn side-on). */
+  showSide(track: Track, duration = 1.4) {
+    const box = new THREE.Box3().expandByPoint(track.start);
+    for (const s of track.strokes.values()) for (const p of s.points) box.expandByPoint(p);
+    for (const st of track.stars.values()) box.expandByPoint(st.position);
+    if (track.finish) box.expandByPoint(track.finish.position);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    // Fit the width (and height) in view with a margin.
+    const half = (THREE.MathUtils.degToRad(this.camera.fov) / 2);
+    const fitH = (size.y / 2 + 4) / Math.tan(half);
+    const fitW = (size.x / 2 + 6) / Math.tan(half) / this.camera.aspect;
+    const dist = THREE.MathUtils.clamp(Math.max(fitH, fitW), 24, 160);
+    this.flyTo(new THREE.Vector3(center.x, center.y + 2, dist), new THREE.Vector3(center.x, center.y, 0), duration);
+  }
+
   /** Keeps the current viewing angle but centers on the rider. */
   focus(center: THREE.Vector3) {
     const offset = this.camera.position.clone().sub(this.controls.target);

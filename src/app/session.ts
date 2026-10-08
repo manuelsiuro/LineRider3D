@@ -8,12 +8,15 @@
  *   level  a built-in level: no editing, rider controls always on
  *   daily  the day's generated ride (same for everyone), like a level; a
  *          friend's link adds a score to beat
+ *   puzzle a broken track to fix with limited ink: restricted editor, classic
+ *          runs (no rider controls)
  */
 export type Session =
   | { kind: 'title' }
   | { kind: 'edit'; challenge: number }
   | { kind: 'level'; index: number }
-  | { kind: 'daily'; day: string; challenge: number };
+  | { kind: 'daily'; day: string; challenge: number }
+  | { kind: 'puzzle'; index: number };
 
 export const TITLE: Session = { kind: 'title' };
 export const EDIT: Session = { kind: 'edit', challenge: 0 };
@@ -29,6 +32,12 @@ export const fixedTrack = (s: Session) => s.kind === 'level' || s.kind === 'dail
 
 /** Riding (or editing) a track, as opposed to the title menu. */
 export const inGame = (s: Session) => s.kind !== 'title';
+
+/** The editor is on (free editing, shared tracks, puzzles). */
+export const editing = (s: Session) => s.kind === 'edit' || s.kind === 'puzzle';
+
+/** Nothing is autosaved over the player's own track. */
+export const autosaves = (s: Session) => s.kind === 'edit';
 
 /** Free editing: the player's own track, no level or challenge rules. */
 export const freeEdit = (s: Session) => s.kind === 'edit' && s.challenge === 0;

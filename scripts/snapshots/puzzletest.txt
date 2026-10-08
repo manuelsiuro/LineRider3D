@@ -1,0 +1,6 @@
+mind-the-gap    unsolved fails    solved 4.25s stars 2/2 ink 12.0/12/24
+catch-the-fall  unsolved fails    solved 3.88s stars 1/1 ink 51.9/56/80
+boost-up        unsolved fails    solved 4.50s stars 2/2 ink 16.0/16/22
+jump-it         unsolved fails    solved 5.13s stars 1/1 ink 6.5/8/14
+bounce-back     unsolved fails    solved 6.58s stars 1/1 ink 12.1/13/18
+star-route      unsolved finishes solved 5.25s stars 3/3 ink 6.2/10/20

@@ -1,6 +1,7 @@
 import type { VehicleId } from '../physics/vehicles';
 import type { BiomeId, WorldConfig } from '../world/worlds';
 import type { Stats } from './RunStats';
+import { PUZZLES } from '../levels/puzzles';
 import { KEYS, readJSON, writeJSON } from './storage';
 
 /** What an achievement can look at. */
@@ -29,6 +30,9 @@ export interface RunContext {
   worldsFinished: number;
   /** Days in a row with a daily ride (after this run). */
   dailyStreak: number;
+  /** Puzzles solved, and solved with three stars. */
+  puzzlesSolved: number;
+  puzzlesPerfect: number;
   /** Worlds whose levels all have 3 stars. */
   champion: Partial<Record<BiomeId, boolean>>;
 }
@@ -64,6 +68,8 @@ export const ACHIEVEMENTS: Achievement[] = [
 
   // ---------------------------------------------------------------- worlds
   { id: 'tourist', title: 'Tourist', desc: 'Ride in all five worlds.', check: (c) => c.worldsRidden >= 5 },
+  { id: 'puzzle-1', title: 'Handy', desc: 'Fix your first puzzle track.', check: (c) => c.puzzlesSolved >= 1 },
+  { id: 'puzzle-all', title: 'Master Builder', desc: 'Earn 3 stars on every puzzle.', check: (c) => c.puzzlesPerfect >= PUZZLES.length },
   { id: 'daily-3', title: 'Regular', desc: 'Ride the daily 3 days in a row.', check: (c) => c.dailyStreak >= 3 },
   { id: 'daily-7', title: 'Every Single Day', desc: 'Ride the daily 7 days in a row.', check: (c) => c.dailyStreak >= 7 },
   { id: 'globetrotter', title: 'Globetrotter', desc: 'Finish a level in every world.', check: (c) => c.worldsFinished >= 5 },

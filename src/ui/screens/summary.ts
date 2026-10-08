@@ -22,7 +22,7 @@ export function showSummary(
     'summary',
     `<div class="card">
       <div class="summary-head ${clean ? 'clean' : 'wipeout'}">
-        ${info.level ? `<span class="badge">Level ${info.level.number} · ${info.level.name}</span> ` : ''}${info.daily ? `<span class="badge">Daily #${info.daily.number} · ${info.daily.name}</span> ` : ''}<span class="badge">${stats.finished ? `Finished · ${stats.finishTime.toFixed(2)}s` : clean ? 'Clean run' : 'Wipeout'}</span>${info.vehicle ? ` <span class="badge">${info.vehicle}</span>` : ''}
+        ${info.level ? `<span class="badge">Level ${info.level.number} · ${info.level.name}</span> ` : ''}${info.daily ? `<span class="badge">Daily #${info.daily.number} · ${info.daily.name}</span> ` : ''}${info.puzzle ? `<span class="badge">Puzzle ${info.puzzle.number} · ${info.puzzle.name}</span> ` : ''}<span class="badge">${stats.finished ? `Finished · ${stats.finishTime.toFixed(2)}s` : clean ? 'Clean run' : 'Wipeout'}</span>${info.vehicle ? ` <span class="badge">${info.vehicle}</span>` : ''}
         <div class="rating">${[0, 1, 2].map((i) => `<span class="rstar ${i < info.rating ? 'on' : ''}" style="animation-delay:${0.25 + i * 0.18}s">${icon('star', 44)}</span>`).join('')}</div>
         <h2>${info.rating === 3 ? 'Legendary!' : stats.finished ? 'Finished!' : clean ? 'Nice ride!' : 'Ouch, Bosh!'}</h2>
         <div class="score-line">
@@ -38,6 +38,7 @@ export function showSummary(
             : ''
         }
         ${medalLine(info)}
+        ${info.puzzle ? `<p class="ink-line ${info.puzzle.ink <= info.puzzle.par + 1e-6 ? 'under' : ''}">${icon('pencil', 15)} ${info.puzzle.ink.toFixed(1)} m of ink · par ${info.puzzle.par.toFixed(1)} m</p>` : ''}
       </div>
       <ul class="goals">${info.goals.map((g) => `<li class="${g.done ? 'done' : ''}">${icon(g.done ? 'check' : 'circle', 16)}${g.label}</li>`).join('')}</ul>
       <div class="stats">
@@ -50,7 +51,11 @@ export function showSummary(
       </div>
       <div class="actions">
         ${
-          info.daily
+          info.puzzle
+            ? `<button class="big-btn ghost icon-only" data-a="levels" title="Puzzles" aria-label="Puzzles">${icon('menu', 20)}</button>
+               <button class="big-btn ${stats.finished && !stats.crashed ? 'ghost' : 'primary'}" data-a="edit">${icon('pencil', 18)} Fix it</button>
+               ${stats.finished && !stats.crashed && info.puzzle.hasNext ? `<button class="big-btn primary" data-a="next">Next ${icon('chevronRight', 18)}</button>` : ''}`
+            : info.daily
             ? `<button class="big-btn ghost icon-only" data-a="levels" title="Main menu" aria-label="Main menu">${icon('home', 20)}</button>
                <button class="big-btn ghost icon-only" data-a="watch" title="Watch replay" aria-label="Watch replay">${icon('eye', 20)}</button>
                ${stats.score > 0 ? `<button class="big-btn ghost" data-a="challenge">${icon('share', 18)} Share score</button>` : ''}

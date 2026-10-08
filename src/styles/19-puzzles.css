@@ -1,0 +1,127 @@
+/* ------------------------------------------------------------ puzzles */
+/* Classic runs only, nothing to share or switch: those buttons step aside. */
+.puzzle-mode .rider-btn,
+.puzzle-mode .vehicle-btn,
+.puzzle-mode .share-btn {
+  display: none;
+}
+
+/* Ink meter above the tools. */
+.ink-meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: center;
+  width: min(420px, calc(100vw - 32px));
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.ink-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-soft);
+}
+
+.ink-bar {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(18, 35, 58, 0.1);
+}
+
+.ink-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4b98ec, #5fb2ff);
+  transition: width 0.15s;
+}
+
+/* Par: past this mark the third star is gone. */
+.ink-par {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--gold);
+  box-shadow: 0 0 0 2px white;
+}
+
+.ink-meter.over-par .ink-fill {
+  background: linear-gradient(90deg, #ff9f55, #f2742a);
+}
+
+.ink-meter.empty .ink-left {
+  color: var(--danger);
+}
+
+.ink-left {
+  min-width: 52px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Intro: the line types allowed, and three simple steps. */
+.type-chip i {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--swatch);
+}
+
+.puzzle-steps {
+  display: grid;
+  gap: 6px;
+  margin: 2px 0 12px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.puzzle-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.puzzle-steps li .ic {
+  color: var(--accent);
+}
+
+/* Summary: ink used against par. */
+.summary .ink-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 4px 12px 4px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.summary .ink-line.under {
+  color: #7a4d00;
+  background: linear-gradient(180deg, #ffd34d, #ffc23d);
+}
+
+/* Puzzle select: one chapter in the editor's blue. */
+.chapter.puzzles .chapter-icon {
+  color: white;
+  background: linear-gradient(180deg, #4b98ec, #2a6fc4);
+}

@@ -1,7 +1,7 @@
 import type { WorldConfig } from '../world/worlds';
 import type { BiomeId } from '../world/worlds';
 
-export type TitleChoice = 'daily' | 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies';
+export type TitleChoice = 'daily' | 'puzzles' | 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies';
 export type PauseChoice = 'resume' | 'restart' | 'settings' | 'levels' | 'menu';
 
 export interface UIHandlers {
@@ -61,6 +61,8 @@ export interface SummaryInfo {
   challenge?: number;
   /** Finish-time medal (levels on their home world). */
   medal?: { medal: string | null; newMedal: boolean; time: number; best: number; newBest: boolean; next: { name: string; time: number } | null };
+  /** Set when solving a puzzle (ink in meters). */
+  puzzle?: { number: number; name: string; ink: number; par: number; hasNext: boolean };
   /** Set when playing the daily ride. */
   daily?: { number: number; name: string; streak: number };
   /** Name of the ride used. */
@@ -175,4 +177,14 @@ export interface DailyCard {
   best: number;
   stars: number;
   streak: number;
+}
+
+/** A puzzle on the puzzle select screen. */
+export interface PuzzleCard {
+  name: string;
+  tip: string;
+  stars: number;
+  /** Best ink used (m), 0 when unsolved. */
+  ink: number;
+  par: number;
 }
