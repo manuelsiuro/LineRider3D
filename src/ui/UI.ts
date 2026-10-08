@@ -1484,20 +1484,36 @@ export class UI {
   }
 
   private bindKeys() {
-    // Enter presses the main button of the card on top (Next, Retry, Ride!...).
+    // Cards are keyboard friendly: arrows move a highlight between the buttons,
+    // Enter presses it (the main button by default: Next, Retry, Ride!...).
+    const MOVE: Record<string, number> = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 };
     window.addEventListener(
       'keydown',
       (e) => {
-        if (e.key !== 'Enter' || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
+        if ((e.key !== 'Enter' && !(e.key in MOVE)) || e.altKey || e.ctrlKey || e.metaKey) return;
         const t = e.target as HTMLElement;
         if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
         const layer = [...document.querySelectorAll('.modal, .summary')].filter((l) => !l.classList.contains('leaving')).pop();
-        const main = layer?.querySelector('.big-btn.primary') as HTMLButtonElement | null;
-        if (!main || main.disabled) return;
-        // Also stops a focused button from being clicked a second time.
+        if (!layer) return;
+        const buttons = [...layer.querySelectorAll<HTMLButtonElement>('.big-btn')].filter((b) => !b.disabled && b.offsetParent !== null);
+        const main = layer.querySelector<HTMLButtonElement>('.big-btn.primary');
+        const sel = layer.querySelector<HTMLButtonElement>('.big-btn.kb-sel') ?? main;
+        if (e.key === 'Enter') {
+          if (e.repeat || !sel || sel.disabled) return;
+          // Also stops a focused button from being clicked a second time.
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          sel.click();
+          return;
+        }
+        // Arrows held while riding into the end of a run shouldn't jump around.
+        if (e.repeat || buttons.length < 2) return;
         e.preventDefault();
         e.stopImmediatePropagation();
-        main.click();
+        const i = sel ? buttons.indexOf(sel) : -1;
+        const next = buttons[(Math.max(0, i) + MOVE[e.key] + buttons.length) % buttons.length];
+        for (const b of buttons) b.classList.toggle('kb-sel', b === next);
+        this.handlers.click();
       },
       true,
     );

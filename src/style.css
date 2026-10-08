@@ -3083,9 +3083,11 @@ body.dev-shot .title-screen {
 .intro .world-pick::before { content: 'World'; }
 .intro .keys.controls::before { content: 'Controls'; margin-bottom: 2px; }
 
-/* Enter hint on the main button of cards. */
+/* Enter hint on the button Enter will press: the main one, or the one picked with the arrows. */
 .modal .big-btn.primary::after,
-.summary .big-btn.primary::after {
+.summary .big-btn.primary::after,
+.modal .big-btn.kb-sel:not(.icon-only)::after,
+.summary .big-btn.kb-sel:not(.icon-only)::after {
   content: '↵';
   display: inline-grid;
   place-items: center;
@@ -3100,9 +3102,27 @@ body.dev-shot .title-screen {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
 
+.big-btn.kb-sel:not(.primary)::after {
+  background: rgba(18, 35, 58, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(18, 35, 58, 0.15);
+}
+
+/* Once another button is picked, the main one loses its hint. */
+.modal:has(.big-btn.kb-sel) .big-btn.primary:not(.kb-sel)::after,
+.summary:has(.big-btn.kb-sel) .big-btn.primary:not(.kb-sel)::after {
+  display: none;
+}
+
+.big-btn.kb-sel {
+  outline: 3px solid var(--accent-2);
+  outline-offset: 3px;
+  transform: translateY(-2px);
+}
+
 @media (pointer: coarse) {
   .modal .big-btn.primary::after,
-  .summary .big-btn.primary::after {
+  .summary .big-btn.primary::after,
+  .big-btn.kb-sel::after {
     display: none;
   }
 }
