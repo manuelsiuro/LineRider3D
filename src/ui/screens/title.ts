@@ -31,11 +31,11 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
           <button class="big-btn secondary" data-c="${hasSave ? 'create' : 'new'}">${icon('pencil', 20)} ${hasSave ? 'Continue my track' : 'Create a track'}</button>
           <div class="title-row">
             <button class="big-btn menu-btn" data-c="puzzles"><span class="menu-ic">${icon('pencil', 18)}</span><span class="menu-label">Puzzles</span>${icon('chevronRight', 16)}</button>
+            ${hasSave ? `<button class="big-btn menu-btn" data-c="gallery"><span class="menu-ic">${icon('folder', 18)}</span><span class="menu-label">My tracks</span>${icon('chevronRight', 16)}</button>` : ''}
             <button class="big-btn menu-btn" data-c="garage"><span class="menu-ic">${icon('garage', 18)}</span><span class="menu-label">Garage</span>${icon('chevronRight', 16)}</button>
             <button class="big-btn menu-btn" data-c="wardrobe"><span class="menu-ic">${icon('sled', 18)}</span><span class="menu-label">Wardrobe</span>${icon('chevronRight', 16)}</button>
             <button class="big-btn menu-btn" data-c="trophies"><span class="menu-ic">${icon('trophy', 18)}</span><span class="menu-label">Trophies</span>${icon('chevronRight', 16)}</button>
             <button class="big-btn menu-btn" data-c="settings"><span class="menu-ic">${icon('gear', 18)}</span><span class="menu-label">Settings</span>${icon('chevronRight', 16)}</button>
-            ${hasSave ? `<button class="big-btn menu-btn" data-c="gallery"><span class="menu-ic">${icon('folder', 18)}</span><span class="menu-label">My tracks</span>${icon('chevronRight', 16)}</button>` : ''}
           </div>
         </div>
         <p class="title-foot">${icon('sound', 16)} Best with sound on · works with mouse and touch</p>
