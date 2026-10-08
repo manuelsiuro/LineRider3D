@@ -1,0 +1,31 @@
+# 1 2026-10-01 Wild Rollercoaster     moto      desert/day/clear               strokes 9 stars 4/4 rings 1 finish 7.8s score 2060/4500
+# 2 2026-10-02 Wild Dash              bike      city/day/clear                 strokes 13 stars 5/5 rings 1 finish 7.4s score 1875/4000
+# 3 2026-10-03 Wild Shortcut          sled      forest/day/clear               strokes 11 stars 5/5 rings 0 finish 8.3s score 800/3000
+# 4 2026-10-04 Stormy Getaway         bike      forest/sunset/clear            strokes 9 stars 4/4 rings 1 finish 8.1s score 1750/4000
+# 5 2026-10-05 Lucky Cruise           bike      alpine/day/fog                 strokes 15 stars 6/6 rings 0 finish 9.4s score 1960/4000
+# 6 2026-10-06 Golden Loop            buggy     alpine/day/snow                strokes 9 stars 4/4 rings 1 finish 7.4s score 1475/3500
+# 7 2026-10-07 Frosty Express         sled      alpine/night/snow              strokes 15 stars 6/6 rings 0 finish 9.7s score 1720/4000
+# 8 2026-10-08 Daring Loop            skis      alpine/sunset/snow             strokes 13 stars 5/5 rings 1 finish 7.8s score 3565/6000
+# 9 2026-10-09 Frosty Plunge          bike      alpine/sunset/snow             strokes 13 stars 5/5 rings 0 finish 9.6s score 1440/3500
+#10 2026-10-10 Stormy Shortcut        bike      alpine/day/snow                strokes 11 stars 5/5 rings 0 finish 7.8s score 1680/4000
+#11 2026-10-11 Breezy Descent         moto      desert/day/clear               strokes 12 stars 5/5 rings 0 finish 7.3s score 1500/3500
+#12 2026-10-12 Lucky Plunge           skis      alpine/sunset/fog              strokes 14 stars 5/5 rings 1 finish 9.6s score 3425/5500
+#13 2026-10-13 Wild Rally             bike      forest/night/clear             strokes 16 stars 7/7 rings 0 finish 8.6s score 1000/3000
+#14 2026-10-14 Golden Gauntlet        snowboard beach/day/fog                  strokes 9 stars 4/4 rings 1 finish 7.8s score 2295/4500
+#15 2026-10-15 Rowdy Express          skis      city/day/rain                  strokes 8 stars 3/3 rings 2 finish 6.7s score 1125/3500
+#16 2026-10-16 Sneaky Shortcut        sled      desert/dawn/storm              strokes 15 stars 5/5 rings 1 finish 11.8s score 1090/3500
+#17 2026-10-17 Lucky Shortcut         snowboard forest/dawn/clear              strokes 15 stars 6/6 rings 0 finish 9.3s score 0/2000
+#18 2026-10-18 Rapid Dash             buggy     beach/night/clear              strokes 15 stars 6/6 rings 0 finish 7.8s score 1100/3500
+#19 2026-10-19 Sunny Sprint           sled      forest/sunset/clear            strokes 15 stars 6/6 rings 1 finish 8.3s score 750/3000
+#20 2026-10-20 Wild Rollercoaster     sled      desert/day/clear               strokes 16 stars 6/6 rings 0 finish 11.6s score 1000/3000
+#21 2026-10-21 Lucky Descent          sled      alpine/day/snow                strokes 9 stars 4/4 rings 1 finish 7.5s score 655/3000
+#22 2026-10-22 Stormy Cruise          moto      city/day/clear                 strokes 13 stars 5/5 rings 0 finish 9.6s score 1100/3500
+#23 2026-10-23 Silver Dash            sled      forest/dawn/rain               strokes 12 stars 5/5 rings 0 finish 10.0s score 1020/3500
+#24 2026-10-24 Frosty Gauntlet        bike      beach/night/clear              strokes 12 stars 5/5 rings 0 finish 8.8s score 0/2000
+#25 2026-10-25 Silver Run             sled      city/day/rain                  strokes 11 stars 5/5 rings 0 finish 7.5s score 1200/3500
+#26 2026-10-26 Sneaky Rollercoaster   moto      beach/night/clear              strokes 14 stars 5/5 rings 0 finish 10.4s score 1000/3000
+#27 2026-10-27 Daring Sprint          sled      beach/night/clear              strokes 15 stars 6/6 rings 0 finish 9.4s score 1120/3500
+#28 2026-10-28 Bouncy Cruise          snowboard desert/dawn/clear              strokes 10 stars 4/4 rings 2 finish 8.2s score 2555/5000
+#29 2026-10-29 Dizzy Shortcut         sled      alpine/day/clear               strokes 16 stars 6/6 rings 0 finish 9.6s score 1100/3500
+#30 2026-10-30 Rapid Express          buggy     alpine/day/snow                strokes 15 stars 6/6 rings 0 finish 10.6s score 0/2000
+rides {"moto":4,"bike":7,"sled":10,"buggy":3,"skis":3,"snowboard":3}

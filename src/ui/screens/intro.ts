@@ -127,3 +127,36 @@ export function showLevelIntro(ctx: ScreenCtx, number: number, name: string, tip
     document.body.append(overlay);
   });
 }
+
+/** Intro for the daily ride: the same track, ride and world for everyone today. */
+export function showDailyIntro(ctx: ScreenCtx, info: { number: number; name: string; date: string; challenge: number; best: number; streak: number; world: string }, goals: string[], keys: Controls, ride?: RidePicker): Promise<void> {
+  return new Promise((resolve) => {
+    const overlay = h(
+      'div',
+      'modal intro',
+      `<div class="card">
+        <span class="badge dark daily">${icon('calendar', 13)} Daily ride #${info.number} · ${info.date}</span>
+        <h2>${info.challenge ? `Beat ${info.challenge.toLocaleString()} points!` : info.name}</h2>
+        <p>${info.challenge ? `A friend scored ${info.challenge.toLocaleString()} on ${info.name}. Can you top it?` : 'A new track every day, the same for everyone. Ride it as often as you like: your best score counts.'}</p>
+        <div class="daily-facts">
+          <span>${icon('globe', 15)} ${info.world}</span>
+          ${info.best > 0 ? `<span>${icon('trophy', 15)} Best ${info.best.toLocaleString()}</span>` : ''}
+          ${info.streak > 0 ? `<span class="streak">${icon('flame', 15)} ${info.streak}-day streak</span>` : ''}
+        </div>
+        <ul class="intro-goals">${goals.map((g) => `<li>${icon('star', 18)}${g}</li>`).join('')}</ul>
+        <div class="ride-pick"></div>
+        <div class="keys controls">${controlsHtml(keys)}</div>
+        <div class="actions"><button class="big-btn primary">${icon('play', 18)} Ride!</button></div>
+      </div>`,
+    );
+    overlay.onclick = (e) => {
+      if (!(e.target as HTMLElement).closest('button') && e.target !== overlay) return;
+      ctx.click();
+      closeOverlay(overlay, 200);
+      resolve();
+    };
+    ridePicker(ctx, overlay, ride, overlay.querySelector('.keys'));
+    document.body.append(overlay);
+  });
+}
+

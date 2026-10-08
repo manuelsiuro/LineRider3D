@@ -27,6 +27,8 @@ export interface RunContext {
   /** Distinct worlds ridden in / finished a level in, across all play. */
   worldsRidden: number;
   worldsFinished: number;
+  /** Days in a row with a daily ride (after this run). */
+  dailyStreak: number;
   /** Worlds whose levels all have 3 stars. */
   champion: Partial<Record<BiomeId, boolean>>;
 }
@@ -62,6 +64,8 @@ export const ACHIEVEMENTS: Achievement[] = [
 
   // ---------------------------------------------------------------- worlds
   { id: 'tourist', title: 'Tourist', desc: 'Ride in all five worlds.', check: (c) => c.worldsRidden >= 5 },
+  { id: 'daily-3', title: 'Regular', desc: 'Ride the daily 3 days in a row.', check: (c) => c.dailyStreak >= 3 },
+  { id: 'daily-7', title: 'Every Single Day', desc: 'Ride the daily 7 days in a row.', check: (c) => c.dailyStreak >= 7 },
   { id: 'globetrotter', title: 'Globetrotter', desc: 'Finish a level in every world.', check: (c) => c.worldsFinished >= 5 },
   { id: 'night-owl', title: 'Night Owl', desc: 'Finish a level at night.', check: (c) => c.ended && c.stats.finished && !c.stats.crashed && c.levelId !== null && c.world.time === 'night' },
   {

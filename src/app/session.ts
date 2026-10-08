@@ -6,11 +6,14 @@
  *   edit   the editor: the player's own track, the demo, or a shared track
  *          (a challenge link adds a score to beat and forces the challenger's ride)
  *   level  a built-in level: no editing, rider controls always on
+ *   daily  the day's generated ride (same for everyone), like a level; a
+ *          friend's link adds a score to beat
  */
 export type Session =
   | { kind: 'title' }
   | { kind: 'edit'; challenge: number }
-  | { kind: 'level'; index: number };
+  | { kind: 'level'; index: number }
+  | { kind: 'daily'; day: string; challenge: number };
 
 export const TITLE: Session = { kind: 'title' };
 export const EDIT: Session = { kind: 'edit', challenge: 0 };
@@ -19,7 +22,10 @@ export const EDIT: Session = { kind: 'edit', challenge: 0 };
 export const levelOf = (s: Session) => (s.kind === 'level' ? s.index : null);
 
 /** Score to beat from a friend's challenge link (0: none). */
-export const challengeOf = (s: Session) => (s.kind === 'edit' ? s.challenge : 0);
+export const challengeOf = (s: Session) => (s.kind === 'edit' || s.kind === 'daily' ? s.challenge : 0);
+
+/** Fixed tracks with rules: no editor, rider controls on, the ride is set. */
+export const fixedTrack = (s: Session) => s.kind === 'level' || s.kind === 'daily';
 
 /** Riding (or editing) a track, as opposed to the title menu. */
 export const inGame = (s: Session) => s.kind !== 'title';

@@ -1,7 +1,7 @@
 import type { WorldConfig } from '../world/worlds';
 import type { BiomeId } from '../world/worlds';
 
-export type TitleChoice = 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies';
+export type TitleChoice = 'daily' | 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies';
 export type PauseChoice = 'resume' | 'restart' | 'settings' | 'levels' | 'menu';
 
 export interface UIHandlers {
@@ -59,6 +59,8 @@ export interface SummaryInfo {
   level?: { number: number; name: string; nextUnlocked: boolean; hasNext: boolean };
   /** Score to beat from a friend's challenge link. */
   challenge?: number;
+  /** Set when playing the daily ride. */
+  daily?: { number: number; name: string; streak: number };
   /** Name of the ride used. */
   vehicle?: string;
 }
@@ -149,4 +151,14 @@ export interface ScreenCtx {
   share(challenge?: number): void;
   /** The world on screen (title badge and caption). */
   readonly world: WorldConfig;
+}
+
+/** The daily ride's entry on the title. */
+export interface DailyCard {
+  number: number;
+  name: string;
+  /** Today's best (0: not played yet). */
+  best: number;
+  stars: number;
+  streak: number;
 }

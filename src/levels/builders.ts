@@ -89,3 +89,46 @@ export function forest(track: Track, x0: number, x1: number, seed: number, kinds
     track.addDecor({ kind, position: new THREE.Vector3(x, 0, side * (near + rand() * spread)), rotation: rand() * 6.28, scale: 0.9 + rand() * 0.7 });
   }
 }
+
+export function start(track: Track, x: number, y: number, z = 0) {
+  track.setStart(new THREE.Vector3(x, y + 0.8, z));
+}
+
+/**
+ * Lands a jump: a ramp that follows the measured flight arc, then eases out
+ * to level ground at `floorY` with a smooth (Hermite) curve. The touchdown
+ * point is chosen high enough that the curve-out stays gentle and never dips
+ * below the floor.
+ */
+export function landing(track: Track, fromX: number, fromY: number, drop: number, floorY: number, type: 'normal' | 'ice' = 'normal', vehicle?: VehicleDef, width = 2.4) {
+  const arc = measureArc(track, fromX, vehicle);
+  const landY = (x: number) => arc(x) - 0.9;
+  const slopeAt = (x: number) => (landY(x + 0.25) - landY(x - 0.25)) / 0.5;
+  let top = fromX;
+  for (let x = fromX; x < fromX + 120; x += 0.25) if (arc(x) > arc(top)) top = x;
+  // Touch down `drop` below the takeoff, or earlier if the curve-out would be too tight.
+  let x1 = top + 2;
+  while (landY(x1) > fromY - drop && x1 < top + 120) x1 += 0.25;
+  while (x1 > top + 3 && landY(x1) - floorY < 9 * Math.abs(slopeAt(x1))) x1 -= 0.25;
+  const x0 = Math.max(top + 2, x1 - 10);
+  profile(track, landY, x0, x1, type, 0, width);
+  const y1 = landY(x1);
+  const slope = Math.min(-0.02, slopeAt(x1));
+  const L = Math.max(26, (2.5 * (y1 - floorY)) / -slope);
+  const runout = (x: number) => {
+    const t = THREE.MathUtils.clamp((x - x1) / L, 0, 1);
+    const h00 = 2 * t ** 3 - 3 * t ** 2 + 1;
+    const h10 = t ** 3 - 2 * t ** 2 + t;
+    const h01 = -2 * t ** 3 + 3 * t ** 2;
+    return y1 * h00 + L * slope * h10 + floorY * h01;
+  };
+  profile(track, runout, x1, x1 + L, type, 0, width);
+  return { arc, runout, end: x1 + L, flat: floorY, top };
+}
+
+/** Highest point of an arc between two x positions. */
+export function apex(arc: (x: number) => number, x0: number, x1: number) {
+  let best = x0;
+  for (let x = x0; x <= x1; x += 0.25) if (arc(x) > arc(best)) best = x;
+  return { x: best, y: arc(best) };
+}

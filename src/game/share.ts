@@ -4,6 +4,8 @@ import { TrackFormatError, validateTrack, type SerializedTrack } from '../track/
  * Track share links: the whole track lives in the URL hash, compressed with
  * deflate (when the browser supports it) and base64url-encoded.
  *   #t=<code>[&c=<score to beat>][&v=<ride id>]
+ * A daily ride needs no track, only its day:
+ *   #d=<YYYY-MM-DD>[&c=<score to beat>]
  * The code's first letter is the encoding (z: deflate, j: plain JSON); the
  * track inside carries its format version, checked by validateTrack.
  */
@@ -70,11 +72,26 @@ export async function shareLink(data: SerializedTrack, challenge = 0, vehicle = 
   return `${base}#t=${code}${challenge > 0 ? `&c=${challenge}` : ''}${vehicle !== 'sled' ? `&v=${vehicle}` : ''}`;
 }
 
-/** Reads a shared track from the current URL, if any. */
-export async function readSharedLink(): Promise<{ data: SerializedTrack; challenge: number; vehicle: string | null } | null> {
+/** A link to a day's daily ride, with a score to beat. */
+export function dailyLink(day: string, challenge = 0): string {
+  return `${location.origin}${location.pathname}#d=${day}${challenge > 0 ? `&c=${challenge}` : ''}`;
+}
+
+export type SharedLink =
+  | { kind: 'track'; data: SerializedTrack; challenge: number; vehicle: string | null }
+  | { kind: 'daily'; day: string; challenge: number };
+
+/** Reads a shared track (or daily ride) from the current URL, if any. */
+export async function readSharedLink(): Promise<SharedLink | null> {
   const params = new URLSearchParams(location.hash.slice(1));
+  const challenge = Number(params.get('c') ?? 0) || 0;
+  const day = params.get('d');
+  if (day) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(`${day}T00:00:00Z`))) throw new TrackFormatError('That daily link looks broken');
+    return { kind: 'daily', day, challenge };
+  }
   const code = params.get('t');
   if (!code) return null;
   const data = await decodeTrack(code);
-  return { data, challenge: Number(params.get('c') ?? 0) || 0, vehicle: params.get('v') };
+  return { kind: 'track', data, challenge, vehicle: params.get('v') };
 }

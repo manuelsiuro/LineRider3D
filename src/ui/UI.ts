@@ -14,7 +14,7 @@ import { showLevels } from './screens/levels';
 import { showWardrobe } from './screens/wardrobe';
 import { showGarage } from './screens/garage';
 import { showTrophies } from './screens/trophies';
-import { showLevelIntro, showSharedIntro } from './screens/intro';
+import { showDailyIntro, showLevelIntro, showSharedIntro } from './screens/intro';
 import { hideSummary, showSummary } from './screens/summary';
 import { showPause, showPhotoMode, showSettings } from './screens/menus';
 import { showHelp } from './screens/help';
@@ -755,6 +755,9 @@ export class UI {
   }
   showLevelIntro(...a: Rest<typeof showLevelIntro>) {
     return showLevelIntro(this.ctx, ...a);
+  }
+  showDailyIntro(...a: Rest<typeof showDailyIntro>) {
+    return showDailyIntro(this.ctx, ...a);
   }
   showSharedIntro(...a: Rest<typeof showSharedIntro>) {
     return showSharedIntro(this.ctx, ...a);

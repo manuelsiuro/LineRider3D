@@ -5,11 +5,11 @@ import { CAMERA_LABELS, type CameraMode } from './render/CameraRig';
 import { STEPS_PER_SECOND } from './physics/Simulation';
 import { P } from './physics/Rider';
 import { vehicleById, type VehicleDef } from './physics/vehicles';
-import { DEFAULT_WORLD, normalizeWorld, surfaceOf, type WorldConfig } from './world/worlds';
+import { DEFAULT_WORLD, normalizeWorld, surfaceOf, worldLabel, type WorldConfig } from './world/worlds';
 import { UI, type SettingsView } from './ui/UI';
 import { resetProgress, saveSettings, type Quality as QualitySetting } from './game/settings';
 import { buildDemoTrack } from './demoTrack';
-import { readSharedLink, shareLink } from './game/share';
+import { dailyLink, readSharedLink, shareLink } from './game/share';
 import { rateRun } from './game/rating';
 import { beats, encodeInputs, loadGhost, saveGhost } from './game/Ghost';
 import { LEVELS, chapterOf } from './levels/levels';
@@ -18,7 +18,10 @@ import { ACHIEVEMENTS, evaluate, loadCounters, noteWorld, selectPaint, unlockedA
 import { KEYS, migrateStorage, readFlag, readJSON, readText, writeFlag, writeJSON, writeText } from './game/storage';
 import { createStage, fitToWindow } from './app/stage';
 import { createCore, type Core } from './app/core';
-import { EDIT, TITLE, challengeOf, freeEdit, inGame, levelOf, type Session } from './app/session';
+import { EDIT, TITLE, challengeOf, fixedTrack, freeEdit, inGame, levelOf, type Session } from './app/session';
+import { dailyInfo, dayKey } from './levels/daily';
+import { loadDaily, recordDaily, streakOn } from './game/dailyRecords';
+import { dailyTrack } from './app/dailyTrack';
 import { Input } from './app/Input';
 import { Run } from './app/Run';
 import { WorldDirector } from './app/WorldDirector';
@@ -40,9 +43,9 @@ let session: Session = TITLE;
 const levelIndex = () => levelOf(session);
 const challenge = () => challengeOf(session);
 const playingGame = () => inGame(session);
-/** Rider controls: always on in levels and challenges, a toggle in the editor. */
+/** Rider controls: always on in levels, dailies and challenges, a toggle in the editor. */
 let riderMode = readFlag(KEYS.riderMode);
-const riderOn = () => levelIndex() !== null || challenge() > 0 || riderMode;
+const riderOn = () => fixedTrack(session) || challenge() > 0 || riderMode;
 
 const moves = new CameraMoves(camera, controls);
 const input = new Input(playingGame, () => freeEdit(session), cycleVehicle);
@@ -68,7 +71,7 @@ const worlds = new WorldDirector(core, {
 });
 
 const rides = new Rides(core, {
-  lockReason: () => (rides.locked ? (challenge() > 0 ? "the challenger's ride" : "this level's ride") : null),
+  lockReason: () => (rides.locked ? (session.kind === 'daily' ? "the daily's ride" : challenge() > 0 ? "the challenger's ride" : "this level's ride") : null),
   changed() {
     run.ghost = null;
     run.reset();
@@ -110,7 +113,7 @@ function loadInto(fn: () => void) {
 }
 
 track.on((e) => {
-  if (loading || e.kind === 'cleared' || levelIndex() !== null) return;
+  if (loading || e.kind === 'cleared' || fixedTrack(session)) return;
   pristine = false;
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => writeJSON(KEYS.track, track.serialize()), 400);
@@ -197,8 +200,14 @@ const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('di
   },
   photo: () => openPhoto(),
   async share(score = 0) {
-    const url = await shareLink(track.serialize(), score, rides.current.id);
-    const text = score > 0 ? `I scored ${score.toLocaleString()} on this Line Rider 3D track. Can you beat it?` : 'Ride my Line Rider 3D track!';
+    // A daily needs no track in the link: everyone can build the day's ride.
+    const daily = session.kind === 'daily' ? dailyInfo(session.day) : null;
+    const url = daily ? dailyLink(daily.day, score) : await shareLink(track.serialize(), score, rides.current.id);
+    const text = daily
+      ? `I scored ${score.toLocaleString()} on Line Rider 3D Daily #${daily.number} (${daily.name}). Can you beat it?`
+      : score > 0
+        ? `I scored ${score.toLocaleString()} on this Line Rider 3D track. Can you beat it?`
+        : 'Ride my Line Rider 3D track!';
     // Phones: the native share sheet. Elsewhere: a dialog with a copy button.
     if (navigator.share && stage.isTouch) {
       try {
@@ -259,11 +268,11 @@ function enter(next: Session, lockedRide: VehicleDef | null = null) {
     ui.setPlaying(false);
   }
   const index = levelOf(next);
-  const fixed = index !== null ? LEVELS[index].vehicle : undefined;
+  const fixed = index !== null ? LEVELS[index].vehicle : next.kind === 'daily' ? dailyInfo(next.day).vehicle : undefined;
   rides.lock(fixed ? vehicleById(fixed) : lockedRide);
   editor.enabled = next.kind === 'edit';
-  document.body.classList.toggle('level-mode', next.kind === 'level');
-  ui.setRiderMode(next.kind === 'level' || challenge() > 0 ? true : riderMode);
+  document.body.classList.toggle('level-mode', fixedTrack(next));
+  ui.setRiderMode(fixedTrack(next) || challenge() > 0 ? true : riderMode);
 }
 
 /**
@@ -319,7 +328,7 @@ async function closeUp<T>(show: () => Promise<T>): Promise<T> {
 async function titleFlow() {
   for (;;) {
     const progress = loadProgress();
-    const choice = await ui.showTitle(savedTrack() !== null, totalStars(progress), LEVELS.length * 3);
+    const choice = await ui.showTitle(savedTrack() !== null, totalStars(progress), LEVELS.length * 3, dailyCard());
     if (choice === 'wardrobe') {
       const stars = totalStars(progress);
       await closeUp(() =>
@@ -363,6 +372,10 @@ async function titleFlow() {
         ),
       );
       continue;
+    }
+    if (choice === 'daily') {
+      enterDaily(dayKey());
+      return;
     }
     if (choice === 'levels') {
       const idx = await pickLevel();
@@ -442,6 +455,43 @@ async function enterShared(data: SerializedTrack, score: number, vehicleId: stri
   run.play();
 }
 
+/** The daily ride's entry on the title. */
+function dailyCard() {
+  const today = dayKey();
+  const info = dailyInfo(today);
+  const rec = loadDaily();
+  return { number: info.number, name: info.name, best: rec.days[today]?.score ?? 0, stars: rec.days[today]?.stars ?? 0, streak: streakOn(today, rec) };
+}
+
+/** Plays a day's daily ride (today's, or an older one from a friend's link). */
+async function enterDaily(day: string, score = 0) {
+  const info = dailyInfo(day);
+  const session0: Session = { kind: 'daily', day, challenge: score };
+  enter(session0);
+  const slow = setTimeout(() => ui.flash("Building today's track…", 4000), 200);
+  const data = await dailyTrack(day);
+  clearTimeout(slow);
+  // The player may have left while it was being built.
+  if (session !== session0) return;
+  loadInto(() => track.load(data));
+  worlds.change(info.world);
+  pristine = true;
+  editor.history.clear();
+  run.stop();
+  history.replaceState(null, '', location.pathname + location.search);
+  moves.showStart(track, 1.3);
+  const today = dayKey();
+  const rec = loadDaily();
+  const date = new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  await ui.showDailyIntro(
+    { number: info.number, name: info.name, date: day === today ? `Today, ${date}` : date, challenge: score, best: rec.days[day]?.score ?? 0, streak: streakOn(today, rec), world: worldLabel(info.world) },
+    rateRun(track, runStats.stats).goals.map((g) => g.label),
+    rides.keys(),
+    rides.picker(),
+  );
+  run.play();
+}
+
 // ------------------------------------------------------------------ end of a run, achievements
 
 let worldsSeen = loadCounters();
@@ -468,6 +518,8 @@ function checkAchievements(ended: boolean, rating = 0) {
     world: env.config,
     worldsRidden: worldsSeen.rode.length,
     worldsFinished: worldsSeen.finished.length,
+    // Read at the end only (this runs every few frames mid-run).
+    dailyStreak: ended ? streakOn(dayKey()) : 0,
     champion: ended ? champions() : {},
   };
   for (const a of evaluate(ctx)) {
@@ -493,7 +545,15 @@ function showSummary(wasReplay: boolean) {
       ghostSaved = true;
     }
   }
-  const best = wasReplay ? { best: recordBest(ghostKey(), 0, 0).best, newBest: false } : recordBest(ghostKey(), s.score, rating.stars);
+  let daily: { number: number; name: string; streak: number } | undefined;
+  let best = wasReplay ? { best: recordBest(ghostKey(), 0, 0).best, newBest: false } : recordBest(ghostKey(), s.score, rating.stars);
+  if (session.kind === 'daily') {
+    const info = dailyInfo(session.day);
+    const today = dayKey();
+    const r = wasReplay ? { ...best, streak: streakOn(today) } : recordDaily(session.day, today, s.score, rating.stars);
+    if (!wasReplay) best = { best: r.best, newBest: r.newBest };
+    daily = { number: info.number, name: info.name, streak: r.streak };
+  }
   if (rating.stars === 3) setTimeout(() => sound.perfect(), 700);
   if (!wasReplay) checkAchievements(true, rating.stars);
   ui.showSummary(
@@ -507,6 +567,7 @@ function showSummary(wasReplay: boolean) {
       ghostSaved,
       level: levelInfo,
       challenge: challenge(),
+      daily,
       vehicle: rides.current.name,
     },
     () => {
@@ -515,7 +576,7 @@ function showSummary(wasReplay: boolean) {
     },
     () => run.stop(),
     () => run.watchReplay(),
-    () => backToLevels(),
+    () => (session.kind === 'daily' ? enterTitle() : backToLevels()),
     () => {
       if (index !== null) startLevel(index + 1);
     },
@@ -590,9 +651,10 @@ async function openSettings() {
 async function openPause() {
   run.pause();
   const index = levelIndex();
-  const title = index !== null ? LEVELS[index].name : challenge() > 0 ? 'Challenge' : 'Your track';
+  const title =
+    index !== null ? LEVELS[index].name : session.kind === 'daily' ? `Daily ride #${dailyInfo(session.day).number}` : challenge() > 0 ? 'Challenge' : 'Your track';
   for (;;) {
-    const choice = await ui.showPause(title, true);
+    const choice = await ui.showPause(title, session.kind !== 'daily');
     if (choice === 'settings') {
       await openSettings();
       continue;
@@ -652,7 +714,7 @@ function loop(time: number) {
   quality.govern(rawDt);
 
   const game = playingGame();
-  editor.update(!run.playing && game && levelIndex() === null);
+  editor.update(!run.playing && session.kind === 'edit');
   core.trackView.update(t, riderCenter, rider.stars);
   env.update(dt, controls.target, t, camera.position);
   worlds.updateHeadlight(game);
@@ -666,8 +728,10 @@ function loop(time: number) {
     document.getElementById('boot')?.classList.add('gone');
     setTimeout(() => document.getElementById('boot')?.remove(), 700);
     // A share link opens its track directly; otherwise show the title.
+    // Start building today's daily ride in the background.
+    void dailyTrack(dayKey());
     readSharedLink()
-      .then((shared) => (shared ? enterShared(shared.data, shared.challenge, shared.vehicle) : enterTitle()))
+      .then((shared) => (!shared ? enterTitle() : shared.kind === 'daily' ? enterDaily(shared.day, shared.challenge) : enterShared(shared.data, shared.challenge, shared.vehicle)))
       .catch((e) => {
         ui.flash(e instanceof TrackFormatError ? e.message : 'That share link looks broken', 4500);
         enterTitle();

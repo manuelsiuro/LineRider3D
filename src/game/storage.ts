@@ -17,6 +17,7 @@ export const KEYS = {
   achievements: 'lr3d.achievements',
   paint: 'lr3d.paint',
   counters: 'lr3d.counters',
+  daily: 'lr3d.daily',
   // Preferences and the editor track (kept on reset).
   settings: 'lr3d.settings',
   vehicle: 'lr3d.vehicle',
@@ -30,7 +31,7 @@ export const KEYS = {
 export type StorageKey = (typeof KEYS)[keyof typeof KEYS];
 
 /** The keys "Reset progress" wipes. */
-export const PROGRESS_KEYS: StorageKey[] = [KEYS.progress, KEYS.best, KEYS.ghosts, KEYS.outfit, KEYS.achievements, KEYS.paint, KEYS.counters];
+export const PROGRESS_KEYS: StorageKey[] = [KEYS.progress, KEYS.best, KEYS.ghosts, KEYS.outfit, KEYS.achievements, KEYS.paint, KEYS.counters, KEYS.daily];
 
 export function readText(key: StorageKey): string | null {
   try {

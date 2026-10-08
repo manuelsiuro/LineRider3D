@@ -1,5 +1,7 @@
 /** Minimal stroke icon set (24×24, currentColor). */
 const P: Record<string, string> = {
+  calendar: '<rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/><path d="M8 14h3v3H8z" fill="currentColor"/>',
+  flame: '<path d="M12 22c4 0 7-2.7 7-6.8 0-3.4-2.2-5.6-3.6-7.6-.4 2-1.4 3.2-2.6 3.6.4-3.5-1.3-6.7-4.3-9.2.2 3.4-1.5 5.6-3 7.6C4.3 11.3 5 12.6 5 15.2 5 19.3 8 22 12 22Z"/><path d="M12 22c-1.7 0-3-1.2-3-3 0-1.7 1.4-2.8 2.4-4 .6 1.3 3.6 2.2 3.6 4 0 1.8-1.3 3-3 3Z"/>',
   pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
   line: '<path d="M5 19 19 5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/>',
   eraser:

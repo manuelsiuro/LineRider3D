@@ -2,13 +2,13 @@ import { TIMES, biomeById } from '../../world/worlds';
 import { h } from '../dom';
 import { icon } from '../icons';
 import type { BiomeId, WorldConfig } from '../../world/worlds';
-import type { ScreenCtx, TitleChoice } from '../types';
+import type { DailyCard, ScreenCtx, TitleChoice } from '../types';
 
 /** Badge icon of each world (the logo follows the world on screen). */
 export const BADGE: Record<BiomeId, string> = { alpine: 'snowflake', forest: 'forest', beach: 'beach', desert: 'desert', city: 'city' };
 
 /** Title screen; resolves with the player's choice. */
-export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxStars: number): Promise<TitleChoice> {
+export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxStars: number, daily: DailyCard): Promise<TitleChoice> {
   document.body.classList.add('on-title');
   return new Promise((resolve) => {
     const overlay = h(
@@ -23,6 +23,11 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
         </div>
         <div class="title-actions">
           <button class="big-btn primary" data-c="levels">${icon('play', 20)} Play <span class="pill">${icon('star', 14)} ${stars}/${maxStars}</span></button>
+          <button class="big-btn daily-btn" data-c="daily">
+            <span class="daily-ic">${icon('calendar', 20)}</span>
+            <span class="daily-text"><b>Daily ride #${daily.number}</b><small>${daily.best > 0 ? `Today's best ${daily.best.toLocaleString()}` : `${daily.name} · new every day`}</small></span>
+            ${daily.streak > 0 ? `<span class="pill streak" title="Days in a row">${icon('flame', 14)} ${daily.streak}</span>` : ''}
+          </button>
           <button class="big-btn secondary" data-c="${hasSave ? 'create' : 'new'}">${icon('pencil', 20)} ${hasSave ? 'Continue my track' : 'Create a track'}</button>
           <div class="title-row">
             <button class="big-btn menu-btn" data-c="garage"><span class="menu-ic">${icon('garage', 18)}</span><span class="menu-label">Garage</span>${icon('chevronRight', 16)}</button>
