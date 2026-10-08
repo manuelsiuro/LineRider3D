@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
 import { serviceWorker } from './vite-sw.ts';
 
@@ -21,8 +22,12 @@ const lanUrls = (): Plugin => ({
   },
 });
 
+/** The game's version, shown on the title screen (bump it with `npm version` before pushing). */
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
+
 export default defineConfig({
   base: './',
+  define: { __APP_VERSION__: JSON.stringify(version) },
   server: { host: true },
   plugins: [lanUrls(), serviceWorker()],
 });

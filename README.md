@@ -65,6 +65,9 @@ The simulation is deterministic, so every test's output is compared with a golde
 `scripts/snapshots/`: any drift in a trajectory, score or timing fails the run. One-off
 investigation probes live in `scripts/dev/` (run them with `npx tsx scripts/dev/<name>.ts`).
 CI (`.github/workflows/ci.yml`) runs the build and the tests on every push, and publishes `main` to GitHub Pages.
+The version in `package.json` is shown in a corner of the title screen. Bump it before each push to `main`:
+`npm version patch` for fixes, `npm version minor` for new features. That commits the bump and tags it
+(`v0.2.0`); push with `git push --follow-tags`.
 
 The production build is an installable web app: `public/manifest.webmanifest` and the icons, plus `sw.js`, a
 service worker written by `vite-sw.ts` after each build that stores the whole game on the device. A new

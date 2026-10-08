@@ -134,6 +134,20 @@
 }
 
 /* Short windows: a smaller badge and tighter spacing. */
+/* Bottom corner, out of the way: which build is this? */
+.title-version {
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  font: 600 11px var(--font-ui);
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+
 @media (max-height: 820px) {
   .logo-mark {
     width: 62px;

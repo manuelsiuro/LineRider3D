@@ -40,7 +40,8 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
           </div>
         </div>
         <p class="title-foot">${icon('sound', 16)} Best with sound on${TOUCH ? '' : ' · works with mouse and touch'}</p>
-      </div>`,
+      </div>
+      <span class="title-version">v${__APP_VERSION__}</span>`,
     );
     overlay.onclick = (e) => {
       const c = (e.target as HTMLElement).closest('button')?.dataset.c as TitleChoice | undefined;
