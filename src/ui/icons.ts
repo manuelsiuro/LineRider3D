@@ -19,6 +19,7 @@ const P: Record<string, string> = {
   tree: '<path d="M12 2 6.5 9.5H9L5 15h4.5L6 20h12l-3.5-5H19l-4-5.5h2.5Z"/><path d="M12 20v2"/>',
   ring: '<ellipse cx="12" cy="12" rx="5" ry="9"/><path d="M2 12h7"/><path d="m15 12h7"/><path d="m19 9 3 3-3 3"/>',
   flag: '<path d="M5 22V3"/><path d="M5 4h13l-2.5 4.5L18 13H5"/>',
+  test: '<path d="M5 22V3"/><path d="M5 4h10l-2 3.5 2 3.5H5"/><path d="m15 14.5 6 3.75-6 3.75z"/>',
   move: '<path d="m5 9-3 3 3 3"/><path d="m9 5 3-3 3 3"/><path d="m15 19-3 3-3-3"/><path d="m19 9 3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/>',
   play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.9l12-7.5a1 1 0 0 0 0-1.8l-12-7.5A1 1 0 0 0 7 4.5Z" fill="currentColor" stroke="none"/>',
   pause:

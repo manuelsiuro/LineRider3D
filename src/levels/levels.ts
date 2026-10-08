@@ -318,7 +318,7 @@ const ALL: LevelDef[] = [
     id: 'big-air',
     name: 'Big Air Park',
     vehicle: 'snowboard',
-    tip: 'Snowboard park: a monster kicker. Hold ↑ to spin, add ←/→ for flips. Land a 720 for the crowd!',
+    tip: 'Snowboard park: a monster kicker. Hold ↑ for flat spins, add ←/→ for flips. Land a 720 for the crowd!',
     build(t) {
       t.clear();
       const V = vehicleById('snowboard');

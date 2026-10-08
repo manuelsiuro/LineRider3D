@@ -19,8 +19,17 @@ export const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html 
   return el;
 };
 
+/** Phones and tablets: no keyboard, no hover. Set once (the `touch` class on body mirrors it). */
+export const TOUCH = matchMedia('(pointer: coarse)').matches;
+document.body.classList.toggle('touch', TOUCH);
+
+/** Drops a trailing shortcut like " (Ctrl+Z)" or " (P)" on touch, where there's no keyboard. */
+export const keyless = (title: string) =>
+  TOUCH ? title.replace(/\s*\((?:Ctrl|⌘|Esc|Space|Del|[A-Z](?=[ +)])|V to switch)[^)]*\)$/, '') : title;
+
 export const button = (cls: string, html: string, title = '') => {
   const b = h('button', cls, html) as HTMLButtonElement;
+  title = keyless(title);
   if (title) {
     b.title = title;
     b.setAttribute('aria-label', title);

@@ -90,8 +90,10 @@
   color: var(--accent);
 }
 
-.menu-item:hover {
-  background: rgba(47, 127, 216, 0.1);
+@media (hover: hover) {
+  .menu-item:hover {
+    background: rgba(47, 127, 216, 0.1);
+  }
 }
 
 /* ------------------------------------------------------------ player */

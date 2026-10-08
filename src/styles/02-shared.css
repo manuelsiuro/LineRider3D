@@ -44,8 +44,10 @@ body.on-title .ui > * {
   transition: transform 0.15s var(--spring), background 0.2s, color 0.2s, opacity 0.2s;
 }
 
-.btn:hover {
-  background: var(--glass-strong);
+@media (hover: hover) {
+  .btn:hover {
+    background: var(--glass-strong);
+  }
 }
 
 .btn:active {
@@ -76,8 +78,10 @@ body.on-title .ui > * {
   -webkit-backdrop-filter: none;
 }
 
-.btn.flat:hover {
-  background: rgba(18, 35, 58, 0.06);
+@media (hover: hover) {
+  .btn.flat:hover {
+    background: rgba(18, 35, 58, 0.06);
+  }
 }
 
 .btn.flat.active {
@@ -129,8 +133,10 @@ body.on-title .ui > * {
   transition: transform 0.18s var(--spring), box-shadow 0.2s, background 0.2s;
 }
 
-.big-btn:hover {
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .big-btn:hover {
+    transform: translateY(-2px);
+  }
 }
 
 .big-btn:active {

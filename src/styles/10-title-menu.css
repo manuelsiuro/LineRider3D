@@ -67,15 +67,19 @@
   transition: transform 0.2s var(--spring), opacity 0.2s;
 }
 
-.menu-btn:hover {
-  transform: translateY(-2px);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 26%, white), rgba(255, 255, 255, 0.9) 70%);
-  box-shadow: 0 12px 26px -12px var(--tone-2), inset 0 0 0 1px color-mix(in srgb, var(--tone) 35%, transparent);
+@media (hover: hover) {
+  .menu-btn:hover {
+    transform: translateY(-2px);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 26%, white), rgba(255, 255, 255, 0.9) 70%);
+    box-shadow: 0 12px 26px -12px var(--tone-2), inset 0 0 0 1px color-mix(in srgb, var(--tone) 35%, transparent);
+  }
 }
 
-.menu-btn:hover > .ic:last-child {
-  opacity: 1;
-  transform: translateX(3px);
+@media (hover: hover) {
+  .menu-btn:hover > .ic:last-child {
+    opacity: 1;
+    transform: translateX(3px);
+  }
 }
 
 /* Very narrow phones: one column again (the screen scrolls if needed). */

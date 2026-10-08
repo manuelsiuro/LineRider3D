@@ -1,8 +1,21 @@
+import { TOUCH } from './dom';
 import { icon } from './icons';
 import type { Controls } from './types';
 
 const KEYCAP = { left: '←', right: '→', up: '↑' };
 const PADNAME = { left: 'Brake', right: 'Push', up: 'Spin' };
+
+/** Tips and blurbs name keys (← → ↑); on touch they name the on-screen buttons instead. */
+export function padWords(text: string) {
+  if (!TOUCH) return text;
+  const pad = (k: string) => PADNAME[k === '←' ? 'left' : k === '→' ? 'right' : 'up'];
+  return (
+    text
+      // "Brake (←)" would read "Brake (Brake)": keep the word, bold.
+      .replace(/(\w+) \(([←→↑])\)/g, (all, word: string, k: string) => (word.toLowerCase() === pad(k).toLowerCase() ? `<b>${word}</b>` : all))
+      .replace(/[←→↑]/g, (k) => `<b>${pad(k)}</b>`)
+  );
+}
 
 /** The controls panel of an intro card. */
 export function controlsHtml(c: Controls) {

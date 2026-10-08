@@ -256,7 +256,7 @@ function skis(): VehicleDef {
   return {
     id: 'skis',
     name: 'Skis',
-    blurb: 'Fast and sharp on the edges. Spin 360s with ↑ in the air, but you stand tall: land clean.',
+    blurb: 'Fast and sharp on the edges. Hold ↑ in the air for 360s, but you stand tall: land clean.',
     points,
     bones: b.bones,
     mirror: STANDARD_MIRROR,

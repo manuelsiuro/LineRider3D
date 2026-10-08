@@ -150,8 +150,10 @@
   background: rgba(255, 255, 255, 0.22);
 }
 
-.level-card:hover {
-  transform: translateY(-4px) scale(1.02);
+@media (hover: hover) {
+  .level-card:hover {
+    transform: translateY(-4px) scale(1.02);
+  }
 }
 
 .level-card.locked,
@@ -161,8 +163,10 @@
   cursor: default;
 }
 
-.level-card.locked:hover {
-  transform: none;
+@media (hover: hover) {
+  .level-card.locked:hover {
+    transform: none;
+  }
 }
 
 .level-num {
@@ -228,8 +232,10 @@
   transition: transform 0.18s var(--spring), border-color 0.2s;
 }
 
-.outfit:hover {
-  transform: translateY(-3px);
+@media (hover: hover) {
+  .outfit:hover {
+    transform: translateY(-3px);
+  }
 }
 
 .outfit.active {

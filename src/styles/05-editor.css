@@ -74,8 +74,10 @@ body.is-playing .bottom > * {
   transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
-.seg button:hover {
-  color: var(--ink);
+@media (hover: hover) {
+  .seg button:hover {
+    color: var(--ink);
+  }
 }
 
 .seg button.swatch::before {
@@ -207,9 +209,11 @@ body.is-playing .bottom > * {
   transition: background 0.2s, color 0.2s, transform 0.15s var(--spring);
 }
 
-.tool:hover {
-  background: rgba(47, 127, 216, 0.08);
-  color: var(--ink);
+@media (hover: hover) {
+  .tool:hover {
+    background: rgba(47, 127, 216, 0.08);
+    color: var(--ink);
+  }
 }
 
 .tool:active {
@@ -231,8 +235,10 @@ body.is-playing .bottom > * {
   transition: opacity 0.2s;
 }
 
-.toolbar:hover .tool kbd {
-  opacity: 0.45;
+@media (hover: hover) {
+  .toolbar:hover .tool kbd {
+    opacity: 0.45;
+  }
 }
 
 .hint {

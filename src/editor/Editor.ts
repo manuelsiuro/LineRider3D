@@ -7,6 +7,9 @@ import type { TrackView } from '../render/TrackView';
 import { buildRibbonMesh } from '../render/ribbon';
 import { History } from './History';
 import { Selection } from './Selection';
+import { TOUCH as TOUCH_DEVICE } from '../ui/dom';
+
+type ScreenPoint = { clientX: number; clientY: number };
 
 export type Tool = 'pencil' | 'line' | 'select' | 'eraser' | 'bank' | 'decor' | 'item' | 'start' | 'hand';
 export type ItemKind = 'ring' | 'star' | 'finish';
@@ -93,6 +96,11 @@ export class Editor {
   private bankDrag: { stroke: Stroke; x: number; bank0: number } | null = null;
   private erasing = false;
   private dragPointer: number | null = null;
+  /**
+   * Touch: a tap-to-place or erase waits until it is clearly one finger (lifted, or
+   * dragged for the eraser), so a pinch that starts with it changes nothing.
+   */
+  private pendingTap: PointerEvent | null = null;
 
   constructor(
     private dom: HTMLElement,
@@ -245,7 +253,7 @@ export class Editor {
 
   // ---------------------------------------------------------------- input
 
-  private setRay(e: PointerEvent) {
+  private setRay(e: ScreenPoint) {
     const r = this.dom.getBoundingClientRect();
     this.ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     this.raycaster.setFromCamera(this.ndc, this.camera);
@@ -273,7 +281,7 @@ export class Editor {
     return best;
   }
 
-  private pickStroke(e: PointerEvent): { stroke: Stroke; point: THREE.Vector3; normal: THREE.Vector3 } | null {
+  private pickStroke(e: ScreenPoint): { stroke: Stroke; point: THREE.Vector3; normal: THREE.Vector3 } | null {
     this.setRay(e);
     const hit = this.raycaster.intersectObjects(this.view.ribbons.children, false)[0];
     if (!hit) return null;
@@ -318,11 +326,23 @@ export class Editor {
         this.cancelDraw();
         this.bankDrag = null;
         this.erasing = false;
+        this.pendingTap = null;
+        if (this.selection.active) this.selection.cancel();
+        this.controls.enabled = true;
         return;
       }
     }
     if (e.button !== 0 || this.tool === 'hand') return;
     this.dragPointer = e.pointerId;
+    if (e.pointerType === 'touch' && (this.tool === 'eraser' || this.tool === 'decor' || this.tool === 'item' || this.tool === 'start')) {
+      this.pendingTap = e;
+      return;
+    }
+    this.act(e);
+  };
+
+  /** What a press does with the current tool. */
+  private act(e: PointerEvent) {
 
     switch (this.tool) {
       case 'pencil':
@@ -358,12 +378,18 @@ export class Editor {
         this.placeStart(e);
         break;
     }
-  };
+  }
 
   private onMove = (e: PointerEvent) => {
     if (e.pointerType === 'touch' && this.touches.size > 1) return;
     const active = this.dragPointer === e.pointerId;
     if (e.target === this.dom) this.lastPointer = e;
+    const tap = this.pendingTap;
+    if (tap && active && Math.hypot(e.clientX - tap.clientX, e.clientY - tap.clientY) > 8) {
+      // A drag: the eraser starts sweeping, a placing tool lets it go.
+      this.pendingTap = null;
+      if (this.tool === 'eraser') this.act(tap);
+    }
     if (active && this.selection.active) {
       this.selection.move(e);
       return;
@@ -404,6 +430,11 @@ export class Editor {
     if (e.pointerType === 'touch') this.touches.delete(e.pointerId);
     if (this.dragPointer !== e.pointerId) return;
     this.dragPointer = null;
+    if (this.pendingTap) {
+      const tap = this.pendingTap;
+      this.pendingTap = null;
+      if (e.type === 'pointerup') this.act(tap);
+    }
     if (this.selection.active) {
       this.selection.up(e);
       this.controls.enabled = true;
@@ -711,15 +742,19 @@ export class Editor {
   }
 
   /** Where a start flag would go under the pointer: on a track, or on the drawing plane. */
-  private startPoint(e: PointerEvent): THREE.Vector3 | null {
+  private startPoint(e: ScreenPoint): THREE.Vector3 | null {
     const hit = this.pickStroke(e);
     if (hit) return hit.point.clone().addScaledVector(hit.normal, 0.9);
     this.setRay(e);
     return this.raycaster.ray.intersectPlane(this.planeThrough(this.controls.target).plane, new THREE.Vector3());
   }
 
-  /** The start point under the last pointer position (for "test from here"). */
+  /** The start point under the last pointer position (for "test from here"); on touch, under the screen centre. */
   cursorPoint(): THREE.Vector3 | null {
+    if (TOUCH_DEVICE) {
+      const r = this.dom.getBoundingClientRect();
+      return this.startPoint({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 });
+    }
     return this.lastPointer ? this.startPoint(this.lastPointer) : null;
   }
 

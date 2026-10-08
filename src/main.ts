@@ -112,7 +112,7 @@ function testHere() {
   // Puzzles keep their own start.
   if (session.kind !== 'edit' || run.playing) return;
   const p = editor.cursorPoint();
-  if (!p) return ui.flash('Point at a track or the drawing grid, then press T');
+  if (!p) return ui.flash(stage.isTouch ? 'Centre a track or the drawing grid on screen, then tap Test' : 'Point at a track or the drawing grid, then press T');
   run.stop();
   if (!testStart) testStart = track.start.clone();
   loadInto(() => track.setStart(p));
@@ -265,7 +265,8 @@ const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('di
     a.href = URL.createObjectURL(blob);
     a.download = `linerider3d-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    // Safari reads the blob after the click returns.
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   },
   importTrack(file) {
     file.text().then((text) => {
@@ -860,14 +861,28 @@ async function openPhoto() {
       // Render and grab the frame in the same task (the buffer isn't preserved).
       stage.postfx.flash = 0;
       stage.postfx.render(0);
-      stage.renderer.domElement.toBlob((blob) => {
-        if (!blob) return;
+      const name = `linerider3d-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`;
+      const canvas = stage.renderer.domElement;
+      const download = (blob: Blob) => {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `linerider3d-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`;
+        a.download = name;
         a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-      }, 'image/png');
+      };
+      if (stage.isTouch && navigator.canShare) {
+        // Phones: the share sheet (save to Photos, send to a chat). Built synchronously,
+        // so the share still counts as part of the tap.
+        const bytes = atob(canvas.toDataURL('image/png').split(',')[1]);
+        const file = new File([Uint8Array.from(bytes, (c) => c.charCodeAt(0))], name, { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: 'Line Rider 3D' }).catch((err: Error) => {
+            if (err.name !== 'AbortError') download(file);
+          });
+        } else download(file);
+      } else {
+        canvas.toBlob((blob) => blob && download(blob), 'image/png');
+      }
       run.flash = 0.6;
       sound.click(true);
     },

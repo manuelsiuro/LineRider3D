@@ -1,4 +1,5 @@
 import { closeOverlay, h, hex } from '../dom';
+import { padWords } from '../controls';
 import { icon } from '../icons';
 import type { ScreenCtx, VehicleCard } from '../types';
 
@@ -13,7 +14,7 @@ export function showGarage(ctx: ScreenCtx, cards: VehicleCard[], selected: strin
           (c, i) => `<button class="ride-card ${c.id === sel ? 'active' : ''}" data-id="${c.id}" style="animation-delay:${i * 0.04}s">
             <span class="ride-icon">${icon(c.id, 40)}</span>
             <span class="ride-name">${c.name}${c.id === sel ? `<span class="ride-tag">${icon('check', 13)} Riding</span>` : ''}</span>
-            <span class="ride-blurb">${c.blurb}</span>
+            <span class="ride-blurb">${padWords(c.blurb)}</span>
             <span class="ride-stats">${bars('Speed', c.stats.speed)}${bars('Grip', c.stats.grip)}${bars('Air', c.stats.air)}${bars('Tough', c.stats.toughness)}</span>
             <span class="ride-paints">
               <span class="ride-prog">${icon('trophy', 13)} ${c.progress.done}/${c.progress.total}</span>

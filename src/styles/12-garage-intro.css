@@ -32,8 +32,10 @@
   transition: transform 0.18s var(--spring), border-color 0.2s, box-shadow 0.2s;
 }
 
-.ride-card:hover {
-  transform: translateY(-3px);
+@media (hover: hover) {
+  .ride-card:hover {
+    transform: translateY(-3px);
+  }
 }
 
 .ride-card.active {
@@ -147,8 +149,10 @@
   transition: transform 0.15s var(--spring), background 0.2s, color 0.2s, border-color 0.2s;
 }
 
-.ride-chip:hover {
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .ride-chip:hover {
+    transform: translateY(-2px);
+  }
 }
 
 .ride-chip.active {

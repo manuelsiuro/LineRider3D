@@ -32,6 +32,8 @@ export class Selection {
   private box: { x: number; y: number; el: HTMLElement } | null = null;
   private drag: { plane: THREE.Plane; from: THREE.Vector3; before: Map<number, THREE.Vector3[]> } | null = null;
   private raycaster = new THREE.Raycaster();
+  /** Taps and boxes add to the selection, as shift does (touch has no shift key). */
+  additive = false;
   /** Selection size changed (the panel shows the actions). */
   onChange?: (count: number) => void;
 
@@ -91,7 +93,8 @@ export class Selection {
 
   /** Pointer down with the Select tool; `hit` is the stroke under the pointer, if any. */
   down(e: PointerEvent, hit: { stroke: Stroke; point: THREE.Vector3 } | null) {
-    if (hit && !e.shiftKey) {
+    const add = e.shiftKey || this.additive;
+    if (hit && !add) {
       if (!this.ids.has(hit.stroke.id)) this.set([hit.stroke.id]);
       // Drag the selection on a plane facing the camera through the grabbed point.
       const normal = this.camera.getWorldDirection(new THREE.Vector3()).negate();
@@ -99,13 +102,13 @@ export class Selection {
       this.drag = { plane: new THREE.Plane().setFromNormalAndCoplanarPoint(normal, hit.point), from: hit.point.clone(), before };
       return true;
     }
-    if (hit && e.shiftKey) {
+    if (hit && add) {
       if (this.ids.has(hit.stroke.id)) this.ids.delete(hit.stroke.id);
       else this.ids.add(hit.stroke.id);
       this.changed();
       return false;
     }
-    if (!e.shiftKey) this.clear();
+    if (!add) this.clear();
     const el = document.createElement('div');
     el.className = 'select-box';
     document.body.append(el);
@@ -135,6 +138,14 @@ export class Selection {
       s.points = pts.map((p) => p.clone().add(delta));
       this.track.updateStroke(s);
     }
+  }
+
+  /** Drops a box or move in progress (a second finger turned it into a camera gesture). */
+  cancel() {
+    this.box?.el.remove();
+    this.box = null;
+    if (this.drag) this.setPoints(this.drag.before);
+    this.drag = null;
   }
 
   up(e: PointerEvent) {

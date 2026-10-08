@@ -1,5 +1,5 @@
 import { TIMES, biomeById } from '../../world/worlds';
-import { h } from '../dom';
+import { TOUCH, h } from '../dom';
 import { icon } from '../icons';
 import type { BiomeId, WorldConfig } from '../../world/worlds';
 import type { DailyCard, ScreenCtx, TitleChoice } from '../types';
@@ -39,7 +39,7 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
             ${onPhone() ? '' : `<button class="big-btn menu-btn" data-c="phone"><span class="menu-ic">${icon('phone', 18)}</span><span class="menu-label">Play on phone</span>${icon('chevronRight', 16)}</button>`}
           </div>
         </div>
-        <p class="title-foot">${icon('sound', 16)} Best with sound on · works with mouse and touch</p>
+        <p class="title-foot">${icon('sound', 16)} Best with sound on${TOUCH ? '' : ' · works with mouse and touch'}</p>
       </div>`,
     );
     overlay.onclick = (e) => {
@@ -56,7 +56,7 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
 }
 
 /** Already on a phone or tablet: no need to offer the QR code. */
-const onPhone = () => matchMedia('(hover: none) and (pointer: coarse)').matches;
+const onPhone = () => TOUCH && matchMedia('(hover: none)').matches;
 
 export function worldCaption(w: WorldConfig) {
   return `${icon(w.time, 15)}<span>${biomeById(w.biome).name}</span>·<span>${TIMES.find((t) => t.id === w.time)!.name}</span>`;

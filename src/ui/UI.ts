@@ -6,7 +6,7 @@ import type { Stats, Trick } from '../game/RunStats';
 import { GRADE_LABEL } from '../game/RunStats';
 import { icon } from './icons';
 import { BIOMES, DEFAULT_WORLD, TIMES, WEATHERS, biomeById, type WorldConfig } from '../world/worlds';
-import { KMH, METERS, button, h, overlayOpen, setText } from './dom';
+import { KMH, METERS, TOUCH, button, h, keyless, overlayOpen, setText } from './dom';
 import type { ScreenCtx, UIHandlers } from './types';
 import { confirm, showLink } from './screens/dialogs';
 import { BADGE, showTitle, worldCaption } from './screens/title';
@@ -131,8 +131,11 @@ export class UI {
     item('plus', 'New track', handlers.newTrack);
     item('sled', 'Demo track', handlers.loadDemo);
     item('share', 'Share link', () => handlers.share());
-    item('download', 'Export track', handlers.exportTrack);
-    item('upload', 'Import track', () => fileInput.click());
+    // JSON files are a desktop thing: on a phone the share link does the job.
+    if (!TOUCH) {
+      item('download', 'Export track', handlers.exportTrack);
+      item('upload', 'Import track', () => fileInput.click());
+    }
     item('gear', 'Settings', handlers.settings);
     item('help', 'How to play', () => this.showHelp());
     menuBtn.onclick = () => {
@@ -188,6 +191,12 @@ export class UI {
     this.playBtn.onclick = () => (this.playing ? handlers.pause() : handlers.play());
     const stopBtn = button('btn icon-btn flat', icon('stop', 18), 'Stop (Esc)');
     stopBtn.onclick = handlers.stop;
+    // Touch has no T key (nor a pointer to ride from): this rides from the screen centre.
+    const testBtn = button('btn icon-btn flat test-btn', icon('test', 20), 'Test from the screen centre');
+    testBtn.onclick = () => {
+      handlers.click();
+      handlers.testHere();
+    };
     const slowBtn = button('btn icon-btn flat slow-btn', icon('slow', 20), 'Slow motion');
     slowBtn.onclick = () => slowBtn.classList.toggle('active', handlers.toggleSlowMo());
     this.timeline = h('input', 'timeline') as HTMLInputElement;
@@ -198,19 +207,19 @@ export class UI {
     this.timeline.setAttribute('aria-label', 'Timeline');
     this.timeline.oninput = () => handlers.seek(Number(this.timeline.value));
     this.timeLabel = h('span', 'time', '0:00.0');
-    this.riderBtn = button(`btn icon-btn flat rider-btn ${riderMode ? 'active' : ''}`, icon('gamepad', 22), 'Rider mode: control Bosh with the arrow keys');
+    this.riderBtn = button(`btn icon-btn flat rider-btn ${riderMode ? 'active' : ''}`, icon('gamepad', 22), TOUCH ? 'Rider mode: steer Bosh with the on-screen buttons' : 'Rider mode: control Bosh with the arrow keys');
     this.riderBtn.onclick = () => {
       handlers.click();
       const on = handlers.toggleRiderMode();
       this.setRiderMode(on);
-      this.flash(on ? 'Rider mode: → push · ← brake · flip in the air' : 'Classic mode');
+      this.flash(on ? (TOUCH ? 'Rider mode: Push · Brake · flip in the air' : 'Rider mode: → push · ← brake · flip in the air') : 'Classic mode');
     };
     this.vehicleBtn = button('btn icon-btn flat vehicle-btn', icon('sled', 22), 'Ride');
     this.vehicleBtn.onclick = () => {
       handlers.click();
       handlers.cycleVehicle();
     };
-    player.append(this.playBtn, stopBtn, slowBtn, this.riderBtn, this.vehicleBtn, this.timeline, this.timeLabel);
+    player.append(this.playBtn, stopBtn, testBtn, slowBtn, this.riderBtn, this.vehicleBtn, this.timeline, this.timeLabel);
 
     // ------------------------------------------------------------ HUD
     this.hud = h(
@@ -469,13 +478,19 @@ export class UI {
         r.append(b);
       };
       const n = sel.ids.size;
-      const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
+      const mod = /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl';
       act('copy', 'Copy', `${mod} C`, n > 0, () => this.flash(`Copied ${sel.copy()} line${n > 1 ? 's' : ''}`));
       act('paste', 'Paste', `${mod} V`, sel.hasClipboard(), () => sel.paste());
       act('mirror', 'Mirror', 'M', n > 0, () => sel.mirror());
       act('smooth', 'Smooth', 'N', n > 0, () => sel.smooth());
       act('trash', 'Delete', 'Del', n > 0, () => sel.remove());
-      row().append(h('span', 'tip', n ? `${n} line${n > 1 ? 's' : ''} selected · drag one to move them · shift-click to add or remove` : 'Drag a box around lines, or click one. Shift-click adds more.'));
+      // No shift key on touch: the Add chip makes taps and boxes add to the selection.
+      if (TOUCH) toggle(r, sel.additive, 'Add', (v) => (sel.additive = v));
+      const count = `${n} line${n > 1 ? 's' : ''} selected · drag one to move them`;
+      const tip = TOUCH
+        ? n ? `${count} · turn on Add to pick more` : 'Tap a line or drag a box around lines. Turn on Add to pick more.'
+        : n ? `${count} · shift-click to add or remove` : 'Drag a box around lines, or click one. Shift-click adds more.';
+      row().append(h('span', 'tip', tip));
     } else if (tool === 'item') {
       seg(
         row(),
@@ -507,7 +522,7 @@ export class UI {
         eraser: 'Tap or drag over a track, ring or decoration to remove it.',
         bank: 'Drag a track left or right to tilt it. Snaps every 15°.',
         start: 'Tap a track or the drawing plane to move the start flag.',
-        hand: 'Drag to orbit · two fingers or right-drag to pan · pinch or wheel to zoom.',
+        hand: TOUCH ? 'Drag to orbit · two fingers to pan and zoom.' : 'Drag to orbit · right-drag to pan · wheel to zoom.',
       };
       row().append(h('span', 'tip', tips[tool] ?? ''));
     }
@@ -604,7 +619,7 @@ export class UI {
   /** Shows the current ride on the quick-switch button; `lockedBy` explains why it can't change. */
   setVehicle(id: string, name: string, lockedBy: string | null) {
     this.vehicleBtn.innerHTML = icon(id, 22);
-    this.vehicleBtn.title = lockedBy ? `${name} (${lockedBy})` : `Ride: ${name} (V to switch)`;
+    this.vehicleBtn.title = lockedBy ? `${name} (${lockedBy})` : keyless(`Ride: ${name} (V to switch)`);
     this.vehicleBtn.disabled = lockedBy !== null;
   }
 

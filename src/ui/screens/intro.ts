@@ -1,5 +1,5 @@
 import { BIOMES, TIMES, WEATHERS, biomeById } from '../../world/worlds';
-import { controlsHtml } from '../controls';
+import { controlsHtml, padWords } from '../controls';
 import { closeOverlay, h } from '../dom';
 import { icon } from '../icons';
 import type { BiomeId, WorldConfig } from '../../world/worlds';
@@ -115,7 +115,7 @@ export function showLevelIntro(ctx: ScreenCtx, number: number, name: string, tip
       `<div class="card">
         <span class="badge dark">Level ${number}</span>
         <h2>${name}</h2>
-        <p>${tip}</p>
+        <p>${padWords(tip)}</p>
         <ul class="intro-goals">${goals.map((g, i) => `<li class="${i < stars ? 'done' : ''}">${icon('star', 18)}${g}</li>`).join('')}</ul>
         <div class="medal-pick"></div>
         <div class="ride-pick"></div>

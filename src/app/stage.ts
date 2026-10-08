@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Environment } from '../world/Environment';
 import { PostFX } from '../render/PostFX';
+import { TOUCH } from '../ui/dom';
 
 /** The renderer, scene, camera and the always-there world around the track. */
 export interface Stage {
@@ -18,7 +19,7 @@ export interface Stage {
 }
 
 export function createStage(app: HTMLElement): Stage {
-  const isTouch = matchMedia('(pointer: coarse)').matches;
+  const isTouch = TOUCH;
   const lowPower = isTouch || (navigator.hardwareConcurrency ?? 8) <= 4;
 
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });

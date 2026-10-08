@@ -1,5 +1,5 @@
 import { BIOMES } from '../../world/worlds';
-import { closeOverlay, h } from '../dom';
+import { TOUCH, closeOverlay, h } from '../dom';
 import { icon } from '../icons';
 import type { ScreenCtx } from '../types';
 import { BADGE } from './title';
@@ -35,7 +35,7 @@ export function showHelp(ctx: ScreenCtx) {
       art: `<div class="help-play">
           <span class="help-play-btn">${icon('play', 40)}</span>
           <div class="help-timeline"><i></i><b></b></div>
-          <div class="help-keys-row">${cap('Space')}<span>play / pause</span></div>
+          ${TOUCH ? '' : `<div class="help-keys-row">${cap('Space')}<span>play / pause</span></div>`}
         </div>`,
       text: 'Press <b>Play</b>. Drag the timeline to rewind, try slow-mo and other cameras, then fix your track and go again.',
     },
@@ -43,13 +43,15 @@ export function showHelp(ctx: ScreenCtx) {
       title: 'Take control',
       art: `<div class="help-arrows">
           <div class="arrow-cluster">
-            <span class="up">${cap('↑', 'up')}<small>Spin</small></span>
-            <span class="left">${cap('←', 'left')}<small>Brake</small></span>
-            <span class="right">${cap('→', 'right')}<small>Push</small></span>
+            <span class="up">${cap(TOUCH ? icon('replay', 22) : '↑', 'up')}<small>Spin</small></span>
+            <span class="left">${cap(TOUCH ? icon('chevronLeft', 24) : '←', 'left')}<small>Brake</small></span>
+            <span class="right">${cap(TOUCH ? icon('chevronRight', 24) : '→', 'right')}<small>Push</small></span>
           </div>
-          <div class="air-hint">${icon('replay', 16)} In the air, <b>←</b> and <b>→</b> flip</div>
+          <div class="air-hint">${icon('replay', 16)} In the air, ${TOUCH ? '<b>Brake</b> and <b>Push</b>' : '<b>←</b> and <b>→</b>'} flip</div>
         </div>`,
-      text: 'Turn on <b>rider mode</b> to steer Bosh. <b>Let go before landing</b> and touch down flat for a Perfect.',
+      text: TOUCH
+        ? 'Turn on <b>rider mode</b> (the gamepad button) and steer Bosh with the buttons at the bottom of the screen. <b>Let go before landing</b> and touch down flat for a Perfect.'
+        : 'Turn on <b>rider mode</b> to steer Bosh. <b>Let go before landing</b> and touch down flat for a Perfect.',
     },
     {
       title: 'Rides and worlds',
@@ -59,7 +61,8 @@ export function showHelp(ctx: ScreenCtx) {
         </div>`,
       text: 'Pick one of six rides in the <b>Garage</b>. In the editor, <b>World</b> sets the landscape, time of day and weather of your track.',
     },
-    {
+    // Touch has no keyboard: the last page lists the gestures and buttons instead.
+    TOUCH ? gesturesPage() : {
       title: 'Shortcuts',
       art: `<div class="help-short">
           ${keyGroup('Play', 'play', [
@@ -146,6 +149,33 @@ export function showHelp(ctx: ScreenCtx) {
   };
   show(0);
   document.body.append(overlay);
+}
+
+/** The touch reference page: each control's icon instead of a key. */
+function gesturesPage() {
+  const group = (title: string, ic: string, items: [string, string][]) =>
+    `<section class="key-group"><h4>${icon(ic, 14)} ${title}</h4><div class="key-list">${items
+      .map(([i, label]) => `<span class="key-item"><span class="caps"><kbd class="key">${icon(i, 15)}</kbd></span><span>${label}</span></span>`)
+      .join('')}</div></section>`;
+  return {
+    title: 'Gestures',
+    art: `<div class="help-short">
+          ${group('Build', 'pencil', [
+            ['pencil', 'One finger draws'],
+            ['move', 'Two fingers orbit and zoom'],
+            ['select', '<b>Add</b> picks several lines'],
+            ['test', '<b>Test</b> rides from the centre'],
+            ['undo', 'Undo'],
+          ])}
+          ${group('Play', 'play', [
+            ['play', 'Play / pause'],
+            ['target', 'Find Bosh'],
+            ['camera', 'Camera'],
+            ['aperture', 'Photo'],
+          ])}
+        </div>`,
+    text: 'The <b>Camera</b> tool orbits with one finger and pans with two. Tap the active tool again to fold its options away.',
+  };
 }
 
 /** A titled block of key caps for the help card. */

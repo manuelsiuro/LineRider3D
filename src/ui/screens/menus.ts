@@ -1,4 +1,4 @@
-import { closeOverlay, h } from '../dom';
+import { TOUCH, closeOverlay, h, keyless } from '../dom';
 import { icon } from '../icons';
 import type { ScreenCtx, PauseChoice, SettingsView } from '../types';
 import { confirm } from './dialogs';
@@ -24,11 +24,11 @@ export function showPhotoMode(ctx: ScreenCtx, o: PhotoOptions): Promise<void> {
     const bar = h(
       'div',
       'photo-bar',
-      `<span class="photo-hint">Drag to orbit · scroll to zoom</span>
+      `<span class="photo-hint">Drag to orbit · ${TOUCH ? 'pinch' : 'scroll'} to zoom</span>
        <label class="photo-fov">${icon('camera', 16)}<input type="range" min="20" max="90" value="${Math.round(o.fov)}" aria-label="Field of view"></label>
-       <button class="chip photo-opt" data-a="time" title="Time of day (T)">${look(o.time)}</button>
-       <button class="chip photo-opt" data-a="weather" title="Weather (W)">${look(o.weather)}</button>
-       <button class="chip photo-opt" data-a="rider" title="Hide Bosh (H)">${icon('eye', 16)}<span>Bosh</span></button>
+       <button class="chip photo-opt" data-a="time" title="${keyless('Time of day (T)')}">${look(o.time)}</button>
+       <button class="chip photo-opt" data-a="weather" title="${keyless('Weather (W)')}">${look(o.weather)}</button>
+       <button class="chip photo-opt" data-a="rider" title="${keyless('Hide Bosh (H)')}">${icon('eye', 16)}<span>Bosh</span></button>
        <button class="big-btn primary" data-a="snap">${icon('aperture', 18)} Snap</button>
        <button class="big-btn ghost" data-a="exit">Done</button>`,
     );

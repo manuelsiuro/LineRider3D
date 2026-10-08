@@ -179,8 +179,10 @@
   transition: transform 0.15s var(--spring);
 }
 
-.paint:hover {
-  transform: scale(1.12);
+@media (hover: hover) {
+  .paint:hover {
+    transform: scale(1.12);
+  }
 }
 
 .paint.outfit {
