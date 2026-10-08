@@ -20,10 +20,12 @@ for (const [name, key, hold] of [['classic', 0, 0], ['backflip', INPUT.brake, 22
     sim.seek(f);
     stats.advance(sim, f, 40);
     for (const tr of stats.takeTricks()) tricks.push(`${tr.grade ?? ''} ${tr.name} +${tr.points}`);
+    for (const c of stats.takeCombos()) tricks.push(`[combo x${c.combo} ${c.lost ? 'lost' : `+${c.points}`}]`);
     if (stats.stats.still > 1.2 && f > 60) { end = f; break; }
   }
   const s = stats.stats;
   if (name !== 'push all') check(!s.crashed && s.rings === 1, `${name} on the demo track should ride clean through the ring`);
   if (name === 'frontflip') check(tricks.some((t) => t.includes('Frontflip')), 'frontflip not scored');
+  if (name === 'classic') check(tricks.some((t) => t.startsWith('[combo x4.5 +')), 'the demo chain should cash in as a x4.5 combo');
   console.log(name.padEnd(10), 'takeoff', takeoff, 'end', end, s.crashed ? 'CRASH' : 'clean', 'score', s.score, 'rings', s.rings, 'top', (s.topSpeed * 2.16).toFixed(0) + 'km/h', tricks.join(', '));
 }

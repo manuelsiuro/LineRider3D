@@ -68,6 +68,14 @@ const MIN_AIR_FRAMES = 8;
 /** Frames after touchdown without crashing for a trick to be awarded. */
 const LAND_FRAMES = 16;
 const RING_POINTS = 250;
+/** A combo chain that ended: its multiplier and the points scored in it. */
+export interface ComboEnd {
+  combo: number;
+  points: number;
+  /** Ended by a crash. */
+  lost: boolean;
+}
+
 /** Seconds to land the next trick or ring before the combo ends. */
 const COMBO_WINDOW = 3.5;
 const MAX_COMBO = 5;
@@ -149,6 +157,9 @@ export class RunStats {
   private bestTrickPoints = 0;
   private chain = 0;
   private lastActionFrame = -1e9;
+  /** Points scored in the current chain, and chains that just ended. */
+  private chainPoints = 0;
+  private combos: ComboEnd[] = [];
   private lastTrickName = '';
   private fwdA = [0, 0, 0];
   private fwdB = [0, 0, 0];
@@ -192,6 +203,8 @@ export class RunStats {
     this.bestTrickPoints = 0;
     this.chain = 0;
     this.lastActionFrame = -1e9;
+    this.chainPoints = 0;
+    this.combos = [];
     this.lastTrickName = '';
   }
 
@@ -200,6 +213,20 @@ export class RunStats {
     const t = this.touchdowns;
     this.touchdowns = [];
     return t;
+  }
+
+  /** Combo chains that ended since the last call (cashed in, or lost to a crash). */
+  takeCombos(): ComboEnd[] {
+    const q = this.combos;
+    this.combos = [];
+    return q;
+  }
+
+  /** Ends the chain; a real combo (x1.5 or more, with tricks in it) is reported. */
+  private endChain(lost: boolean) {
+    if (this.chainPoints > 0 && this.multiplier > 1) this.combos.push({ combo: this.multiplier, points: this.chainPoints, lost });
+    this.chain = 0;
+    this.chainPoints = 0;
   }
 
   /** Tricks resolved since the last call (landed or bailed). */
@@ -226,6 +253,7 @@ export class RunStats {
     const combo = this.multiplier;
     const points = Math.round((base.points * GRADE_MULT[grade] * (repeat ? 0.5 : 1) * combo) / 10) * 10;
     this.queue.push({ name: base.name, points, bailed: false, grade, combo, repeat });
+    this.chainPoints += points;
     s.score += points;
     s.tricks++;
     if (grade === 'perfect') s.perfects++;
@@ -347,6 +375,12 @@ export class RunStats {
       if (ev & EVENT.finish && !s.finished) {
         s.finished = true;
         s.finishTime = f / fps;
+        // Crossing the line cashes in the combo for the callout (scoring is unchanged:
+        // the chain itself runs on until it times out).
+        if (this.chainPoints > 0 && this.multiplier > 1) {
+          this.combos.push({ combo: this.multiplier, points: this.chainPoints, lost: false });
+          this.chainPoints = 0;
+        }
       }
       events |= ev;
       // A crash after crossing the finish doesn't spoil the run.
@@ -357,7 +391,7 @@ export class RunStats {
         const attempt = this.pending ?? (airborne ? { rotation: this.airRotation, yaw: this.airYaw, air: this.airFrames / fps } : null);
         if (attempt && (Math.abs(attempt.rotation) > Math.PI || Math.abs(attempt.yaw) > Math.PI || attempt.air > 1)) this.bail();
         this.pending = null;
-        this.chain = 0;
+        this.endChain(true);
       } else if (this.pending && f - this.pending.frame >= LAND_FRAMES) {
         const base = scoreJump(this.pending.rotation, this.pending.air, this.pending.yaw);
         if (base) this.award(base, gradeLanding(this.pending.angle, this.pending.spin), f);
@@ -365,7 +399,7 @@ export class RunStats {
       }
 
       // The combo ends when nothing happens for a while (airtime keeps it alive).
-      if (this.chain > 0 && !airborne && !this.pending && f - this.lastActionFrame > COMBO_WINDOW * fps) this.chain = 0;
+      if (this.chain > 0 && !airborne && !this.pending && f - this.lastActionFrame > COMBO_WINDOW * fps) this.endChain(false);
       this.frame = f;
     }
     s.combo = this.multiplier;

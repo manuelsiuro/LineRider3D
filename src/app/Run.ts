@@ -287,6 +287,14 @@ export class Run {
         this.flash = Math.max(this.flash, 0.15);
       }
     }
+    for (const c of runStats.takeCombos()) {
+      const label = `x${c.combo % 1 ? c.combo.toFixed(1) : c.combo}`;
+      if (c.lost) ui.popup(`COMBO ${label} LOST`, 'crash');
+      else {
+        ui.popup(`COMBO ${label} · ${c.points.toLocaleString()} PTS`, 'finish');
+        sound.success();
+      }
+    }
     for (const trick of runStats.takeTricks()) {
       ui.trick(trick);
       if (trick.bailed) continue;
