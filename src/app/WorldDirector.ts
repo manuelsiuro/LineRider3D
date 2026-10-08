@@ -53,7 +53,26 @@ export class WorldDirector {
 
   /** Shows a world right away (returns false when it was already showing). */
   apply(w: Partial<WorldConfig>, force = false) {
-    const { env, track, postfx, trackView, effects, trail, groundMarks, sim, sound } = this.c;
+    if (!this.look(w, force)) return false;
+    const { env, sim } = this.c;
+    sim.setGroundDrag(SURFACES[surfaceOf(env.config)].drag);
+    this.hooks.applied();
+    this.hooks.shown(env.config);
+    return true;
+  }
+
+  /**
+   * Photo mode: changes only how the world looks (sky, light, weather, sound),
+   * never the ground under the rider, so the run on screen stays exactly as it is.
+   */
+  preview(w: Partial<WorldConfig>) {
+    this.gen++;
+    return this.look(w, false);
+  }
+
+  /** Landscape, sky, decor style, particles and sound (no physics). */
+  private look(w: Partial<WorldConfig>, force: boolean) {
+    const { env, track, postfx, trackView, effects, trail, groundMarks, sound } = this.c;
     const footprint: THREE.Vector3[] = [];
     for (const s of track.strokes.values()) for (let i = 0; i < s.points.length; i += 2) footprint.push(s.points[i]);
     footprint.push(track.start);
@@ -65,10 +84,7 @@ export class WorldDirector {
     effects.setStyle(fx, env.atm.night);
     trail.setColor(fx.trail);
     groundMarks.setSurface(ground, env.atm.wet, env.atm.night);
-    sim.setGroundDrag(SURFACES[ground].drag);
     sound.setWorld(env.config.biome, env.config.time, env.config.weather, ground);
-    this.hooks.applied();
-    this.hooks.shown(env.config);
     return true;
   }
 

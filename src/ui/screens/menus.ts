@@ -4,41 +4,65 @@ import type { ScreenCtx, PauseChoice, SettingsView } from '../types';
 import { confirm } from './dialogs';
 
 /** Photo mode bar: field of view, snap and exit. Resolves on exit. */
-export function showPhotoMode(ctx: ScreenCtx, fov: number, onFov: (fov: number) => void, onSnap: () => void): Promise<void> {
+export interface PhotoOptions {
+  fov: number;
+  onFov(fov: number): void;
+  onSnap(): void;
+  /** Next time of day / weather; return the new label (icon id and name). */
+  cycleTime(): { icon: string; name: string };
+  cycleWeather(): { icon: string; name: string };
+  time: { icon: string; name: string };
+  weather: { icon: string; name: string };
+  /** Hides Bosh (and his ghost) for scenery shots; returns whether hidden. */
+  toggleRider(): boolean;
+}
+
+/** Photo mode bar: frame, light and weather, then snap. */
+export function showPhotoMode(ctx: ScreenCtx, o: PhotoOptions): Promise<void> {
   return new Promise((resolve) => {
+    const look = (l: { icon: string; name: string }) => `${icon(l.icon, 16)}<span>${l.name}</span>`;
     const bar = h(
       'div',
       'photo-bar',
       `<span class="photo-hint">Drag to orbit · scroll to zoom</span>
-       <label class="photo-fov">${icon('camera', 16)}<input type="range" min="20" max="90" value="${Math.round(fov)}" aria-label="Field of view"></label>
+       <label class="photo-fov">${icon('camera', 16)}<input type="range" min="20" max="90" value="${Math.round(o.fov)}" aria-label="Field of view"></label>
+       <button class="chip photo-opt" data-a="time" title="Time of day (T)">${look(o.time)}</button>
+       <button class="chip photo-opt" data-a="weather" title="Weather (W)">${look(o.weather)}</button>
+       <button class="chip photo-opt" data-a="rider" title="Hide Bosh (H)">${icon('eye', 16)}<span>Bosh</span></button>
        <button class="big-btn primary" data-a="snap">${icon('aperture', 18)} Snap</button>
        <button class="big-btn ghost" data-a="exit">Done</button>`,
     );
+    const act = (a: string | undefined) => {
+      if (a === 'snap') o.onSnap();
+      else if (a === 'time') bar.querySelector('[data-a="time"]')!.innerHTML = look(o.cycleTime());
+      else if (a === 'weather') bar.querySelector('[data-a="weather"]')!.innerHTML = look(o.cycleWeather());
+      else if (a === 'rider') bar.querySelector('[data-a="rider"]')!.classList.toggle('off', o.toggleRider());
+      else if (a === 'exit') exit();
+      if (a && a !== 'snap') ctx.click();
+    };
     const exit = () => {
       window.removeEventListener('keydown', onKey, true);
       closeOverlay(bar, 200);
       resolve();
     };
+    const KEYS: Record<string, string> = { t: 'time', w: 'weather', h: 'rider' };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
+      const k = e.key.toLowerCase();
+      if (e.key === 'Escape' || k === 'p') {
         e.stopImmediatePropagation();
         exit();
       } else if (e.code === 'Space') {
         e.preventDefault();
         e.stopImmediatePropagation();
-        onSnap();
+        o.onSnap();
+      } else if (KEYS[k] && !e.ctrlKey && !e.metaKey) {
+        e.stopImmediatePropagation();
+        act(KEYS[k]);
       }
     };
     window.addEventListener('keydown', onKey, true);
-    bar.querySelector('input')!.addEventListener('input', (e) => onFov(Number((e.target as HTMLInputElement).value)));
-    bar.onclick = (e) => {
-      const a = ((e.target as HTMLElement).closest('[data-a]') as HTMLElement | null)?.dataset.a;
-      if (a === 'snap') onSnap();
-      else if (a === 'exit') {
-        ctx.click();
-        exit();
-      }
-    };
+    bar.querySelector('input')!.addEventListener('input', (e) => o.onFov(Number((e.target as HTMLInputElement).value)));
+    bar.onclick = (e) => act(((e.target as HTMLElement).closest('[data-a]') as HTMLElement | null)?.dataset.a);
     document.body.append(bar);
   });
 }

@@ -5,7 +5,7 @@ import { CAMERA_LABELS, type CameraMode } from './render/CameraRig';
 import { STEPS_PER_SECOND } from './physics/Simulation';
 import { P } from './physics/Rider';
 import { vehicleById, type VehicleDef } from './physics/vehicles';
-import { DEFAULT_WORLD, normalizeWorld, sameWorld, surfaceOf, worldLabel, type WorldConfig } from './world/worlds';
+import { DEFAULT_WORLD, TIMES, WEATHERS, biomeById, normalizeWorld, sameWorld, surfaceOf, worldLabel, type WorldConfig } from './world/worlds';
 import { UI, type SettingsView, type SummaryInfo } from './ui/UI';
 import { METERS } from './ui/dom';
 import { resetProgress, saveSettings, type Quality as QualitySetting } from './game/settings';
@@ -811,7 +811,7 @@ function showPuzzleSummary(index: number) {
 // ------------------------------------------------------------------ photo mode, settings, pause
 let photoOn = false;
 
-/** Freezes the moment, hides the UI and lets the player frame a shot. */
+/** Freezes the moment, hides the UI and lets the player frame a shot (light and weather too). */
 async function openPhoto() {
   if (!playingGame() || photoOn || run.summaryShown) return;
   photoOn = true;
@@ -821,13 +821,23 @@ async function openPhoto() {
   rig.mode = 'follow';
   controls.target.copy(riderCenter);
   document.body.classList.add('photo');
-  await ui.showPhotoMode(
-    camera.fov,
-    (fov) => {
+  // The look can change for the shot; the world itself comes back after.
+  const original = { ...env.config };
+  const label = <T extends { id: string; name: string }>(list: T[], id: string) => ({ icon: id, name: list.find((x) => x.id === id)?.name ?? id });
+  const cycle = (key: 'time' | 'weather') => {
+    const options = key === 'time' ? TIMES.map((t) => t.id) : biomeById(env.config.biome).weathers;
+    const next = options[(options.indexOf(env.config[key] as never) + 1) % options.length];
+    worlds.preview({ ...env.config, [key]: next });
+    return key === 'time' ? label(TIMES, env.config.time) : label(WEATHERS, env.config.weather);
+  };
+  let riderHidden = false;
+  await ui.showPhotoMode({
+    fov: camera.fov,
+    onFov: (fov) => {
       camera.fov = fov;
       camera.updateProjectionMatrix();
     },
-    () => {
+    onSnap: () => {
       // Render and grab the frame in the same task (the buffer isn't preserved).
       stage.postfx.flash = 0;
       stage.postfx.render(0);
@@ -842,7 +852,18 @@ async function openPhoto() {
       run.flash = 0.6;
       sound.click(true);
     },
-  );
+    time: label(TIMES, env.config.time),
+    weather: label(WEATHERS, env.config.weather),
+    cycleTime: () => cycle('time'),
+    cycleWeather: () => cycle('weather'),
+    toggleRider: () => {
+      riderHidden = !riderHidden;
+      core.riderView.root.visible = !riderHidden;
+      return riderHidden;
+    },
+  });
+  core.riderView.root.visible = true;
+  if (!sameWorld(env.config, original)) worlds.preview(original);
   document.body.classList.remove('photo');
   rig.mode = prevMode;
   photoOn = false;
@@ -946,7 +967,7 @@ function loop(time: number) {
   if (session.kind === 'puzzle' && editor.rules) ui.setInk(editor.inkLeft(), editor.rules.ink, PUZZLES[session.index].par);
   core.trackView.update(t, riderCenter, rider.stars);
   env.update(dt, controls.target, t, camera.position);
-  worlds.updateHeadlight(game);
+  worlds.updateHeadlight(game && core.riderView.root.visible);
   ui.setTime(run.frame, sim.recorded, STEPS_PER_SECOND);
   ui.setHud(game && (run.playing || run.frame > 0) && !run.summaryShown, runStats.stats, track.stars.size);
   ui.setGap(game && !run.summaryShown ? run.gap : null);

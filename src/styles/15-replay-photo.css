@@ -132,3 +132,13 @@ body.photo .ui * {
 body.dev-shot .title-screen {
   opacity: 0 !important;
 }
+
+/* Light and weather for the shot, and hiding Bosh for scenery. */
+.photo-opt {
+  white-space: nowrap;
+}
+
+.photo-opt.off {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
