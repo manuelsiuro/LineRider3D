@@ -1,9 +1,9 @@
-import { Track } from '../src/track/Track';
-import { Simulation } from '../src/physics/Simulation';
-import { LEVELS } from '../src/levels/levels';
-import { vehicleById } from '../src/physics/vehicles';
-import { P } from '../src/physics/Rider';
-import { buildDemoTrack } from '../src/demoTrack';
+import { Track } from '../../src/track/Track';
+import { Simulation } from '../../src/physics/Simulation';
+import { LEVELS } from '../../src/levels/levels';
+import { vehicleById } from '../../src/physics/vehicles';
+import { P } from '../../src/physics/Rider';
+import { buildDemoTrack } from '../../src/demoTrack';
 
 /** Traces one vehicle on one level: npx tsx scripts/vtrace.ts moto "Ring Road" [input] */
 const v = vehicleById(process.argv[2]);

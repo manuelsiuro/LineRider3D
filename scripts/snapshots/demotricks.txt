@@ -1,0 +1,4 @@
+classic    takeoff 130 end 463 clean score 1475 rings 1 top 107km/h good Big Air +600
+backflip   takeoff 130 end 464 clean score 750 rings 1 top 106km/h 
+frontflip  takeoff 130 end 464 clean score 3875 rings 1 top 107km/h good Frontflip +3000
+push all   takeoff 130 end 136 CRASH score 0 rings 0 top 8km/h 

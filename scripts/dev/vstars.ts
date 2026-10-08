@@ -1,8 +1,8 @@
-import { Track } from '../src/track/Track';
-import { Simulation } from '../src/physics/Simulation';
-import { LEVELS } from '../src/levels/levels';
-import { VEHICLES } from '../src/physics/vehicles';
-import { P } from '../src/physics/Rider';
+import { Track } from '../../src/track/Track';
+import { Simulation } from '../../src/physics/Simulation';
+import { LEVELS } from '../../src/levels/levels';
+import { VEHICLES } from '../../src/physics/vehicles';
+import { P } from '../../src/physics/Rider';
 
 /** Closest approach of each ride to each star of a level (classic run). */
 const level = LEVELS.find((l) => l.name === (process.argv[2] ?? 'Ring Road'))!;

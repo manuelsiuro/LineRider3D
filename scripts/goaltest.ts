@@ -3,6 +3,7 @@ import { Simulation } from '../src/physics/Simulation';
 import { INPUT } from '../src/physics/Rider';
 import { RunStats } from '../src/game/RunStats';
 import { rateRun } from '../src/game/rating';
+import { check } from './assert';
 import { buildDemoTrack } from '../src/demoTrack';
 
 for (const [name, key, hold] of [['classic', 0, 0], ['backflip', INPUT.brake, 25]] as const) {
@@ -18,5 +19,7 @@ for (const [name, key, hold] of [['classic', 0, 0], ['backflip', INPUT.brake, 25
   }
   const s = stats.stats;
   const r = rateRun(t, s);
+  check(s.finished && s.stars === t.stars.size, `${name}: should finish with every star`);
+  check(r.stars === (name === 'classic' ? 2 : 3), `${name}: rated ${r.stars} stars`);
   console.log(name.padEnd(9), `stars ${s.stars}/${t.stars.size}`, s.finished ? `finish ${s.finishTime.toFixed(2)}s` : 'no finish', s.crashed ? 'CRASH' : '', 'score', s.score, '→', '★'.repeat(r.stars) + '☆'.repeat(3 - r.stars));
 }

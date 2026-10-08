@@ -1,0 +1,7 @@
+none         takeoff 130 air 1.07s rotation -89° crash 210
+backflip     takeoff 130 air 1.05s rotation 258° crash -1
+frontflip    takeoff 130 air 1.10s rotation -436° crash 210
+double back  takeoff 130 air 1.07s rotation 556° crash 174
+score none       220 good Big Air +220
+score backflip   440 perfect Big Air +440
+score frontflip  0  Bailed! +0

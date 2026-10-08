@@ -1,7 +1,7 @@
-import { Track } from '../src/track/Track';
-import { Simulation } from '../src/physics/Simulation';
-import { LEVELS } from '../src/levels/levels';
-import { vehicleById } from '../src/physics/vehicles';
+import { Track } from '../../src/track/Track';
+import { Simulation } from '../../src/physics/Simulation';
+import { LEVELS } from '../../src/levels/levels';
+import { vehicleById } from '../../src/physics/vehicles';
 
 /** Takeoffs and airtimes of a classic run: npx tsx scripts/vair2.ts "Pump Track" */
 const level = LEVELS.find((l) => l.name === process.argv[2])!;

@@ -1,0 +1,5 @@
+push flat  [0: 3km/h] [40: 17km/h] [80: 33km/h] [120: 49km/h] [160: 50km/h] [200: 50km/h]
+then brake  [100: 41km/h] [120: 20km/h] [140: 10km/h] [160: 5km/h] [180: 2km/h] [200: 1km/h]
+none       takeoff 130 landing 166 air rotation -74° crash -1
+backflip   takeoff 130 landing 166 air rotation 399° crash -1
+frontflip  takeoff 130 landing 168 air rotation -557° crash -1

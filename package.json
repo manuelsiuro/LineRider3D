@@ -7,7 +7,9 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
-    "test:physics": "tsx scripts/simtest.ts && tsx scripts/pathtest.ts && tsx scripts/typestest.ts && tsx scripts/controltest.ts && tsx scripts/fliptest.ts && tsx scripts/demotricks.ts && tsx scripts/holdscan.ts && tsx scripts/goaltest.ts && tsx scripts/ghosttest.ts && tsx scripts/levelstest.ts && tsx scripts/sharetest.ts && tsx scripts/vehicletest.ts && tsx scripts/vtricks.ts && tsx scripts/surfacetest.ts"
+    "test:physics": "tsx scripts/test.ts",
+    "test": "tsx scripts/test.ts",
+    "check": "tsc --noEmit && tsx scripts/test.ts"
   },
   "dependencies": {
     "three": "^0.186.1"

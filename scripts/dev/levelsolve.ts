@@ -1,10 +1,10 @@
-import { Track } from '../src/track/Track';
-import { Simulation } from '../src/physics/Simulation';
-import { INPUT } from '../src/physics/Rider';
-import { RunStats } from '../src/game/RunStats';
-import { rateRun } from '../src/game/rating';
-import { LEVELS } from '../src/levels/levels';
-import { vehicleById, type VehicleDef } from '../src/physics/vehicles';
+import { Track } from '../../src/track/Track';
+import { Simulation } from '../../src/physics/Simulation';
+import { INPUT } from '../../src/physics/Rider';
+import { RunStats } from '../../src/game/RunStats';
+import { rateRun } from '../../src/game/rating';
+import { LEVELS } from '../../src/levels/levels';
+import { vehicleById, type VehicleDef } from '../../src/physics/vehicles';
 
 /** Plays a level with an input plan; returns stats. */
 function play(t: Track, plan: Map<number, number>, pushAll: boolean, v?: VehicleDef) {

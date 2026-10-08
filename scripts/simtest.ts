@@ -1,6 +1,7 @@
 import { Track } from '../src/track/Track';
 import { Simulation } from '../src/physics/Simulation';
 import { buildDemoTrack } from '../src/demoTrack';
+import { check } from './assert';
 import { P } from '../src/physics/Rider';
 
 const track = new Track();
@@ -17,3 +18,5 @@ for (let f = 0; f <= 600; f++) {
   }
 }
 console.log('crash frame', crashFrame);
+check(crashFrame < 0, 'demo track ride crashed');
+check(sim.rider.pos[P.butt].x > 240, 'demo ride stopped short');

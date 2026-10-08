@@ -9,11 +9,12 @@ import { vehicleById } from '../src/physics/vehicles';
 
 /** Each level must be finishable, with all stars, in a classic (no input) run. */
 let failed = false;
+let slowest = 0;
 for (const level of LEVELS) {
   const t = new Track();
   const t0 = performance.now();
   level.build(t);
-  const buildMs = performance.now() - t0;
+  slowest = Math.max(slowest, performance.now() - t0);
   const sim = new Simulation(t, level.vehicle ? vehicleById(level.vehicle) : undefined);
   // On its home ground (sand drags more, asphalt less).
   sim.setGroundDrag(SURFACES[surfaceOf(normalizeWorld(level.world))].drag);
@@ -30,8 +31,9 @@ for (const level of LEVELS) {
   const ok = s.finished && s.stars === t.stars.size && !s.crashed;
   if (!ok) failed = true;
   console.log(
-    `${ok ? 'OK  ' : 'FAIL'} ${level.name.padEnd(14)} build ${buildMs.toFixed(0)}ms  stars ${s.stars}/${t.stars.size}  ${s.finished ? `finish ${s.finishTime.toFixed(1)}s` : 'NO FINISH'}${s.crashed ? ' CRASH' : ''}  score ${s.score}/${t.targetScore}  ${'★'.repeat(r.stars)}${'☆'.repeat(3 - r.stars)}  end x=${sim.rider.pos[6].x.toFixed(0)},y=${sim.rider.pos[6].y.toFixed(1)},z=${sim.rider.pos[6].z.toFixed(1)} f${f}`,
+    `${ok ? 'OK  ' : 'FAIL'} ${level.name.padEnd(14)} stars ${s.stars}/${t.stars.size}  ${s.finished ? `finish ${s.finishTime.toFixed(1)}s` : 'NO FINISH'}${s.crashed ? ' CRASH' : ''}  score ${s.score}/${t.targetScore}  ${'★'.repeat(r.stars)}${'☆'.repeat(3 - r.stars)}  end x=${sim.rider.pos[6].x.toFixed(0)},y=${sim.rider.pos[6].y.toFixed(1)},z=${sim.rider.pos[6].z.toFixed(1)} f${f}`,
   );
 }
 void INPUT;
+console.error(`slowest build: ${slowest.toFixed(0)}ms`);
 if (failed) process.exitCode = 1;

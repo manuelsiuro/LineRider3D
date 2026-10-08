@@ -1,7 +1,7 @@
-import { Track } from '../src/track/Track';
-import { Simulation } from '../src/physics/Simulation';
-import { LEVELS } from '../src/levels/levels';
-import { vehicleById } from '../src/physics/vehicles';
+import { Track } from '../../src/track/Track';
+import { Simulation } from '../../src/physics/Simulation';
+import { LEVELS } from '../../src/levels/levels';
+import { vehicleById } from '../../src/physics/vehicles';
 
 /** Local pose of every point (relative to the start pose) at a few frames. */
 const v = vehicleById(process.argv[2]);

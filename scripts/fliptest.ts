@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Track } from '../src/track/Track';
 import { Simulation } from '../src/physics/Simulation';
 import { INPUT, P } from '../src/physics/Rider';
+import { check } from './assert';
 import type { LineType } from '../src/track/types';
 
 /** Big kicker with a long landing: room for flips. */
@@ -57,6 +58,8 @@ for (const [name, key, hold] of [['none', 0, 0], ['backflip', INPUT.brake, 22], 
     prevFwd = fwd;
     if (r.crashed && crash < 0) crash = f;
   }
+  if (name === 'backflip') check(crash < 0 && rot > 3.5, 'a held backflip should land on the big jump');
+  if (name === 'double back') check(crash >= 0, 'over-rotating should crash');
   console.log(name.padEnd(12), 'takeoff', takeoff, 'air', ((landing - takeoff) / 40).toFixed(2) + 's', 'rotation', ((rot * 180) / Math.PI).toFixed(0) + '°', 'crash', crash);
 }
 
@@ -74,5 +77,6 @@ for (const [name, key, hold] of [['none', 0, 0], ['backflip', INPUT.brake, 22], 
     stats.advance(sim, f, 40);
     for (const tr of stats.takeTricks()) tricks.push(`${tr.grade ?? ''} ${tr.name} +${tr.points}`);
   }
+  if (name === 'backflip') check(stats.stats.score > 0, 'backflip landing should score');
   console.log('score', name.padEnd(10), stats.stats.score, tricks.join(', '));
 }

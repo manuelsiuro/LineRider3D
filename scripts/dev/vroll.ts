@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { Track } from '../src/track/Track';
-import { Simulation } from '../src/physics/Simulation';
-import { LEVELS } from '../src/levels/levels';
-import { vehicleById } from '../src/physics/vehicles';
-import { P } from '../src/physics/Rider';
+import { Track } from '../../src/track/Track';
+import { Simulation } from '../../src/physics/Simulation';
+import { LEVELS } from '../../src/levels/levels';
+import { vehicleById } from '../../src/physics/vehicles';
+import { P } from '../../src/physics/Rider';
 
 /** Roll / heading / lateral offset of a ride on a path level, frame by frame. */
 const v = vehicleById(process.argv[2]);
@@ -11,7 +11,7 @@ const t = new Track();
 LEVELS.find((l) => l.name === (process.argv[3] ?? 'Ring Road'))!.build(t);
 const [f0, f1] = (process.argv[4] ?? '200,320').split(',').map(Number);
 const sim = new Simulation(t, v);
-const near = new Set<import('../src/track/types').Segment>();
+const near = new Set<import('../../src/track/types').Segment>();
 for (let f = f0; f <= f1; f += 3) {
   sim.seek(f);
   const r = sim.rider;
@@ -23,7 +23,7 @@ for (let f = f0; f <= f1; f += 3) {
   const vel = r.pos[P.butt].clone().sub(r.prev[P.butt]);
   near.clear();
   t.querySegments(tail, near);
-  let best: import('../src/track/types').Segment | null = null;
+  let best: import('../../src/track/types').Segment | null = null;
   let bd = 1e9;
   for (const s of near) {
     if (s.wall) continue;

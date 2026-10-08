@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Track } from '../src/track/Track';
 import { Simulation } from '../src/physics/Simulation';
+import { check } from './assert';
 import { P } from '../src/physics/Rider';
 
 for (const auto of [false, true]) {
@@ -25,4 +26,8 @@ for (const auto of [false, true]) {
   let out = '';
   for (let f = 0; f <= 300; f += 30) { sim.seek(f); const b = sim.rider.pos[P.butt]; out += ` [${f}: ${b.x.toFixed(1)},${b.y.toFixed(1)},${b.z.toFixed(1)}${sim.rider.crashed ? ' X' : ''}]`; }
   console.log('autoBank', auto, out);
+  if (auto) {
+    sim.seek(150);
+    check(!sim.rider.crashed && sim.rider.pos[P.butt].z < -15, 'auto-banked turn should carry the rider round the bend');
+  }
 }

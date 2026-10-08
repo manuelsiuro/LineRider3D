@@ -7,8 +7,15 @@ Draw tracks in a snowy landscape and watch Bosh sled down them. Works on desktop
 npm install
 npm run dev            # http://localhost:5173 (also exposed on your LAN for phones)
 npm run build          # type-check + production build in dist/
-npm run test:physics   # headless checks: physics, controls, scoring, ghosts, every level
+npm test               # headless checks in parallel: physics, controls, scoring, ghosts, every level
+npm test -- level      # only tests whose file name contains "level"
+npm test -- -u         # accept intended changes as the new golden outputs
 ```
+
+The simulation is deterministic, so every test's output is compared with a golden copy in
+`scripts/snapshots/`: any drift in a trajectory, score or timing fails the run. One-off
+investigation probes live in `scripts/dev/` (run them with `npx tsx scripts/dev/<name>.ts`).
+CI (`.github/workflows/ci.yml`) runs the build and the tests on every push.
 
 ## How it plays
 

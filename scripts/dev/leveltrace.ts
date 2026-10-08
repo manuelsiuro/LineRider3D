@@ -1,7 +1,7 @@
-import { Track } from '../src/track/Track';
-import { Simulation } from '../src/physics/Simulation';
-import { P } from '../src/physics/Rider';
-import { LEVELS } from '../src/levels/levels';
+import { Track } from '../../src/track/Track';
+import { Simulation } from '../../src/physics/Simulation';
+import { P } from '../../src/physics/Rider';
+import { LEVELS } from '../../src/levels/levels';
 
 const name = process.argv[2];
 const level = LEVELS.find((l) => l.id === name)!;

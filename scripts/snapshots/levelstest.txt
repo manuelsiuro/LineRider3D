@@ -1,0 +1,25 @@
+OK   First Run      stars 4/4  finish 6.0s  score 625/600  ★★★  end x=124,y=0.5,z=0.0 f280
+OK   Little Hop     stars 3/3  finish 5.6s  score 0/3000  ★★☆  end x=139,y=0.5,z=0.0 f266
+OK   Boost Lane     stars 4/4  finish 5.0s  score 625/3000  ★★☆  end x=161,y=0.5,z=0.0 f239
+OK   Ice Age        stars 4/4  finish 6.1s  score 1500/1500  ★★★  end x=-53,y=0.0,z=-32.8 f284
+OK   Boing Boing    stars 4/4  finish 6.0s  score 0/5000  ★★☆  end x=147,y=0.5,z=0.0 f280
+OK   Flip Academy   stars 5/5  finish 6.5s  score 1475/6000  ★★☆  end x=197,y=0.2,z=0.0 f300
+OK   Ring Road      stars 5/5  finish 9.4s  score 1375/1350  ★★★  end x=186,y=0.2,z=-12.1 f419
+OK   Slalom         stars 4/4  finish 13.8s  score 1915/12000  ★★☆  end x=280,y=4.7,z=0.1 f593
+OK   Big Air Park   stars 4/4  finish 8.3s  score 2580/18000  ★★☆  end x=256,y=0.9,z=0.2 f371
+OK   Grand Finale   stars 4/4  finish 8.0s  score 2305/12000  ★★☆  end x=282,y=4.9,z=-0.1 f359
+OK   Timberline     stars 4/4  finish 9.5s  score 1125/1300  ★★☆  end x=196,y=-0.2,z=-1.2 f421
+OK   Treetop Trail  stars 4/4  finish 7.5s  score 0/4500  ★★☆  end x=198,y=0.1,z=-0.0 f339
+OK   Pump Track     stars 4/4  finish 9.5s  score 0/4000  ★★☆  end x=220,y=-1.7,z=0.0 f421
+OK   Misty Hollow   stars 4/4  finish 6.5s  score 1500/1600  ★★☆  end x=-57,y=0.0,z=37.2 f301
+OK   Boardwalk      stars 4/4  finish 6.3s  score 750/6000  ★★☆  end x=170,y=0.6,z=0.0 f292
+OK   Surf's Up      stars 5/5  finish 8.6s  score 2200/15000  ★★☆  end x=225,y=-1.9,z=0.0 f383
+OK   Sunset Cruise  stars 5/5  finish 11.4s  score 2600/6000  ★★☆  end x=276,y=4.4,z=0.5 f497
+OK   Mesa Drop      stars 4/4  finish 8.6s  score 1740/9000  ★★☆  end x=300,y=5.6,z=-0.0 f385
+OK   Canyon Jump    stars 4/4  finish 6.5s  score 2250/6000  ★★☆  end x=226,y=-2.0,z=-0.6 f303
+OK   Dune Bash      stars 3/3  finish 8.1s  score 1040/3500  ★★☆  end x=199,y=0.0,z=-0.0 f365
+OK   Quarry Run     stars 4/4  finish 8.0s  score 1000/3500  ★★☆  end x=180,y=0.6,z=-0.0 f362
+OK   Sandstorm Rally stars 4/4  finish 8.6s  score 1920/6500  ★★☆  end x=295,y=5.9,z=0.0 f386
+OK   Rooftop Run    stars 4/4  finish 9.1s  score 0/5000  ★★☆  end x=238,y=-1.6,z=-0.0 f406
+OK   Downtown Drift stars 4/4  finish 13.9s  score 1915/12000  ★★☆  end x=282,y=4.9,z=0.2 f599
+OK   Neon Nights    stars 4/4  finish 7.7s  score 3165/12000  ★★☆  end x=322,y=5.1,z=-0.0 f350

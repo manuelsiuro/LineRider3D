@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Track } from '../src/track/Track';
 import { Simulation } from '../src/physics/Simulation';
 import { INPUT, P } from '../src/physics/Rider';
+import { check } from './assert';
 import { buildDemoTrack } from '../src/demoTrack';
 
 const kmh = (sim: Simulation) => (sim.rider.velocity(new THREE.Vector3()).length() * 40 * 3.6 * 0.6).toFixed(0);
@@ -18,10 +19,13 @@ const kmh = (sim: Simulation) => (sim.rider.velocity(new THREE.Vector3()).length
   let out = '';
   for (let f = 0; f <= 200; f += 40) { sim.seek(f); out += ` [${f}: ${kmh(sim)}km/h${sim.rider.crashed ? ' X' : ''}]`; }
   console.log('push flat', out);
+  sim.seek(160);
+  check(+kmh(sim) >= 45, 'pushing on the flat should reach top speed');
   for (let f = 100; f < 200; f++) sim.setInput(f, INPUT.brake);
   out = '';
   for (let f = 100; f <= 200; f += 20) { sim.seek(f); out += ` [${f}: ${kmh(sim)}km/h${sim.rider.crashed ? ' X' : ''}]`; }
   console.log('then brake', out);
+  check(+kmh(sim) <= 3, 'braking should stop the sled');
 }
 
 // Flips over the demo jump: hold a key while airborne, then release.
@@ -48,5 +52,9 @@ for (const [name, key, hold] of [['none', 0, 0], ['backflip', INPUT.brake, 30], 
     prevFwd = fwd;
     if (r.crashed && crash < 0) crash = f;
   }
+  const deg = (rot * 180) / Math.PI;
+  check(crash < 0, `${name} over the demo jump crashed`);
+  if (name === 'backflip') check(deg > 300, `backflip rotated only ${deg.toFixed(0)}°`);
+  if (name === 'frontflip') check(deg < -300, `frontflip rotated only ${deg.toFixed(0)}°`);
   console.log(name.padEnd(10), 'takeoff', takeoff, 'landing', landing, 'air rotation', ((rot * 180) / Math.PI).toFixed(0) + '°', 'crash', crash);
 }

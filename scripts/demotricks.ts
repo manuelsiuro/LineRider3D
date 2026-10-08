@@ -2,6 +2,7 @@ import { Track } from '../src/track/Track';
 import { Simulation } from '../src/physics/Simulation';
 import { INPUT } from '../src/physics/Rider';
 import { RunStats } from '../src/game/RunStats';
+import { check } from './assert';
 import { buildDemoTrack } from '../src/demoTrack';
 
 for (const [name, key, hold] of [['classic', 0, 0], ['backflip', INPUT.brake, 22], ['frontflip', INPUT.push, 20], ['push all', INPUT.push, 999]] as const) {
@@ -22,5 +23,7 @@ for (const [name, key, hold] of [['classic', 0, 0], ['backflip', INPUT.brake, 22
     if (stats.stats.still > 1.2 && f > 60) { end = f; break; }
   }
   const s = stats.stats;
+  if (name !== 'push all') check(!s.crashed && s.rings === 1, `${name} on the demo track should ride clean through the ring`);
+  if (name === 'frontflip') check(tricks.some((t) => t.includes('Frontflip')), 'frontflip not scored');
   console.log(name.padEnd(10), 'takeoff', takeoff, 'end', end, s.crashed ? 'CRASH' : 'clean', 'score', s.score, 'rings', s.rings, 'top', (s.topSpeed * 2.16).toFixed(0) + 'km/h', tricks.join(', '));
 }
