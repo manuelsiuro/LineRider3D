@@ -48,6 +48,7 @@
 .world-chip[data-biome='beach'] { --world: #18b6c9; --world-2: #0b7fa3; }
 .world-chip[data-biome='desert'] { --world: #f08a3c; --world-2: #c4532a; }
 .world-chip[data-biome='city'] { --world: #7466f0; --world-2: #3c2fb4; }
+.world-chip[data-biome='halloween'] { --world: #ff7a1a; --world-2: #5b2a86; }
 
 .home-dot {
   position: absolute;

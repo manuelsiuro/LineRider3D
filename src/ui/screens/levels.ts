@@ -5,7 +5,7 @@ import type { BiomeId } from '../../world/worlds';
 import type { ScreenCtx, LevelCard } from '../types';
 
 /** Level select, chapter by chapter; resolves with a level index, or null to go back. */
-export function showLevels(ctx: ScreenCtx, levels: LevelCard[], stars: number): Promise<number | null> {
+export function showLevels(ctx: ScreenCtx, levels: LevelCard[], stars: number, focus?: BiomeId): Promise<number | null> {
   return new Promise((resolve) => {
     const card = (l: LevelCard, i: number) => `<button class="level-card ${l.unlocked ? '' : 'locked'}" data-world="${l.world}" data-i="${i}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${Math.min(i, 14) * 0.03}s">
           <span class="level-num">${l.unlocked ? i + 1 : icon('lock', 20)}</span>
@@ -64,5 +64,6 @@ export function showLevels(ctx: ScreenCtx, levels: LevelCard[], stars: number): 
       resolve(i);
     };
     document.body.append(overlay);
+    if (focus) overlay.querySelector(`.chapter[data-world="${focus}"]`)?.scrollIntoView({ block: 'start' });
   });
 }

@@ -17,7 +17,7 @@ export interface VehicleModel {
    * Poses the model from the simulated points. May return where the feet
    * should be drawn (e.g. on spinning pedals).
    */
-  update(p: THREE.Vector3[], basis: Basis, dt: number, crashed: boolean): { feet?: [THREE.Vector3, THREE.Vector3] } | void;
+  update(p: THREE.Vector3[], basis: Basis, dt: number, crashed: boolean, airborne?: boolean): { feet?: [THREE.Vector3, THREE.Vector3] } | void;
   dispose(): void;
 }
 
@@ -446,11 +446,106 @@ function buggyModel(world: THREE.Object3D, def: VehicleDef): VehicleModel {
   };
 }
 
+// ------------------------------------------------------------------ coffin
+/** Six-sided coffin outline (x along the ride, z across), wide at Bosh's shoulders. */
+function coffinShape(inset: number) {
+  const pts: [number, number][] = [
+    [-0.2 + inset, -0.24 + inset],
+    [0.35, -0.36 + inset],
+    [1.75 - inset, -0.2 + inset],
+    [1.75 - inset, 0.2 - inset],
+    [0.35, 0.36 - inset],
+    [-0.2 + inset, 0.24 - inset],
+  ];
+  // Shape space is (x, -z) so that extruding along +y after rotating keeps z to the right.
+  return new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z)));
+}
+
+/** Lays an extruded outline flat: shape (x, y) → model (x, z), depth → +y. */
+function slab(shape: THREE.Shape, depth: number, holes: THREE.Shape[] = []) {
+  shape.holes = holes.map((h) => new THREE.Path(h.getPoints()));
+  const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+  geo.rotateX(-Math.PI / 2);
+  return geo;
+}
+
+function coffinModel(world: THREE.Object3D): VehicleModel {
+  const group = new THREE.Group();
+  const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number) => part(group, geo, m, x, y, z);
+  // Skids underneath, like the sled.
+  for (const z of [-0.2, 0.2]) {
+    add(new THREE.BoxGeometry(1.7, 0.035, 0.035), MAT.metal, 0.75, 0.02, z);
+    const curl = add(new THREE.TorusGeometry(0.12, 0.018, 6, 10, Math.PI), MAT.metal, 1.6, 0.14, z);
+    curl.rotation.z = -Math.PI / 2;
+    for (const x of [0.1, 0.8, 1.4]) add(new THREE.BoxGeometry(0.035, 0.14, 0.035), MAT.woodDark, x, 0.09, z);
+  }
+  // Floor (satin lined) and walls.
+  add(slab(coffinShape(0), 0.06), MAT.paint, 0, 0.16, 0);
+  add(slab(coffinShape(0.05), 0.02), MAT.accent, 0, 0.22, 0);
+  add(slab(coffinShape(0), 0.4, [coffinShape(0.05)]), MAT.paint, 0, 0.22, 0);
+  add(slab(coffinShape(0), 0.03, [coffinShape(0.05)]), MAT.woodDark, 0, 0.62, 0);
+  // Brass handles along both sides.
+  for (const z of [-1, 1])
+    for (const x of [0.15, 0.75, 1.35]) {
+      const w = z * (x < 0.35 ? 0.24 + (x + 0.2) * 0.22 : 0.36 - (x - 0.35) * 0.115);
+      const h = add(new THREE.TorusGeometry(0.06, 0.014, 5, 10, Math.PI), MAT.brass, x, 0.36, w + z * 0.02);
+      h.rotation.x = z * Math.PI / 2;
+    }
+  // The lid, hinged at the head end: open behind Bosh, flapping in the air.
+  const lid = new THREE.Group();
+  lid.position.set(-0.2, 0.64, 0);
+  // Lid parts sit relative to the hinge at the head end (x = -0.2).
+  part(lid, slab(coffinShape(0), 0.05), MAT.paint, 0.2, 0, 0);
+  part(lid, slab(coffinShape(0.05), 0.01), MAT.accent, 0.2, -0.01, 0);
+  part(lid, new THREE.BoxGeometry(0.9, 0.02, 0.07), MAT.brass, 1.15, 0.06, 0);
+  part(lid, new THREE.BoxGeometry(0.07, 0.02, 0.4), MAT.brass, 0.8, 0.06, 0);
+  group.add(lid);
+  world.add(group);
+
+  let flap = 0;
+  let loose = false;
+  const vel = new THREE.Vector3();
+  const spin = new THREE.Vector3();
+  const OPEN = 1.95;
+  return {
+    group,
+    update(_p, b, dt, crashed, airborne = false) {
+      pose(group, b.origin, b.fwd, b.up, b.right);
+      if (crashed && !loose) {
+        // The lid bursts off and tumbles away.
+        loose = true;
+        world.attach(lid);
+        vel.copy(b.up).multiplyScalar(5).addScaledVector(b.fwd, -2).addScaledVector(b.right, (Math.random() - 0.5) * 3);
+        spin.set(Math.random() * 6 - 3, Math.random() * 6 - 3, 8);
+      } else if (!crashed && loose) {
+        loose = false;
+        group.add(lid);
+        lid.position.set(-0.2, 0.64, 0);
+        lid.rotation.set(0, 0, OPEN);
+      }
+      if (loose) {
+        const step = Math.min(dt, 0.05);
+        vel.y -= 14 * step;
+        lid.position.addScaledVector(vel, step);
+        lid.rotation.x += spin.x * step;
+        lid.rotation.y += spin.y * step;
+        lid.rotation.z += spin.z * step;
+        spin.multiplyScalar(1 - step * 0.8);
+        return;
+      }
+      // In the air the lid flaps; on the ground it rests open.
+      flap += dt * (airborne ? 18 : 0);
+      lid.rotation.set(0, 0, OPEN - (airborne ? 0.25 + Math.sin(flap) * 0.25 : 0));
+    },
+    dispose() {},
+  };
+}
+
 export function buildVehicleModel(def: VehicleDef, world: THREE.Object3D): VehicleModel {
   // Everything a model creates lives in one layer, removed as a whole.
   const layer = new THREE.Group();
   world.add(layer);
-  const build = { skis: skisModel, snowboard: snowboardModel, bike: bikeModel, moto: motoModel, buggy: buggyModel, sled: sledModel }[def.id];
+  const build = { skis: skisModel, snowboard: snowboardModel, bike: bikeModel, moto: motoModel, buggy: buggyModel, sled: sledModel, coffin: coffinModel }[def.id];
   const model = build(layer, def);
   return {
     group: model.group,

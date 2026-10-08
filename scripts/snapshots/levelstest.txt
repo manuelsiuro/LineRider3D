@@ -23,3 +23,8 @@ OK   Sandstorm Rally stars 4/4  finish 8.6s  score 1920/6500  ★★☆  end x=2
 OK   Rooftop Run    stars 4/4  finish 9.1s  score 0/5000  ★★☆  end x=238,y=-1.6,z=-0.0 f406
 OK   Downtown Drift stars 4/4  finish 13.9s  score 1915/12000  ★★☆  end x=282,y=4.9,z=0.2 f599
 OK   Neon Nights    stars 4/4  finish 7.7s  score 3165/12000  ★★☆  end x=322,y=5.1,z=-0.0 f350
+OK   Pumpkin Patch  stars 4/4  finish 5.8s  score 0/3500  ★★☆  end x=139,y=0.5,z=0.0 f275
+OK   Graveyard Shift stars 4/4  finish 7.5s  score 0/5000  ★★☆  end x=198,y=0.1,z=-0.0 f339
+OK   Bat Cave Drop  stars 4/4  finish 8.6s  score 1740/9000  ★★☆  end x=303,y=5.6,z=-0.0 f385
+OK   Haunted Manor  stars 4/4  finish 9.5s  score 1125/1300  ★★☆  end x=196,y=-0.2,z=-1.2 f421
+OK   Witching Hour  stars 4/4  finish 8.0s  score 2305/12000  ★★☆  end x=282,y=4.8,z=-0.1 f359

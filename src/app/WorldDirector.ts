@@ -15,6 +15,14 @@ const TITLE_WORLDS: Partial<WorldConfig>[] = [
   { biome: 'forest', time: 'night', weather: 'clear' },
 ];
 
+/** Halloween season: the tour opens in Haunted Hollow and comes back to it. */
+const SEASON_WORLDS: Partial<WorldConfig>[] = [
+  { biome: 'halloween', time: 'night', weather: 'fog' },
+  ...TITLE_WORLDS.slice(0, 3),
+  { biome: 'halloween', time: 'night', weather: 'clear' },
+  ...TITLE_WORLDS.slice(3),
+];
+
 export interface WorldHooks {
   /** A world was rebuilt (the ground, and so the physics, may have changed). */
   applied(): void;
@@ -28,6 +36,7 @@ export class WorldDirector {
   private gen = 0;
   private titleIndex = 0;
   private titleClock = 0;
+  private titleWorlds = TITLE_WORLDS;
   /** The rider's lamp after dark: a soft spot ahead of the ride. */
   private headlight = new THREE.SpotLight(0xfff1d6, 0, 46, 0.55, 0.6, 1.2);
   private lampDir = new THREE.Vector3(1, -0.15, 0);
@@ -129,10 +138,18 @@ export class WorldDirector {
     };
   }
 
+  /** Seasonal tour on or off (restarts the tour from its first world). */
+  setSeason(on: boolean) {
+    const list = on ? SEASON_WORLDS : TITLE_WORLDS;
+    if (list === this.titleWorlds) return;
+    this.titleWorlds = list;
+    this.titleIndex = 0;
+  }
+
   /** Back to the title: the tour resumes on its current world. */
   startTour() {
     this.titleClock = 0;
-    this.change(TITLE_WORLDS[this.titleIndex]);
+    this.change(this.titleWorlds[this.titleIndex]);
   }
 
   /** Next world on the title every 16 s, while `showing` (the menu itself is up). */
@@ -141,8 +158,8 @@ export class WorldDirector {
     this.titleClock += dt;
     if (this.titleClock < 16) return;
     this.titleClock = 0;
-    this.titleIndex = (this.titleIndex + 1) % TITLE_WORLDS.length;
-    this.change(TITLE_WORLDS[this.titleIndex]);
+    this.titleIndex = (this.titleIndex + 1) % this.titleWorlds.length;
+    this.change(this.titleWorlds[this.titleIndex]);
   }
 
   updateHeadlight(riding: boolean) {

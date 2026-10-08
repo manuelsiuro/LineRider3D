@@ -1,6 +1,8 @@
 import { LEVELS, chapterOf } from '../levels/levels';
 import { unlockedAchievements } from './achievements';
 import type { BiomeId } from '../world/worlds';
+import type { HeadKind } from '../render/RiderView';
+import { halloweenSeason } from './season';
 import { KEYS, readJSON, readText, writeJSON, writeText } from './storage';
 
 export interface LevelProgress {
@@ -52,10 +54,20 @@ export interface Outfit {
   scarf: number;
   hat: number;
   sled: number;
+  /** Costume pieces. */
+  head?: HeadKind;
+  skin?: number;
+  boot?: number;
+  pattern?: 'bones';
+  /** Free for everyone during this season (and kept for good once worn then). */
+  season?: 'halloween';
 }
 
 export const OUTFITS: Outfit[] = [
   { id: 'classic', name: 'Classic Bosh', stars: 0, jacket: 0x2f6fd0, pants: 0x2a2f3a, scarf: 0xe0332b, hat: 0xf2f2f2, sled: 0xb5793f },
+  // Halloween costumes: free in season, otherwise earned in Haunted Hollow.
+  { id: 'pumpkin', name: 'Pumpkin Head', stars: 0, achievement: 'trick-or-treat', season: 'halloween', head: 'pumpkin', jacket: 0x3a6a2a, pants: 0x2a2a2e, scarf: 0xff8a1a, hat: 0xff8a1a, sled: 0x5a3a22 },
+  { id: 'skeleton', name: 'Skeleton', stars: 0, achievement: 'bag-of-bones', season: 'halloween', head: 'skull', pattern: 'bones', boot: 0xeee6d2, jacket: 0x16161a, pants: 0x16161a, scarf: 0xeee6d2, hat: 0xeee6d2, sled: 0x2a2d33 },
   { id: 'arctic', name: 'Arctic Fox', stars: 4, jacket: 0xf4f7fb, pants: 0x5d7a99, scarf: 0x3fc6e8, hat: 0x3fc6e8, sled: 0xd9e4ee },
   { id: 'ruby', name: 'Ruby Rocket', stars: 8, jacket: 0xd3263a, pants: 0x1e1e26, scarf: 0xffc23d, hat: 0x1e1e26, sled: 0x2c2c34 },
   { id: 'forest', name: 'Forest Ranger', stars: 12, jacket: 0x2e7d4f, pants: 0x4a3b2a, scarf: 0xff8a3d, hat: 0xff8a3d, sled: 0x8a5a36 },
@@ -66,11 +78,18 @@ export const OUTFITS: Outfit[] = [
   { id: 'lifeguard', name: 'Lifeguard', stars: 0, achievement: 'champ-beach', hint: 'Beach', jacket: 0xe0332b, pants: 0xf2c94c, scarf: 0xffffff, hat: 0xf2c94c, sled: 0x18b6c9 },
   { id: 'nomad', name: 'Desert Nomad', stars: 0, achievement: 'champ-desert', hint: 'Desert', jacket: 0xd9b26a, pants: 0x8a5a36, scarf: 0x2f6fd0, hat: 0xf4ecd8, sled: 0xc4532a },
   { id: 'courier', name: 'Neon Courier', stars: 0, achievement: 'champ-city', hint: 'City', jacket: 0x1d1f24, pants: 0x2a2d33, scarf: 0xff3da6, hat: 0x39e6f0, sled: 0x7466f0 },
+  { id: 'count', name: 'Count Boshula', stars: 0, achievement: 'champ-halloween', hint: 'Haunted Hollow', head: 'vampire', skin: 0xdfe3e8, jacket: 0x1d1a22, pants: 0x1d1a22, scarf: 0xc8102e, hat: 0x141018, sled: 0x3a1020 },
 ];
 
-/** Is an outfit available (enough stars, and its world mastered)? */
+/** Is an outfit available (enough stars, and its world mastered)? Costumes are free in their season. */
 export function outfitUnlocked(o: Outfit, stars = totalStars(), got = unlockedAchievements()) {
+  if (o.season && (halloweenSeason() || wornCostumes().includes(o.id))) return true;
   return stars >= o.stars && (!o.achievement || !!got[o.achievement]);
+}
+
+/** Seasonal costumes worn during their season: they stay unlocked. */
+export function wornCostumes(): string[] {
+  return readJSON<string[]>(KEYS.costumes, []);
 }
 
 /** Worlds whose levels all have 3 stars. */
@@ -92,6 +111,9 @@ export function selectedOutfit(): Outfit {
 
 export function selectOutfit(id: string) {
   writeText(KEYS.outfit, id);
+  const o = OUTFITS.find((x) => x.id === id);
+  const worn = wornCostumes();
+  if (o?.season && halloweenSeason() && !worn.includes(id)) writeJSON(KEYS.costumes, [...worn, id]);
 }
 
 /** The player's chosen ride (all rides are available from the start). */

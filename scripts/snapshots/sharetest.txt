@@ -23,6 +23,11 @@ OK   Sandstorm Rally round trip, compressed
 OK   Rooftop Run    round trip, compressed
 OK   Downtown Drift round trip, compressed
 OK   Neon Nights    round trip, compressed
+OK   Pumpkin Patch  round trip, compressed
+OK   Graveyard Shift round trip, compressed
+OK   Bat Cave Drop  round trip, compressed
+OK   Haunted Manor  round trip, compressed
+OK   Witching Hour  round trip, compressed
 cut off          → That share link is incomplete: was it cut off when copied?
 garbage          → That share link is incomplete: was it cut off when copied?
 unknown encoding → That share link looks broken

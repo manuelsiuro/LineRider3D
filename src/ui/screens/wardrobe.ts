@@ -13,7 +13,8 @@ export function showWardrobe(ctx: ScreenCtx, outfits: OutfitCard[], stars: numbe
           return `<button class="outfit ${o.id === sel ? 'active' : ''} ${unlocked ? '' : 'locked'}" data-id="${o.id}" ${unlocked ? '' : 'disabled'}>
             <span class="swatches">${swatch}</span>
             <span class="outfit-name">${o.name}</span>
-            <span class="outfit-req">${unlocked ? (o.id === sel ? 'Wearing' : 'Wear') : o.world ? `${icon('lock', 13)} 3${icon('star', 13)} all ${o.world}` : `${icon('lock', 13)} ${o.stars} ${icon('star', 13)}`}</span>
+            ${o.tag ? `<span class="outfit-tag">${o.tag}</span>` : ''}
+            <span class="outfit-req">${unlocked ? (o.id === sel ? 'Wearing' : 'Wear') : o.lock ? `${icon('lock', 13)} ${o.lock}` : o.world ? `${icon('lock', 13)} 3${icon('star', 13)} all ${o.world}` : `${icon('lock', 13)} ${o.stars} ${icon('star', 13)}`}</span>
           </button>`;
         })
         .join('');

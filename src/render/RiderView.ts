@@ -14,9 +14,48 @@ export function applyPaint(main: number, accent: number) {
 /** Recolors Bosh and his ride (all player riders share these materials). */
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 
-export function applyOutfit(o: { jacket: number; pants: number; scarf: number; hat: number; sled: number }) {
-  MAT.jacket.color.setHex(o.jacket);
-  MAT.pants.color.setHex(o.pants);
+export type HeadKind = 'bosh' | 'pumpkin' | 'skull' | 'vampire';
+
+/** Black onesie with white bones printed on it (the Skeleton costume). */
+let bonesTex: THREE.CanvasTexture | null = null;
+function bonesTexture() {
+  if (bonesTex) return bonesTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#222';
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.fillStyle = '#f2ecdc';
+  // Ribs / limb bones: a bar across with knobbly ends, repeated.
+  for (let y = 4; y < 64; y += 16) {
+    ctx.fillRect(10, y + 3, 44, 5);
+    for (const x of [10, 54]) {
+      ctx.beginPath();
+      ctx.arc(x, y + 3, 3.5, 0, Math.PI * 2);
+      ctx.arc(x, y + 8, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  bonesTex = new THREE.CanvasTexture(c);
+  bonesTex.colorSpace = THREE.SRGBColorSpace;
+  bonesTex.wrapS = bonesTex.wrapT = THREE.RepeatWrapping;
+  bonesTex.repeat.set(1, 3);
+  return bonesTex;
+}
+
+export function applyOutfit(o: { jacket: number; pants: number; scarf: number; hat: number; sled: number; skin?: number; boot?: number; pattern?: 'bones' }) {
+  const bones = o.pattern === 'bones' ? bonesTexture() : null;
+  for (const m of [MAT.jacket, MAT.pants]) {
+    if (m.map !== bones) {
+      m.map = bones;
+      m.needsUpdate = true;
+    }
+  }
+  // A printed pattern shows its own colors.
+  MAT.jacket.color.setHex(bones ? 0xffffff : o.jacket);
+  MAT.pants.color.setHex(bones ? 0xffffff : o.pants);
+  MAT.skin.color.setHex(o.skin ?? 0xf2c9a0);
+  MAT.boot.color.setHex(o.boot ?? 0x3a2a1e);
   MAT.scarf.color.setHex(o.scarf);
   MAT.hat.color.setHex(o.hat);
   MAT.wood.color.setHex(o.sled);
@@ -34,6 +73,7 @@ export class RiderView {
   private thighs: Limb[];
   private shins: Limb[];
   private head = new THREE.Group();
+  private headKind: HeadKind = 'bosh';
   private hands: THREE.Mesh[];
   private feet: THREE.Mesh[];
   private scarf: THREE.Vector3[] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
@@ -59,7 +99,7 @@ export class RiderView {
     this.feet = [sphere(0.075, MAT.boot), sphere(0.075, MAT.boot)];
     for (const f of this.feet) f.scale.set(1.7, 0.9, 1);
     this.hands.forEach((hnd) => hnd.scale.set(1.1, 1, 0.9));
-    this.buildHead();
+    this.buildHead('bosh');
     this.root.add(this.head);
     this.model = buildVehicleModel(SLED, this.root);
     this.setVehicle(SLED, true);
@@ -120,7 +160,30 @@ export class RiderView {
     this.root.visible = v;
   }
 
-  private buildHead() {
+  /** Costume heads: a jack-o'-lantern, a skull or a vampire's. */
+  setHead(kind: HeadKind = 'bosh') {
+    if (kind === this.headKind) return;
+    this.headKind = kind;
+    const old = [...this.head.children];
+    for (const o of old) {
+      o.removeFromParent();
+      if (o instanceof THREE.Mesh) {
+        o.geometry.dispose();
+        // Per-head materials (eyes, glow); the shared MAT ones stay.
+        if (!Object.values(MAT).includes(o.material) && o.material !== this.ghostMat) (o.material as THREE.Material).dispose();
+      }
+    }
+    this.buildHead(kind);
+    this.applyGhostLook();
+  }
+
+  private buildHead(kind: HeadKind) {
+    const neckScarf = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.045, 6, 14), MAT.scarf);
+    neckScarf.rotation.x = Math.PI / 2;
+    neckScarf.position.y = -0.17;
+    if (kind === 'pumpkin') return this.pumpkinHead(neckScarf);
+    if (kind === 'skull') return this.skullHead(neckScarf);
+    if (kind === 'vampire') return this.vampireHead(neckScarf);
     const face = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 10), MAT.skin);
     face.castShadow = true;
     const hat = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), MAT.hat);
@@ -146,10 +209,70 @@ export class RiderView {
       this.head.add(cheek);
     }
     this.head.add(nose);
-    const neckScarf = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.045, 6, 14), MAT.scarf);
-    neckScarf.rotation.x = Math.PI / 2;
-    neckScarf.position.y = -0.17;
     this.head.add(face, hat, brim, pompom, neckScarf);
+  }
+
+  private mesh(geo: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0) {
+    const o = new THREE.Mesh(geo, m);
+    o.position.set(x, y, z);
+    o.castShadow = true;
+    this.head.add(o);
+    return o;
+  }
+
+  /** A carved jack-o'-lantern whose eyes and grin glow. */
+  private pumpkinHead(neck: THREE.Mesh) {
+    const orange = new THREE.MeshStandardMaterial({ color: 0xf07a1c, roughness: 0.6 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0xc85a10, roughness: 0.6 });
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const rib = this.mesh(new THREE.SphereGeometry(0.15, 12, 10), i % 2 ? orange : dark, Math.cos(a) * 0.07, 0.03, Math.sin(a) * 0.07);
+      rib.scale.set(0.85, 0.95, 0.85);
+    }
+    this.mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.09, 6), new THREE.MeshStandardMaterial({ color: 0x4a5a22 }), 0, 0.2, 0).rotation.z = 0.3;
+    const glow = new THREE.MeshBasicMaterial({ color: 0xffc040 });
+    for (const z of [-0.065, 0.065]) {
+      const eye = this.mesh(new THREE.ConeGeometry(0.035, 0.05, 3), glow, 0.2, 0.06, z);
+      eye.rotation.set(Math.PI, 0, -Math.PI / 2);
+      eye.castShadow = false;
+    }
+    const grin = this.mesh(new THREE.BoxGeometry(0.03, 0.03, 0.15), glow, 0.2, -0.04, 0);
+    grin.castShadow = false;
+    for (const z of [-0.04, 0.04]) this.mesh(new THREE.BoxGeometry(0.031, 0.02, 0.02), orange, 0.2, -0.03, z);
+    this.head.add(neck);
+  }
+
+  /** A grinning skull. */
+  private skullHead(neck: THREE.Mesh) {
+    const bone = new THREE.MeshStandardMaterial({ color: 0xf2ecdc, roughness: 0.55 });
+    const hole = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    const cranium = this.mesh(new THREE.SphereGeometry(0.16, 14, 10), bone, -0.01, 0.02, 0);
+    cranium.scale.set(1.05, 1, 0.95);
+    const jaw = this.mesh(new THREE.BoxGeometry(0.16, 0.08, 0.17), bone, 0.06, -0.11, 0);
+    jaw.rotation.z = 0.1;
+    for (const z of [-0.065, 0.065]) this.mesh(new THREE.SphereGeometry(0.045, 8, 6), hole, 0.125, 0.01, z).scale.set(0.6, 1, 1);
+    this.mesh(new THREE.ConeGeometry(0.022, 0.04, 3), hole, 0.15, -0.045, 0).rotation.z = Math.PI;
+    for (let i = -2; i <= 2; i++) this.mesh(new THREE.BoxGeometry(0.01, 0.035, 0.004), hole, 0.141, -0.1, i * 0.024);
+    this.head.add(neck);
+  }
+
+  /** Slicked hair, pale skin, red eyes and two little fangs. */
+  private vampireHead(neck: THREE.Mesh) {
+    this.mesh(new THREE.SphereGeometry(0.16, 14, 10), MAT.skin);
+    const hair = this.mesh(new THREE.SphereGeometry(0.168, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.42), MAT.hat, -0.01, 0.01, 0);
+    hair.rotation.z = 0.35;
+    // Widow's peak.
+    const peak = this.mesh(new THREE.ConeGeometry(0.035, 0.07, 4), MAT.hat, 0.135, 0.09, 0);
+    peak.rotation.z = Math.PI;
+    const eye = new THREE.MeshBasicMaterial({ color: 0xff2030 });
+    for (const z of [-0.06, 0.06]) this.mesh(new THREE.SphereGeometry(0.022, 6, 4), eye, 0.145, 0.0, z);
+    const fang = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    for (const z of [-0.03, 0.03]) this.mesh(new THREE.ConeGeometry(0.01, 0.035, 4), fang, 0.152, -0.075, z).rotation.z = Math.PI;
+    // A tall cape collar behind the head.
+    const cape = new THREE.MeshStandardMaterial({ color: 0x1d1a22, roughness: 0.5, side: THREE.DoubleSide });
+    const collar = this.mesh(new THREE.CylinderGeometry(0.2, 0.13, 0.22, 12, 1, true, Math.PI * 0.25, Math.PI * 1.5), cape, -0.02, -0.06, 0);
+    collar.rotation.y = Math.PI / 2;
+    this.head.add(neck);
   }
 
   /** Leg from hip to foot, bending the knee toward `bend` when the leg is short. */
@@ -191,7 +314,7 @@ export class RiderView {
   private basis: Basis = { origin: this.v.tail, fwd: this.v.fwd, up: this.v.up, right: this.v.right };
 
   /** Positions every part from the simulated points. */
-  update(dt: number, crashed: boolean) {
+  update(dt: number, crashed: boolean, airborne = false) {
     const p = this.pts;
     // Vehicle basis from the contact points.
     const tail = this.v.tail.addVectors(p[P.tailL], p[P.tailR]).multiplyScalar(0.5);
@@ -200,7 +323,7 @@ export class RiderView {
     const right = this.v.right.subVectors(p[P.tailR], p[P.tailL]);
     right.addScaledVector(fwd, -right.dot(fwd)).normalize();
     this.v.up.crossVectors(right, fwd).normalize();
-    const posed = this.model.update(p, this.basis, dt, crashed);
+    const posed = this.model.update(p, this.basis, dt, crashed, airborne);
 
     // Body.
     const shoulder = p[P.shoulder];

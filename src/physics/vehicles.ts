@@ -9,7 +9,7 @@ import * as THREE from 'three';
  * below the start point), z to the right.
  */
 
-export type VehicleId = 'sled' | 'skis' | 'snowboard' | 'bike' | 'moto' | 'buggy';
+export type VehicleId = 'sled' | 'skis' | 'snowboard' | 'bike' | 'moto' | 'buggy' | 'coffin';
 
 export const P = {
   /** Rear contact pair (sled runner tails, ski tails, rear wheel...). */
@@ -112,7 +112,7 @@ export interface VehicleDef {
   /** Wheel radius for rolling vehicles (visual and sound). */
   wheelRadius: number;
   /** Ride sound family. */
-  sound: 'sled' | 'skis' | 'board' | 'pedal' | 'engine' | 'motor';
+  sound: 'sled' | 'skis' | 'board' | 'pedal' | 'engine' | 'motor' | 'coffin';
   /** Rider stands sideways (snowboard). */
   sideways?: boolean;
   /** Visual leg length; the knees bend when the hip is closer than this. */
@@ -474,7 +474,22 @@ function buggy(): VehicleDef {
   };
 }
 
-export const VEHICLES: VehicleDef[] = [sled(), skis(), snowboard(), bike(), moto(), buggy()];
+// ------------------------------------------------------------------ coffin
+/** Bosh sits up in an open coffin: the sled's frame, heavier and tougher, slow to flip. */
+function coffin(): VehicleDef {
+  const base = sled();
+  return {
+    ...base,
+    id: 'coffin',
+    name: 'Coffin',
+    blurb: 'Rise and slide. Heavy and tough, but slow to flip with ←/→.',
+    handling: { ...BASE_HANDLING, pushAccel: 0.004, flipAccel: 0.024, flipMax: 0.25, breakStrain: 0.45 },
+    stats: { speed: 3, grip: 3, air: 2, toughness: 5 },
+    sound: 'coffin',
+  };
+}
+
+export const VEHICLES: VehicleDef[] = [sled(), skis(), snowboard(), bike(), moto(), buggy(), coffin()];
 const BY_ID = new Map(VEHICLES.map((v) => [v.id, v]));
 
 export function vehicleById(id: string | null | undefined): VehicleDef {

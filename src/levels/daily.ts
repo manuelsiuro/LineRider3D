@@ -3,7 +3,7 @@ import { Track } from '../track/Track';
 import { Simulation } from '../physics/Simulation';
 import { vehicleById, type VehicleId } from '../physics/vehicles';
 import { RunStats } from '../game/RunStats';
-import { BIOMES, SURFACES, normalizeWorld, surfaceOf, type TimeId, type WorldConfig } from '../world/worlds';
+import { BIOMES, SURFACES, biomeById, normalizeWorld, surfaceOf, type TimeId, type WorldConfig } from '../world/worlds';
 import { cosine, finish, forest, landing, profile, riderLine, star, start } from './builders';
 
 /**
@@ -66,6 +66,18 @@ const NOUNS = ['Switchback', 'Plunge', 'Rollercoaster', 'Getaway', 'Gauntlet', '
 /** Rides in the rotation (the sled twice: it is the classic). */
 const RIDES: VehicleId[] = ['sled', 'sled', 'skis', 'snowboard', 'bike', 'moto', 'buggy'];
 const TIMES: TimeId[] = ['day', 'day', 'sunset', 'dawn', 'night'];
+const SPOOKY_ADJECTIVES = ['Creepy', 'Ghoulish', 'Haunted', 'Spooky', 'Wicked', 'Eerie', 'Batty', 'Grim', 'Howling', 'Cursed', 'Moonlit', 'Shadowy', 'Bony', 'Witchy', 'Phantom'];
+const SPOOKY_NOUNS = ['Crypt', 'Gully', 'Graveyard', 'Hollow', 'Plunge', 'Nightmare', 'Descent', 'Scramble', 'Hayride', 'Fright', 'Drop', 'Lantern Run', 'Bone Rattle', 'Shortcut', 'Midnight Run'];
+
+/** Haunted Hollow joins the daily worlds from this day on (earlier dailies stay as they were). */
+const HOLLOW_FROM = '2026-10-09';
+const CLASSIC_WORLDS = BIOMES.filter((b) => b.id !== 'halloween');
+
+/** Halloween season on the daily's own UTC date (the same for every player). */
+const spookyDate = (day: string) => {
+  const [, m, d] = day.split('-').map(Number);
+  return m === 10 || (m === 11 && d <= 10);
+};
 
 type Piece = 'dip' | 'jump' | 'boost' | 'ring' | 'bump';
 
@@ -168,9 +180,16 @@ export function dailyInfo(day: string): DailyInfo {
   const rand = rng(hash(`lr3d-daily-${day}`));
   const pick = <T>(list: T[]) => list[Math.floor(rand() * list.length)];
   const vehicle = pick(RIDES);
-  const biome = pick(BIOMES);
-  const world = normalizeWorld({ biome: biome.id, time: pick(TIMES), weather: rand() < 0.65 ? biome.weathers[0] : pick(biome.weathers) });
-  return { day, number: dayNumber(day), name: `${pick(ADJECTIVES)} ${pick(NOUNS)}`, vehicle, world };
+  const hollow = day >= HOLLOW_FROM;
+  let biome = pick(hollow ? BIOMES : CLASSIC_WORLDS);
+  // In the Halloween season, half the days go to the Hollow (an extra seed keeps the rest of the pick as it was).
+  if (hollow && spookyDate(day) && (day.endsWith('-10-31') || rng(hash(`lr3d-spooky-${day}`))() < 0.5)) biome = biomeById('halloween');
+  const spooky = biome.id === 'halloween';
+  let time = pick(TIMES);
+  if (spooky && time !== 'sunset') time = 'night';
+  const world = normalizeWorld({ biome: biome.id, time, weather: rand() < 0.65 ? biome.weathers[0] : pick(biome.weathers) });
+  const name = spooky ? `${pick(SPOOKY_ADJECTIVES)} ${pick(SPOOKY_NOUNS)}` : `${pick(ADJECTIVES)} ${pick(NOUNS)}`;
+  return { day, number: dayNumber(day), name, vehicle, world };
 }
 
 /** Which attempt rides clean, and the score of an untouched run (per day). */

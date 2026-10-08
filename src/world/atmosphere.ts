@@ -17,6 +17,9 @@ export interface Atmosphere {
   sunGlow: THREE.Color;
   /** Sun disc / halo visibility (0 under clouds). */
   sunDisc: number;
+  /** Moon disc color (linear RGB) and size multiplier. */
+  moon: THREE.Color;
+  moonSize: number;
   hemiSky: THREE.Color;
   hemiGround: THREE.Color;
   hemiIntensity: number;
@@ -160,6 +163,11 @@ const BIOME: Record<BiomeId, { tints: Partial<Record<'top' | 'mid' | 'horizon' |
     fogFar: 1.35,
     saturation: -0.03,
   },
+  halloween: {
+    tints: { top: [0x3a1a5c, 0.6], mid: [0x7a4a9a, 0.5], horizon: [0xb8e070, 0.35], fog: [0x8a6aa8, 0.6], hemiGround: [0x4a3a5a, 0.7], hemiSky: [0x9a7ac8, 0.45] },
+    fogFar: 0.85,
+    saturation: -0.02,
+  },
 };
 
 const lum = (c: THREE.Color) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
@@ -210,6 +218,8 @@ export function resolveAtmosphere(w: WorldConfig): Atmosphere {
     sunIntensity: t.sunIntensity,
     sunGlow: new THREE.Color().setRGB(...t.glow),
     sunDisc: 1,
+    moon: new THREE.Color().setRGB(0.92, 0.94, 1.0),
+    moonSize: 1,
     hemiSky: c(t.hemiSky),
     hemiGround: c(t.hemiGround),
     hemiIntensity: t.hemi,
@@ -292,6 +302,21 @@ export function resolveAtmosphere(w: WorldConfig): Atmosphere {
       a.grade.highlights.set(0.03, 0.012, -0.02);
       break;
     }
+  }
+  if (w.biome === 'halloween') {
+    // A huge orange harvest moon that the fog never quite hides, and violet shadows.
+    a.moon.setRGB(1.25, 0.66, 0.26);
+    a.moonSize = 3;
+    a.sunDisc = Math.max(a.sunDisc, 0.75);
+    if (w.time === 'night') {
+      // Bright enough to see the graves: a strong violet moonlight.
+      a.sunColor.lerp(c(0xd0b0ff), 0.5);
+      a.sunIntensity *= 1.8;
+      a.hemiIntensity *= 1.6;
+      a.exposure += 0.12;
+    }
+    a.grade.shadows.set(0.012, -0.01, 0.04);
+    a.grade.vignette += 0.1;
   }
   return a;
 }

@@ -1,5 +1,5 @@
 import type { VehicleId } from '../physics/vehicles';
-import type { BiomeId, WorldConfig } from '../world/worlds';
+import { BIOMES, type BiomeId, type WorldConfig } from '../world/worlds';
 import type { Stats } from './RunStats';
 import { PUZZLES } from '../levels/puzzles';
 import { KEYS, readJSON, writeJSON } from './storage';
@@ -50,6 +50,7 @@ const KMH = 3.6 * 0.6;
 const landed = (c: RunContext, re: RegExp) => c.tricks.some((t) => re.test(t));
 const finishedLevel = (c: RunContext, id: string) => c.ended && c.stats.finished && !c.stats.crashed && c.levelId === id;
 const on = (c: RunContext, v: VehicleId) => c.vehicle === v;
+const hollowFinish = (c: RunContext) => c.ended && c.stats.finished && !c.stats.crashed && c.levelId !== null && c.world.biome === 'halloween';
 
 export const ACHIEVEMENTS: Achievement[] = [
   // ---------------------------------------------------------------- general
@@ -67,12 +68,12 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'rival', title: 'Rival', desc: "Beat a friend's challenge score.", check: (c) => c.ended && c.beatChallenge },
 
   // ---------------------------------------------------------------- worlds
-  { id: 'tourist', title: 'Tourist', desc: 'Ride in all five worlds.', check: (c) => c.worldsRidden >= 5 },
+  { id: 'tourist', title: 'Tourist', desc: 'Ride in every world.', check: (c) => c.worldsRidden >= BIOMES.length },
   { id: 'puzzle-1', title: 'Handy', desc: 'Fix your first puzzle track.', check: (c) => c.puzzlesSolved >= 1 },
   { id: 'puzzle-all', title: 'Master Builder', desc: 'Earn 3 stars on every puzzle.', check: (c) => c.puzzlesPerfect >= PUZZLES.length },
   { id: 'daily-3', title: 'Regular', desc: 'Ride the daily 3 days in a row.', check: (c) => c.dailyStreak >= 3 },
   { id: 'daily-7', title: 'Every Single Day', desc: 'Ride the daily 7 days in a row.', check: (c) => c.dailyStreak >= 7 },
-  { id: 'globetrotter', title: 'Globetrotter', desc: 'Finish a level in every world.', check: (c) => c.worldsFinished >= 5 },
+  { id: 'globetrotter', title: 'Globetrotter', desc: 'Finish a level in every world.', check: (c) => c.worldsFinished >= BIOMES.length },
   { id: 'night-owl', title: 'Night Owl', desc: 'Finish a level at night.', check: (c) => c.ended && c.stats.finished && !c.stats.crashed && c.levelId !== null && c.world.time === 'night' },
   {
     id: 'storm-chaser',
@@ -84,6 +85,11 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'champ-beach', title: 'Beach Legend', desc: '3 stars on every Beach level.', check: (c) => !!c.champion.beach },
   { id: 'champ-desert', title: 'Desert Fox', desc: '3 stars on every Desert level.', check: (c) => !!c.champion.desert },
   { id: 'champ-city', title: 'City Slicker', desc: '3 stars on every City level.', check: (c) => !!c.champion.city },
+  { id: 'champ-halloween', title: 'Pumpkin King', desc: '3 stars on every Haunted Hollow level.', check: (c) => !!c.champion.halloween },
+
+  // ---------------------------------------------------------------- haunted hollow
+  { id: 'trick-or-treat', title: 'Trick or Treat', desc: 'Finish a level in Haunted Hollow.', check: (c) => hollowFinish(c) },
+  { id: 'bag-of-bones', title: 'Bag of Bones', desc: 'Land 3 flips in one run in Haunted Hollow.', check: (c) => c.world.biome === 'halloween' && c.tricks.filter((t) => /flip/i.test(t)).length >= 3 },
 
   // ---------------------------------------------------------------- sled
   { id: 'sled-legend', ride: 'sled', title: 'Old School', desc: 'Earn 3 stars on a level with the sled.', check: (c) => on(c, 'sled') && c.ended && c.rating === 3 && c.levelId !== null },
@@ -216,6 +222,11 @@ export const PAINTS: Record<VehicleId, Paint[]> = {
     { id: 'factory', name: 'Outfit match', need: 0, colors: null },
     { id: 'desert', name: 'Desert', need: 1, colors: [0xd9b26a, 0x3a2a12] },
     { id: 'racing', name: 'Racing Green', need: 3, colors: [0x1f6b45, 0xf2c94c] },
+  ],
+  coffin: [
+    { id: 'factory', name: 'Mahogany', need: 0, colors: [0x5a2a1a, 0x6a2a8a] },
+    { id: 'vampire', name: 'Vampire', need: 1, colors: [0x1d1a22, 0xc8102e] },
+    { id: 'bone', name: 'Bone White', need: 3, colors: [0xeee6d2, 0x2a2d33] },
   ],
 };
 

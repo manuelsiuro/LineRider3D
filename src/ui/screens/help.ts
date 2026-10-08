@@ -1,4 +1,5 @@
 import { BIOMES } from '../../world/worlds';
+import { VEHICLES } from '../../physics/vehicles';
 import { TOUCH, closeOverlay, h } from '../dom';
 import { icon } from '../icons';
 import type { ScreenCtx } from '../types';
@@ -56,10 +57,10 @@ export function showHelp(ctx: ScreenCtx) {
     {
       title: 'Rides and worlds',
       art: `<div class="help-explore">
-          <div class="row">${['sled', 'skis', 'snowboard', 'bike', 'moto', 'buggy'].map((v) => `<span class="ride">${icon(v, 24)}</span>`).join('')}</div>
+          <div class="row">${VEHICLES.map((v) => v.id).map((v) => `<span class="ride">${icon(v, 24)}</span>`).join('')}</div>
           <div class="row">${BIOMES.map((b) => `<span class="world" data-world="${b.id}">${icon(BADGE[b.id], 22)}</span>`).join('')}</div>
         </div>`,
-      text: 'Pick one of six rides in the <b>Garage</b>. In the editor, <b>World</b> sets the landscape, time of day and weather of your track.',
+      text: `Pick one of ${VEHICLES.length === 7 ? 'seven' : VEHICLES.length} rides in the <b>Garage</b>. In the editor, <b>World</b> sets the landscape, time of day and weather of your track.`,
     },
     // Touch has no keyboard: the last page lists the gestures and buttons instead.
     TOUCH ? gesturesPage() : {

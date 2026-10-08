@@ -105,6 +105,7 @@
 .gallery-ic[data-world='beach'] { background: linear-gradient(160deg, #5fd8e0, #1b98b0); }
 .gallery-ic[data-world='desert'] { background: linear-gradient(160deg, #ffb066, #d9692a); }
 .gallery-ic[data-world='city'] { background: linear-gradient(160deg, #a08cff, #5b3fd6); }
+.gallery-ic[data-world='halloween'] { background: linear-gradient(160deg, #ff9a3d, #5b2a86); }
 
 .gallery-name,
 .gallery-rename {

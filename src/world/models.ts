@@ -72,6 +72,21 @@ export const M = {
   tire: mat(0x1d1f24, { roughness: 0.95 }),
   headlight: glowMat(0xfff6d8, 0xfff1c0, 1.4),
   taillight: glowMat(0xff4a3a, 0xff2010, 1.4),
+  // Haunted Hollow
+  pumpkin: mat(0xf07a1c),
+  pumpkinDark: mat(0xc85a10),
+  pumpkinStem: mat(0x4a5a22),
+  jackGlow: glowMat(0xffc040, 0xff8a10, 2.4),
+  grave: mat(0x8a8f99),
+  graveDark: mat(0x5d626c),
+  deadBark: mat(0x3a2e2a),
+  sheet: mat(0xeef0f6, { transparent: true, opacity: 0.88, flatShading: false }),
+  iron: mat(0x26232c, { metalness: 0.4, roughness: 0.6 }),
+  brew: glowMat(0x7dff6a, 0x44ff30, 2.0),
+  straw: mat(0xd8b45a),
+  plaid: mat(0x8a3a5a),
+  candle: mat(0xf2ead2),
+  flame: glowMat(0xffd27a, 0xffa020, 2.6),
 };
 
 /** Paint jobs for cars, huts and buildings (picked by variant). */
@@ -701,6 +716,175 @@ function planter(o: DecorOptions): THREE.Group {
   return g;
 }
 
+// ------------------------------------------------------------------ haunted hollow
+
+/** A jack-o'-lantern: ribbed pumpkin with a glowing carved face. */
+function pumpkin(o: DecorOptions): THREE.Group {
+  const g = new THREE.Group();
+  const s = 0.8 + ((o.variant ?? 0) % 3) * 0.2;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const rib = mesh(new THREE.SphereGeometry(0.42 * s, 8, 6), i % 2 ? M.pumpkin : M.pumpkinDark, Math.cos(a) * 0.2 * s, 0.42 * s, Math.sin(a) * 0.2 * s);
+    rib.scale.set(0.8, 0.85, 0.8);
+    g.add(rib);
+  }
+  stick(g, [0, 0.75 * s, 0], [0.08 * s, 1.0 * s, 0.04 * s], 0.06 * s, M.pumpkinStem, 0.04 * s);
+  // Face toward +x (the camera side of most tracks) and +z.
+  const face = (rot: number) => {
+    const f = new THREE.Group();
+    const eye = new THREE.ConeGeometry(0.09 * s, 0.14 * s, 3);
+    for (const z of [-0.14, 0.14]) {
+      const e = mesh(eye, M.jackGlow, 0.5 * s, 0.52 * s, z * s);
+      e.rotation.z = -Math.PI / 2;
+      e.rotation.x = Math.PI;
+      e.castShadow = false;
+      f.add(e);
+    }
+    const mouth = mesh(new THREE.BoxGeometry(0.06 * s, 0.07 * s, 0.34 * s), M.jackGlow, 0.5 * s, 0.32 * s, 0);
+    mouth.castShadow = false;
+    f.add(mouth);
+    f.rotation.y = rot;
+    g.add(f);
+  };
+  face(0);
+  face(-Math.PI / 2);
+  return g;
+}
+
+/** A leaning gravestone, rounded or a cross. */
+function tombstone(o: DecorOptions): THREE.Group {
+  const g = new THREE.Group();
+  const v = o.variant ?? 0;
+  if (v % 3 === 2) {
+    g.add(mesh(new THREE.BoxGeometry(0.22, 1.5, 0.22), M.grave, 0, 0.75, 0));
+    g.add(mesh(new THREE.BoxGeometry(0.22, 0.22, 0.9), M.grave, 0, 1.1, 0));
+  } else {
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.45, 0);
+    shape.lineTo(-0.45, 0.9);
+    shape.absarc(0, 0.9, 0.45, Math.PI, 0, true);
+    shape.lineTo(0.45, 0);
+    const stone = mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.18, bevelEnabled: false }), v % 2 ? M.graveDark : M.grave, 0, 0, -0.09);
+    stone.rotation.y = Math.PI / 2;
+    g.add(stone);
+    g.add(mesh(new THREE.BoxGeometry(0.03, 0.08, 0.5), M.graveDark, 0.1, 0.95, 0));
+  }
+  g.add(mesh(new THREE.BoxGeometry(0.6, 0.12, 1.0), o.snowy ? M.snow : M.moss, 0.25, 0.04, 0));
+  g.rotation.z = 0.08 * ((v % 5) - 2);
+  return g;
+}
+
+/** A gnarled, leafless tree. */
+function deadtree(o: DecorOptions): THREE.Group {
+  const g = new THREE.Group();
+  const v = o.variant ?? 0;
+  g.add(mesh(new THREE.CylinderGeometry(0.16, 0.38, 3.2, 6), M.deadBark, 0, 1.6, 0));
+  const branches: [number, number, number, number, number, number][] = [
+    [0, 2.4, 0, 1.3, 3.6, 0.4],
+    [0, 2.0, 0, -1.2, 3.1, -0.3],
+    [0, 3.0, 0, 0.3, 4.4, -0.6],
+    [0, 1.6, 0, -0.6, 2.2, 1.0],
+  ];
+  branches.forEach(([x, y, z, bx, by, bz], i) => {
+    const k = 1 + ((v + i) % 3) * 0.12;
+    stick(g, [x, y, z], [bx * k, by, bz * k], 0.1, M.deadBark, 0.03, 5);
+    stick(g, [bx * k, by, bz * k], [bx * k * 1.35, by + 0.5, bz * k + 0.3], 0.04, M.deadBark, 0.015, 4);
+  });
+  if (o.snowy) g.add(blob(0.3, M.snow, 0, 3.25, 0, 0.4, 2));
+  return g;
+}
+
+/** A floating bedsheet ghost. */
+function ghost(o: DecorOptions): THREE.Group {
+  const g = new THREE.Group();
+  const lift = 0.9 + ((o.variant ?? 0) % 3) * 0.3;
+  const head = mesh(new THREE.SphereGeometry(0.55, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.sheet, 0, lift + 1.1, 0);
+  head.castShadow = false;
+  g.add(head);
+  const body = mesh(new THREE.CylinderGeometry(0.55, 0.75, 1.1, 12, 1, true), M.sheet, 0, lift + 0.55, 0);
+  // A ragged hem.
+  const p = body.geometry.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) p.setY(i, p.getY(i) - 0.15 * Math.abs(Math.sin(i * 1.7)));
+  body.castShadow = false;
+  g.add(body);
+  for (const z of [-0.18, 0.18]) g.add(mesh(new THREE.SphereGeometry(0.09, 6, 5), M.coal, 0.48, lift + 1.25, z));
+  g.add(mesh(new THREE.SphereGeometry(0.11, 6, 5), M.coal, 0.5, lift + 1.0, 0));
+  return g;
+}
+
+/** A witch's cauldron bubbling with green brew. */
+function cauldron(): THREE.Group {
+  const g = new THREE.Group();
+  const pot = mesh(new THREE.SphereGeometry(0.7, 12, 8, 0, Math.PI * 2, Math.PI * 0.25, Math.PI * 0.75), M.iron, 0, 0.75, 0);
+  g.add(pot);
+  g.add(mesh(new THREE.TorusGeometry(0.5, 0.06, 6, 14), M.iron, 0, 1.25, 0)).rotation.x = Math.PI / 2;
+  const brew = mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.05, 14), M.brew, 0, 1.2, 0);
+  brew.castShadow = false;
+  g.add(brew);
+  for (let i = 0; i < 4; i++) g.add(mesh(new THREE.SphereGeometry(0.08 + (i % 2) * 0.04, 6, 4), M.brew, Math.cos(i * 1.9) * 0.25, 1.27, Math.sin(i * 1.9) * 0.25));
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2;
+    stick(g, [Math.cos(a) * 0.45, 0.3, Math.sin(a) * 0.45], [Math.cos(a) * 0.55, 0, Math.sin(a) * 0.55], 0.06, M.iron);
+  }
+  // Embers under the pot.
+  g.add(mesh(new THREE.ConeGeometry(0.3, 0.35, 5), M.flame, 0, 0.12, 0));
+  return g;
+}
+
+/** A scarecrow with a pumpkin head. */
+function scarecrow(): THREE.Group {
+  const g = new THREE.Group();
+  stick(g, [0, 0, 0], [0, 2.4, 0], 0.07, M.woodDark);
+  stick(g, [0, 1.8, -1.0], [0, 1.8, 1.0], 0.06, M.woodDark);
+  g.add(mesh(new THREE.BoxGeometry(0.4, 0.9, 0.8), M.plaid, 0, 1.55, 0));
+  for (const z of [-0.95, 0.95]) g.add(mesh(new THREE.ConeGeometry(0.12, 0.3, 5), M.straw, 0, 1.78, z)).rotation.x = (z > 0 ? -1 : 1) * Math.PI / 2;
+  g.add(mesh(new THREE.ConeGeometry(0.25, 0.4, 6), M.straw, 0, 1.0, 0));
+  const head = pumpkin({ variant: 0 });
+  head.scale.setScalar(0.6);
+  head.position.set(0, 1.95, 0);
+  g.add(head);
+  const hat = mesh(new THREE.ConeGeometry(0.32, 0.6, 7), M.coal, 0, 2.75, 0);
+  hat.rotation.z = 0.2;
+  g.add(hat);
+  g.add(mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.04, 10), M.coal, 0, 2.47, 0));
+  return g;
+}
+
+/** A small stone crypt with a glowing doorway. */
+function crypt(o: DecorOptions): THREE.Group {
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.BoxGeometry(2.4, 2.0, 2.2), M.grave, 0, 1.0, 0));
+  const roof = mesh(new THREE.CylinderGeometry(0.01, 1.75, 1.0, 4), M.graveDark, 0, 2.5, 0);
+  roof.rotation.y = Math.PI / 4;
+  roof.scale.z = 0.95;
+  g.add(roof);
+  if (o.snowy) g.add(mesh(new THREE.CylinderGeometry(0.01, 1.6, 0.6, 4), M.snow, 0, 2.75, 0)).rotation.y = Math.PI / 4;
+  g.add(mesh(new THREE.BoxGeometry(0.06, 1.2, 0.7), M.flame, 1.2, 0.6, 0));
+  for (const z of [-0.6, 0.6]) g.add(mesh(new THREE.BoxGeometry(0.3, 1.9, 0.3), M.graveDark, 1.25, 0.95, z));
+  g.add(mesh(new THREE.BoxGeometry(0.05, 0.4, 0.14), M.graveDark, 1.24, 2.15, 0));
+  g.add(mesh(new THREE.BoxGeometry(0.05, 0.14, 0.4), M.graveDark, 1.24, 2.2, 0));
+  return g;
+}
+
+/** A cluster of dripping candles. */
+function candles(): THREE.Group {
+  const g = new THREE.Group();
+  const set: [number, number, number][] = [
+    [0, 0, 0.8],
+    [0.3, 0.2, 0.55],
+    [-0.25, 0.25, 0.4],
+    [0.1, -0.3, 0.65],
+  ];
+  for (const [x, z, h] of set) {
+    g.add(mesh(new THREE.CylinderGeometry(0.08, 0.09, h, 7), M.candle, x, h / 2, z));
+    const f = mesh(new THREE.ConeGeometry(0.05, 0.16, 5), M.flame, x, h + 0.1, z);
+    f.castShadow = false;
+    g.add(f);
+  }
+  g.add(mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.06, 10), M.candle, 0.05, 0.03, 0));
+  return g;
+}
+
 const BUILDERS: Record<DecorKind, (o: DecorOptions) => THREE.Group> = {
   pine,
   snowman,
@@ -733,6 +917,14 @@ const BUILDERS: Record<DecorKind, (o: DecorOptions) => THREE.Group> = {
   billboard,
   car,
   planter,
+  pumpkin,
+  tombstone,
+  deadtree,
+  ghost,
+  cauldron,
+  scarecrow,
+  crypt,
+  candles,
 };
 
 export const DECOR_LABELS: Record<DecorKind, string> = {
@@ -767,6 +959,14 @@ export const DECOR_LABELS: Record<DecorKind, string> = {
   billboard: '🪧 Billboard',
   car: '🚗 Car',
   planter: '🌳 Planter',
+  pumpkin: '🎃 Pumpkin',
+  tombstone: '🪦 Gravestone',
+  deadtree: '🥀 Dead tree',
+  ghost: '👻 Ghost',
+  cauldron: '🧪 Cauldron',
+  scarecrow: '🌾 Scarecrow',
+  crypt: '⚰️ Crypt',
+  candles: '🕯️ Candles',
 };
 
 export const isDecorKind = (k: unknown): k is DecorKind => typeof k === 'string' && Object.hasOwn(BUILDERS, k);
@@ -811,6 +1011,14 @@ const ROLE: Record<DecorKind, Role> = {
   streetlight: 'light',
   flag: 'flag',
   sign: 'flag',
+  deadtree: 'tree',
+  pumpkin: 'small',
+  ghost: 'small',
+  cauldron: 'small',
+  candles: 'light',
+  tombstone: 'rock',
+  crypt: 'building',
+  scarecrow: 'flag',
 };
 
 const NATIVE: Record<BiomeId, Record<Role, DecorKind[]>> = {
@@ -819,6 +1027,7 @@ const NATIVE: Record<BiomeId, Record<Role, DecorKind[]>> = {
   beach: { tree: ['palm'], small: ['umbrella', 'deckchair', 'surfboard'], building: ['hut', 'lifeguard', 'hut'], rock: ['rock'], light: ['lamp'], flag: ['flag'] },
   desert: { tree: ['cactus', 'cactus', 'barrel'], small: ['barrel', 'tumbleweed', 'skull'], building: ['windmill'], rock: ['mesa', 'rock'], light: ['lamp'], flag: ['flag'] },
   city: { tree: ['planter'], small: ['cone'], building: ['tower', 'tower', 'billboard'], rock: ['car'], light: ['streetlight'], flag: ['flag'] },
+  halloween: { tree: ['deadtree'], small: ['pumpkin', 'ghost', 'pumpkin', 'cauldron'], building: ['crypt'], rock: ['tombstone', 'rock', 'tombstone'], light: ['candles'], flag: ['scarecrow'] },
 };
 
 /**

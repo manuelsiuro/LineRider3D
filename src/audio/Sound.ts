@@ -9,10 +9,10 @@
 import { KEYS, readFlag, writeFlag } from '../game/storage';
 import type { BiomeId, SurfaceId, TimeId, WeatherId } from '../world/worlds';
 
-type Voice = 'bell' | 'pluck' | 'marimba' | 'twang' | 'keys';
+type Voice = 'bell' | 'pluck' | 'marimba' | 'twang' | 'keys' | 'organ';
 
 /** Music of each world: pad chords, a melodic voice and its scale. */
-const MUSIC: Record<BiomeId, { chords: number[][]; notes: number[]; voice: Voice; beat?: boolean }> = {
+const MUSIC: Record<BiomeId, { chords: number[][]; notes: number[]; voice: Voice; beat?: 'lofi' | 'heart' }> = {
   // Cmaj7 Am7 Fmaj7 G with sleigh-like bells.
   alpine: { chords: [[48, 55, 59, 64], [45, 52, 55, 60], [41, 48, 52, 57], [43, 50, 55, 59]], notes: [72, 74, 76, 79, 81, 84, 86, 88], voice: 'bell' },
   // G Em C D, plucked folk pentatonic.
@@ -22,7 +22,9 @@ const MUSIC: Record<BiomeId, { chords: number[][]; notes: number[]; voice: Voice
   // E phrygian: E F G E, twangy.
   desert: { chords: [[40, 47, 52, 55], [41, 48, 53, 57], [43, 50, 55, 59], [40, 47, 52, 56]], notes: [64, 65, 67, 69, 71, 72, 76, 77], voice: 'twang' },
   // Dm9 G13 Cmaj9 A7, lo-fi keys over a soft beat.
-  city: { chords: [[50, 53, 57, 60, 64], [43, 53, 57, 59, 64], [48, 52, 55, 59, 62], [45, 49, 55, 57, 61]], notes: [62, 64, 65, 69, 72, 74, 76, 77], voice: 'keys', beat: true },
+  city: { chords: [[50, 53, 57, 60, 64], [43, 53, 57, 59, 64], [48, 52, 55, 59, 62], [45, 49, 55, 57, 61]], notes: [62, 64, 65, 69, 72, 74, 76, 77], voice: 'keys', beat: 'lofi' },
+  // Dm Bb Gm A7b9 in D harmonic minor: a haunted organ over a slow heartbeat.
+  halloween: { chords: [[38, 45, 50, 53], [34, 46, 50, 53], [43, 46, 50, 55], [45, 49, 52, 55, 58]], notes: [62, 64, 65, 69, 70, 73, 74, 77], voice: 'organ', beat: 'heart' },
 };
 
 /** How each ground sounds under the rider: filter and loudness. */
@@ -33,7 +35,7 @@ const GROUND: Record<SurfaceId, { type: BiquadFilterType; freq: number; q: numbe
   asphalt: { type: 'lowpass', freq: 380, q: 1.6, gain: 1.15 },
 };
 
-const WIND: Record<BiomeId, number> = { alpine: 0.025, forest: 0.012, beach: 0.02, desert: 0.032, city: 0.01 };
+const WIND: Record<BiomeId, number> = { alpine: 0.025, forest: 0.012, beach: 0.02, desert: 0.032, city: 0.01, halloween: 0.03 };
 
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
@@ -42,7 +44,7 @@ interface Layer {
   filter: BiquadFilterNode;
 }
 
-export type RideSound = 'sled' | 'skis' | 'board' | 'pedal' | 'engine' | 'motor';
+export type RideSound = 'sled' | 'skis' | 'board' | 'pedal' | 'engine' | 'motor' | 'coffin';
 
 interface Engine {
   gain: GainNode;
@@ -359,6 +361,27 @@ export class Sound {
           case 'alpine':
             if (!night && !wet && r() < 0.3) this.chirp('sine', 3200, 2600, t, 0.12, 0.01);
             break;
+          case 'halloween': {
+            const pick = r();
+            if (pick < 0.3) {
+              // An owl: hoo, hoo-hoo.
+              for (const [k, d] of [[0, 0.4], [0.7, 0.18], [0.95, 0.45]]) this.chirp('sine', 400, 360, t + k, d, 0.03);
+            } else if (pick < 0.45) {
+              // A wolf howls far away.
+              this.chirp('sawtooth', 420, 760, t, 0.9, 0.006, 900);
+              this.chirp('sawtooth', 760, 520, t + 0.9, 1.6, 0.006, 900);
+            } else if (pick < 0.65) {
+              // A rusty gate creaks.
+              for (let k = 0; k < 3; k++) this.chirp('sawtooth', 260 + r() * 120, 180 + r() * 80, t + k * 0.22, 0.2, 0.01, 1300);
+            } else if (pick < 0.75) {
+              // A church bell tolls in the distance.
+              this.chirp('sine', 196, 195, t, 3.5, 0.025);
+              this.chirp('sine', 466, 465, t, 2.2, 0.008);
+            } else if (night) {
+              for (let k = 0; k < 6; k++) this.chirp('sine', 4400, 4300, t + k * 0.07, 0.04, 0.01);
+            }
+            break;
+          }
         }
       }
       this.ambientTimer = window.setTimeout(next, 2500 + Math.random() * 5500);
@@ -389,8 +412,10 @@ export class Sound {
     if (this.biome === 'beach') this.surf.filter.frequency.setTargetAtTime(380 + 260 * (0.5 + 0.5 * Math.sin(t * 0.7)), t, 0.3);
     this.wind.filter.frequency.setTargetAtTime(350 + s * 1600, t, 0.2);
     // Runners scrape, skis and boards hiss lower, tyres hum.
-    const scrapeFreq = kind === 'sled' ? 2200 + s * 2500 : wheels ? 300 + s * 500 : 1100 + s * 1400;
-    const scrapeGain = kind === 'sled' ? Math.min(0.05 + s * 0.12, 0.16) : wheels ? Math.min(0.03 + s * 0.08, 0.1) : Math.min(0.06 + s * 0.14, 0.2);
+    // The coffin is a wooden box dragged along: low and creaky.
+    if (kind === 'coffin' && playing && onTrack && speed > 3 && Math.random() < dt * 0.5) this.chirp('sawtooth', 240 + Math.random() * 90, 170, t, 0.25, 0.012, 900);
+    const scrapeFreq = kind === 'coffin' ? 700 + s * 900 : kind === 'sled' ? 2200 + s * 2500 : wheels ? 300 + s * 500 : 1100 + s * 1400;
+    const scrapeGain = kind === 'sled' || kind === 'coffin' ? Math.min(0.05 + s * 0.12, 0.16) : wheels ? Math.min(0.03 + s * 0.08, 0.1) : Math.min(0.06 + s * 0.14, 0.2);
     this.scrape.gain.gain.setTargetAtTime(onTrack && playing ? scrapeGain : 0, t, 0.04);
     this.scrape.filter.frequency.setTargetAtTime(scrapeFreq, t, 0.1);
     const ground = GROUND[this.ground].gain;
@@ -695,9 +720,24 @@ export class Sound {
       this.bellTimer = window.setTimeout(playBell, (900 + Math.random() * 1600) * slow);
     };
     // City: a soft lo-fi beat (kick on 1 and 3, a hat on the off-beats).
+    // Haunted Hollow: a slow heartbeat, lub-dub.
     const beat = () => {
       const ctx = this.ctx!;
-      if (this.musicOn && MUSIC[this.biome].beat && !document.hidden) {
+      const kind = MUSIC[this.biome].beat;
+      if (this.musicOn && kind === 'heart' && !document.hidden) {
+        const t = ctx.currentTime + 0.02;
+        const step = this.beatStep++ % 8;
+        if (step === 0 || step === 1) {
+          const osc = ctx.createOscillator();
+          osc.frequency.setValueAtTime(step === 0 ? 70 : 60, t);
+          osc.frequency.exponentialRampToValueAtTime(34, t + 0.16);
+          const g = ctx.createGain();
+          this.env(g, t, step === 0 ? 0.08 : 0.06, 0.006, 0.22);
+          osc.connect(g).connect(this.music);
+          osc.start(t);
+          osc.stop(t + 0.3);
+        }
+      } else if (this.musicOn && kind === 'lofi' && !document.hidden) {
         const t = ctx.currentTime + 0.02;
         const step = this.beatStep++ % 8;
         if (step % 4 === 0 || (step === 6 && Math.random() < 0.4)) {
@@ -770,6 +810,12 @@ export class Sound {
       case 'keys':
         tone('sine', f, 0.03, 1.6);
         tone('triangle', f * 2, 0.008, 0.8, 1800);
+        break;
+      case 'organ':
+        // Drawbars: fundamental, octave and a fifth above, slightly reedy.
+        tone('sine', f, 0.026, 1.8);
+        tone('sine', f * 2, 0.012, 1.5);
+        tone('square', f * 3, 0.003, 1.2, 1600);
         break;
     }
   }

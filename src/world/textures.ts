@@ -123,6 +123,38 @@ function grass(): GroundTextures {
   return { map, normal, normalScale: 0.8, roughness: 0.95, color: 0xffffff };
 }
 
+/** Dark, mossy graveyard grass strewn with dead orange leaves. */
+function grave(): GroundTextures {
+  const size = 256;
+  const big = valueNoise(size, 6, 41);
+  const mid = valueNoise(size, 24, 42);
+  const fine = valueNoise(size, 128, 43);
+  const rand = rng(44);
+  const blades = new Float32Array(size * size).map(() => rand());
+  const leaves = new Float32Array(size * size).map(() => rand());
+  const map = colorMap(size, (x, y, c) => {
+    const i = y * size + x;
+    const g = big[i] * 0.5 + mid[i] * 0.35 + fine[i] * 0.3;
+    const blade = blades[i] > 0.85 ? 0.08 : blades[i] < 0.1 ? -0.08 : 0;
+    c[0] = 0.24 + g * 0.1 + blade * 0.5;
+    c[1] = 0.3 + g * 0.12 + blade;
+    c[2] = 0.2 + g * 0.08 + blade * 0.4;
+    // Bare earth patches and fallen leaves.
+    if (mid[i] > 0.74) {
+      c[0] = 0.25 + g * 0.06;
+      c[1] = 0.23 + g * 0.06;
+      c[2] = 0.2;
+    }
+    if (leaves[i] > 0.992) {
+      c[0] = 0.8;
+      c[1] = 0.38 + fine[i] * 0.2;
+      c[2] = 0.1;
+    }
+  });
+  const normal = normalMap(size, (x, y) => fine[y * size + x] * 0.6 + blades[y * size + x] * 0.35, 4);
+  return { map, normal, normalScale: 0.8, roughness: 0.95, color: 0xffffff };
+}
+
 /** Wind ripples in fine sand. */
 function sand(seed: number, tone: [number, number, number]): GroundTextures {
   const size = 256;
@@ -175,7 +207,7 @@ function concrete(): GroundTextures {
 
 const cache = new Map<string, GroundTextures>();
 
-export type GroundKind = 'snow' | 'grass' | 'sand' | 'redsand' | 'concrete';
+export type GroundKind = 'snow' | 'grass' | 'sand' | 'redsand' | 'concrete' | 'grave';
 
 /** Ground textures, made once and shared. */
 export function groundTextures(kind: GroundKind): GroundTextures {
@@ -186,6 +218,8 @@ export function groundTextures(kind: GroundKind): GroundTextures {
         ? snow()
         : kind === 'grass'
           ? grass()
+          : kind === 'grave'
+            ? grave()
           : kind === 'sand'
             ? sand(61, [0.93, 0.84, 0.64])
             : kind === 'redsand'

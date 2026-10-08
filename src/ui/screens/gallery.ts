@@ -1,9 +1,10 @@
+import { BIOMES as WORLDS } from '../../world/worlds';
 import { closeOverlay, h } from '../dom';
 import { icon } from '../icons';
 import type { GalleryActions, GalleryCard, ScreenCtx } from '../types';
 import { confirm } from './dialogs';
 
-const BIOMES = new Set(['alpine', 'forest', 'beach', 'desert', 'city']);
+const BIOMES = new Set<string>(WORLDS.map((b) => b.id));
 
 /** "just now", "5 min ago", "yesterday", "12 Mar". */
 function ago(t: number) {

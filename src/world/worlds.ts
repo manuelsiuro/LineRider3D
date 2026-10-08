@@ -1,6 +1,6 @@
 import type { DecorKind } from '../track/types';
 
-export type BiomeId = 'alpine' | 'forest' | 'beach' | 'desert' | 'city';
+export type BiomeId = 'alpine' | 'forest' | 'beach' | 'desert' | 'city' | 'halloween';
 export type TimeId = 'dawn' | 'day' | 'sunset' | 'night';
 export type WeatherId = 'clear' | 'snow' | 'rain' | 'fog' | 'storm' | 'sandstorm';
 export type SurfaceId = 'snow' | 'grass' | 'sand' | 'asphalt';
@@ -22,6 +22,8 @@ export interface BiomeDef {
   weathers: WeatherId[];
   /** Decor that belongs here (editor palette and level scatter). */
   decor: DecorKind[];
+  /** Time of day it switches to when picked (otherwise the time stays). */
+  time?: TimeId;
 }
 
 export const BIOMES: BiomeDef[] = [
@@ -64,6 +66,15 @@ export const BIOMES: BiomeDef[] = [
     surface: 'asphalt',
     weathers: ['clear', 'rain', 'fog', 'snow', 'storm'],
     decor: ['tower', 'streetlight', 'cone', 'billboard', 'car', 'planter', 'lamp', 'flag'],
+  },
+  {
+    id: 'halloween',
+    name: 'Haunted Hollow',
+    blurb: 'Crooked graves, grinning pumpkins and something in the fog.',
+    surface: 'grass',
+    weathers: ['fog', 'clear', 'rain', 'storm'],
+    decor: ['pumpkin', 'tombstone', 'deadtree', 'ghost', 'cauldron', 'scarecrow', 'crypt', 'candles', 'rock'],
+    time: 'night',
   },
 ];
 

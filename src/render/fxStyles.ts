@@ -77,6 +77,16 @@ const BASE: Record<WorldConfig['biome'], FxStyle> = {
     sparks: true,
     puff: { size: 0.9, life: 0.6, gravity: -7, drag: 3, rise: 0.7 },
   },
+  // Dark earth and orange leaves, ghostly mist, pumpkin and witch-purple sparkles.
+  halloween: {
+    ground: [s(0.3, 0.24, 0.22), s(0.2, 0.16, 0.18)],
+    bits: [s(0.9, 0.45, 0.1), s(0.55, 0.25, 0.6)],
+    spray: [s(0.75, 0.7, 0.85), s(0.6, 0.55, 0.72)],
+    sparkle: [c(1.8, 0.8, 0.2), c(1.1, 0.4, 1.7)],
+    trail: c(0.85, 0.45, 1),
+    sparks: false,
+    puff: { size: 1.2, life: 1.3, gravity: -3, drag: 2, rise: 0.8 },
+  },
 };
 
 const SNOW = BASE.alpine;
@@ -93,7 +103,7 @@ export function fxStyle(w: WorldConfig, wet: number): FxStyle {
     return {
       ...base,
       spray: WATER,
-      ground: w.biome === 'forest' || w.biome === 'alpine' ? MUD : base.ground,
+      ground: w.biome === 'forest' || w.biome === 'alpine' || w.biome === 'halloween' ? MUD : base.ground,
       puff: { ...base.puff, size: base.puff.size * 0.7, life: base.puff.life * 0.6, gravity: -9, drag: 2.5 },
     };
   }

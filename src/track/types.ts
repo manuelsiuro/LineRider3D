@@ -39,7 +39,8 @@ export type DecorKind =
   | 'oak' | 'birch' | 'bush' | 'log' | 'mushroom' | 'sign'
   | 'palm' | 'umbrella' | 'surfboard' | 'hut' | 'lifeguard' | 'deckchair'
   | 'cactus' | 'barrel' | 'mesa' | 'tumbleweed' | 'skull' | 'windmill'
-  | 'tower' | 'streetlight' | 'cone' | 'billboard' | 'car' | 'planter';
+  | 'tower' | 'streetlight' | 'cone' | 'billboard' | 'car' | 'planter'
+  | 'pumpkin' | 'tombstone' | 'deadtree' | 'ghost' | 'cauldron' | 'scarecrow' | 'crypt' | 'candles';
 
 /** A ring in space that launches the rider along its axis. */
 export interface Ring {

@@ -14,8 +14,8 @@ export interface RideHooks {
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-const MARK_WIDTH: Record<VehicleDef['id'], number> = { sled: 0.07, skis: 0.07, snowboard: 0.18, bike: 0.08, moto: 0.12, buggy: 0.17 };
-const PUSH_LABEL: Record<VehicleDef['id'], string> = { sled: 'Push', skis: 'Skate', snowboard: 'Push', bike: 'Pedal', moto: 'Throttle', buggy: 'Gas' };
+const MARK_WIDTH: Record<VehicleDef['id'], number> = { sled: 0.07, skis: 0.07, snowboard: 0.18, bike: 0.08, moto: 0.12, buggy: 0.17, coffin: 0.08 };
+const PUSH_LABEL: Record<VehicleDef['id'], string> = { sled: 'Push', skis: 'Skate', snowboard: 'Push', bike: 'Pedal', moto: 'Throttle', buggy: 'Gas', coffin: 'Push' };
 
 /** The ride in use: the player's choice, or the one a level or challenge sets. */
 export class Rides {
@@ -47,7 +47,10 @@ export class Rides {
 
   /** Outfit colors, then the ride's paint job on top. */
   dress() {
-    applyOutfit(selectedOutfit());
+    const o = selectedOutfit();
+    applyOutfit(o);
+    this.c.riderView.setHead(o.head);
+    this.c.ghostView.setHead(o.head);
     const p = paintFor(this.current.id);
     if (p.colors) applyPaint(p.colors[0], p.colors[1]);
   }

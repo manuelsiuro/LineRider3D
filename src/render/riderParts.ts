@@ -26,6 +26,8 @@ export const MAT = {
   light: new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff1c0, emissiveIntensity: 1.6 }),
   base: mat(0xf4f4f6, 0.4),
   nose: mat(0xf0a080),
+  /** Coffin fittings. */
+  brass: mat(0xc9a24a, 0.45, 0.35),
 };
 
 export const UP = new THREE.Vector3(0, 1, 0);

@@ -1,0 +1,115 @@
+/* ------------------------------------------------------------ halloween season */
+/* Only while the season is on (body.season-halloween): the title dresses up. */
+.season-halloween .title-screen {
+  overflow-x: hidden;
+  background: radial-gradient(ellipse at 50% 42%, rgba(255, 170, 90, 0.32), rgba(60, 20, 90, 0.08) 60%),
+    linear-gradient(180deg, rgba(40, 10, 60, 0.45), transparent 32%, transparent 68%, rgba(30, 8, 40, 0.5));
+}
+
+.season-halloween .logo h1 {
+  text-shadow: 0 3px 0 #c8561a, 0 6px 0 #7a2a8a, 0 18px 40px rgba(40, 8, 60, 0.6);
+}
+
+.season-halloween .logo h1 span {
+  background: linear-gradient(180deg, #8a4ad8, #5b2a86);
+  box-shadow: 0 6px 0 #3a1658, 0 14px 30px -6px rgba(91, 42, 134, 0.8);
+}
+
+.season-halloween .tagline {
+  color: #ffe2c4;
+}
+
+/* The pumpkin badge glows like a lantern. */
+.logo-mark[data-world='halloween'] .ic,
+.brand-mark[data-world='halloween'] .ic {
+  filter: drop-shadow(0 0 6px rgba(255, 200, 80, 0.8));
+  animation: sway 5s ease-in-out infinite, lantern 2.6s ease-in-out infinite;
+}
+
+@keyframes lantern {
+  50% {
+    filter: drop-shadow(0 0 2px rgba(255, 200, 80, 0.4));
+  }
+}
+
+/* Bats flutter across the logo. */
+.season-halloween .logo {
+  position: relative;
+}
+
+.season-halloween .logo::before,
+.season-halloween .logo::after {
+  content: '';
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  width: 34px;
+  height: 18px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 12'%3E%3Cpath d='M12 4c-.8 0-1.4-.6-1.6-1.4L9.8 1l-.6 2.2C7.5 2.3 5 2 2 3.5c2 .8 3 2.2 3 4 1.2-1 2.6-1 3.8 0 .6-1 1.8-1.3 3.2-.5 1.4-.8 2.6-.5 3.2.5 1.2-1 2.6-1 3.8 0 0-1.8 1-3.2 3-4-3-1.5-5.5-1.2-7.2-.3L14.2 1l-.6 1.6C13.4 3.4 12.8 4 12 4Z' fill='%231a0d22'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  pointer-events: none;
+  animation: bat-fly 9s linear infinite;
+}
+
+.season-halloween .logo::after {
+  top: 45%;
+  width: 24px;
+  animation-duration: 12s;
+  animation-delay: -5s;
+}
+
+@keyframes bat-fly {
+  0% {
+    transform: translate(-260px, 30px) scaleY(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  25% {
+    transform: translate(-120px, -20px) scaleY(0.4);
+  }
+  50% {
+    transform: translate(0, 10px) scaleY(1);
+  }
+  75% {
+    transform: translate(120px, -30px) scaleY(0.4);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(260px, 0) scaleY(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .season-halloween .logo::before,
+  .season-halloween .logo::after {
+    display: none;
+  }
+}
+
+/* Title entry to the Haunted Hollow chapter. */
+.big-btn.season-btn {
+  background: linear-gradient(180deg, #ff8a2a, #c8501a 55%, #6a2a8a);
+  box-shadow: 0 10px 24px -8px rgba(200, 80, 26, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.season-btn .daily-ic .ic {
+  filter: drop-shadow(0 0 4px rgba(255, 220, 120, 0.9));
+}
+
+/* A phone on its side: one more button on the title, so the menu tightens up. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .title-actions:has(.season-btn) {
+    gap: 6px;
+  }
+  .title-actions:has(.season-btn) > .big-btn {
+    height: 42px;
+  }
+  .title-actions:has(.season-btn) > .big-btn.daily-btn {
+    height: 46px;
+  }
+}

@@ -20,6 +20,8 @@ export const KEYS = {
   daily: 'lr3d.daily',
   medals: 'lr3d.medals',
   puzzles: 'lr3d.puzzles',
+  /** Seasonal costumes worn in their season (kept unlocked). */
+  costumes: 'lr3d.costumes',
   // Preferences and the editor track (kept on reset).
   settings: 'lr3d.settings',
   vehicle: 'lr3d.vehicle',
@@ -40,7 +42,7 @@ export const slotKey = (id: string): SlotKey => `lr3d.slot.${id}`;
 export type StorageKey = (typeof KEYS)[keyof typeof KEYS] | SlotKey;
 
 /** The keys "Reset progress" wipes. */
-export const PROGRESS_KEYS: StorageKey[] = [KEYS.progress, KEYS.best, KEYS.ghosts, KEYS.outfit, KEYS.achievements, KEYS.paint, KEYS.counters, KEYS.daily, KEYS.medals, KEYS.puzzles];
+export const PROGRESS_KEYS: StorageKey[] = [KEYS.progress, KEYS.best, KEYS.ghosts, KEYS.outfit, KEYS.achievements, KEYS.paint, KEYS.counters, KEYS.daily, KEYS.medals, KEYS.puzzles, KEYS.costumes];
 
 export function readText(key: StorageKey): string | null {
   try {

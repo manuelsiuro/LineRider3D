@@ -1,7 +1,7 @@
 import type { WorldConfig } from '../world/worlds';
 import type { BiomeId } from '../world/worlds';
 
-export type TitleChoice = 'daily' | 'puzzles' | 'gallery' | 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies' | 'phone';
+export type TitleChoice = 'daily' | 'puzzles' | 'gallery' | 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies' | 'phone' | 'season';
 export type PauseChoice = 'resume' | 'restart' | 'settings' | 'levels' | 'menu';
 
 export interface UIHandlers {
@@ -83,6 +83,7 @@ export interface SettingsView {
   camera: string;
   cameraDistance: number;
   reducedMotion: boolean;
+  seasonal: string;
 }
 
 export interface VehicleCard {
@@ -159,6 +160,10 @@ export interface OutfitCard {
   unlocked: boolean;
   /** World to master, for world outfits. */
   world?: string;
+  /** How to unlock it, when that isn't stars or a world (e.g. an achievement). */
+  lock?: string;
+  /** Small label on the card, e.g. a seasonal costume. */
+  tag?: string;
 }
 
 /** What every screen needs from the UI shell. */

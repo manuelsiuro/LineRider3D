@@ -137,6 +137,10 @@ export function showSettings(ctx: ScreenCtx, s: SettingsView, onChange: (s: Sett
             <label class="row toggle"><span>Reduced motion<small>No shake, zoom punches or flashes</small></span><input type="checkbox" data-name="reducedMotion" ${s.reducedMotion ? 'checked' : ''}><i></i></label>
           </section>
           <section>
+            <h3>Events</h3>
+            <div class="row"><span>Seasonal events<small>Halloween look from Oct 1 to Nov 10</small></span>${seg('seasonal', [['auto', 'Auto'], ['off', 'Off']], s.seasonal)}</div>
+          </section>
+          <section>
             <h3>Progress</h3>
             <div class="row"><span>Reset stars, bests and ghosts</span><button class="big-btn danger small-btn" data-reset>Reset</button></div>
           </section>

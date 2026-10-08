@@ -6,12 +6,13 @@ import { city } from './backdrops/city';
 import { disposeTree, rng, setKeepOut, type Backdrop, type BackdropCtx } from './backdrops/common';
 import { desert } from './backdrops/desert';
 import { forest } from './backdrops/forest';
+import { halloween } from './backdrops/halloween';
 import { terrainHeight } from './terrain';
 import { groundTextures } from './textures';
 import { Weather } from './Weather';
 import { DEFAULT_WORLD, normalizeWorld, sameWorld, type BiomeId, type WorldConfig } from './worlds';
 
-const BACKDROPS: Record<BiomeId, (ctx: BackdropCtx) => Backdrop> = { alpine, forest, beach, desert, city };
+const BACKDROPS: Record<BiomeId, (ctx: BackdropCtx) => Backdrop> = { alpine, forest, beach, desert, city, halloween };
 
 export type Detail = 'low' | 'medium' | 'high';
 const DETAIL: Record<Detail, number> = { low: 0.35, medium: 0.6, high: 1 };
@@ -161,6 +162,8 @@ export class Environment {
     u.sunDir.value.copy(atm.sunOffset).normalize();
     u.sunGlow.value.copy(atm.sunGlow);
     u.sunDisc.value = atm.sunDisc;
+    u.moonCol.value.copy(atm.moon);
+    u.moonSize.value = atm.moonSize;
     u.night.value = atm.night;
     u.overcast.value = atm.overcast;
 
@@ -275,12 +278,14 @@ export class Environment {
         sunDir: { value: new THREE.Vector3(0, 1, 0) },
         sunGlow: { value: new THREE.Color() },
         sunDisc: { value: 1 },
+        moonCol: { value: new THREE.Color(0.92, 0.94, 1.0) },
+        moonSize: { value: 1 },
         night: { value: 0 },
         overcast: { value: 0 },
         time: { value: 0 },
       },
       vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 horizon; uniform vec3 fogCol; uniform vec3 sunDir; uniform vec3 sunGlow;
+      fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 horizon; uniform vec3 fogCol; uniform vec3 sunDir; uniform vec3 sunGlow; uniform vec3 moonCol; uniform float moonSize;
         uniform float sunDisc; uniform float night; uniform float overcast; uniform float time; varying vec3 vPos;
         float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
         void main(){
@@ -300,9 +305,10 @@ export class Environment {
             float star = step(0.9965, h) * round * (0.6 + 0.4 * sin(time * 2.0 + h * 400.0)) * 1.6;
             col += vec3(0.9, 0.95, 1.0) * star * smoothstep(0.05, 0.35, d.y) * night * (1.0 - overcast);
             // Moon: crisp disc with soft maria and a pale halo.
-            float m = smoothstep(0.99935, 0.99955, s);
+            float m = smoothstep(1.0 - 0.00065 * moonSize, 1.0 - 0.00045 * moonSize, s);
             float maria = 0.85 + 0.15 * sin(d.x * 900.0) * sin(d.z * 800.0);
-            col = mix(col, vec3(0.92, 0.94, 1.0) * maria * 1.3, m * sunDisc);
+            col = mix(col, moonCol * maria * 1.3, m * sunDisc);
+            col += moonCol * pow(s, 900.0 / moonSize) * 0.35 * (moonSize - 1.0) * sunDisc;
             col += sunGlow * pow(s, 200.0) * 0.25 * sunDisc * night;
           } else {
             // Sun disc, halo and wide glow.

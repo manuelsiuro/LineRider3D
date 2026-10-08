@@ -424,7 +424,7 @@ export class UI {
         row(),
         BIOMES.map((b) => ({ id: b.id, label: `${icon(b.id, 16)} ${b.name}` })),
         w.biome,
-        (v) => set({ biome: v, weather: biomeById(v).weathers[0] }),
+        (v) => set({ biome: v, weather: biomeById(v).weathers[0], ...(biomeById(v).time ? { time: biomeById(v).time } : {}) }),
       );
       const r2 = row();
       seg(r2, TIMES.map((t) => ({ id: t.id, label: `${icon(t.id, 16)} ${t.name}` })), w.time, (v) => set({ time: v }));

@@ -196,7 +196,7 @@ export class Run {
     const alpha = this.playing ? this.acc / STEP : 0;
     sim.interpolated(alpha, riderView.pts);
     const rider = sim.rider;
-    riderView.update(dt, rider.crashed);
+    riderView.update(dt, rider.crashed, !rider.contact.some((c) => c));
 
     // Ghost of the best run, in lockstep with the player.
     const ghost = this.ghost;
@@ -206,7 +206,7 @@ export class Run {
       ghost.sim.seek(frame + 1);
       ghost.sim.seek(frame);
       ghost.sim.interpolated(alpha, ghostView.pts);
-      ghostView.update(dt, ghost.sim.rider.crashed);
+      ghostView.update(dt, ghost.sim.rider.crashed, !ghost.sim.rider.contact.some((c) => c));
     }
     riderCenter.copy(riderView.pts[P.butt]);
     rider.velocity(riderVel);
@@ -273,7 +273,10 @@ export class Run {
     if (justCrashed) {
       if (!this.replaying) this.wipeouts = bumpWipeouts();
       sound.crash();
-      ui.popup('WIPEOUT!', 'crash');
+      // Haunted Hollow: bats burst out of the wipeout.
+      const spooky = this.c.env.config.biome === 'halloween';
+      ui.popup(spooky ? 'SPOOKED!' : 'WIPEOUT!', 'crash');
+      if (spooky) effects.batBurst(sim.rider.pos[P.butt]);
       rig.shake(0.6);
       rig.punch(12);
       this.slowmo(0.22, 1.1);

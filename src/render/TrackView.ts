@@ -110,9 +110,9 @@ export class TrackView {
   /** Restyles decor (and track skin) for a world: a pine becomes a palm on the beach. */
   setWorld(w: WorldConfig, night = 0, wet = 0) {
     this.world = w;
-    const skin: Skin = ({ alpine: 'ice', forest: 'timber', beach: 'boardwalk', desert: 'sandstone', city: 'asphalt' } as const)[w.biome];
+    const skin: Skin = ({ alpine: 'ice', forest: 'timber', beach: 'boardwalk', desert: 'sandstone', city: 'asphalt', halloween: 'haunted' } as const)[w.biome];
     setRibbonStyle(skin, night, wet);
-    setSupportStyle(({ alpine: 'timber', forest: 'timber', beach: 'driftwood', desert: 'rust', city: 'steel' } as const)[w.biome]);
+    setSupportStyle(({ alpine: 'timber', forest: 'timber', beach: 'driftwood', desert: 'rust', city: 'steel', halloween: 'timber' } as const)[w.biome]);
     for (const [id, mesh] of this.ribbonById) {
       const stroke = this.track.strokes.get(id);
       if (!stroke) continue;

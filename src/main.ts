@@ -6,7 +6,7 @@ import { CAMERA_LABELS, type CameraMode } from './render/CameraRig';
 import { STEPS_PER_SECOND } from './physics/Simulation';
 import { P } from './physics/Rider';
 import { vehicleById, type VehicleDef } from './physics/vehicles';
-import { DEFAULT_WORLD, TIMES, WEATHERS, biomeById, normalizeWorld, sameWorld, surfaceOf, worldLabel, type WorldConfig } from './world/worlds';
+import { DEFAULT_WORLD, TIMES, WEATHERS, biomeById, normalizeWorld, sameWorld, surfaceOf, worldLabel, type BiomeId, type WorldConfig } from './world/worlds';
 import { UI, type SettingsView, type SummaryInfo } from './ui/UI';
 import { METERS } from './ui/dom';
 import { resetProgress, saveSettings, type Quality as QualitySetting } from './game/settings';
@@ -36,6 +36,14 @@ import { Rides } from './app/Rides';
 import { Quality } from './app/Quality';
 import { recordBest, runKey } from './app/records';
 import { registerServiceWorker } from './app/pwa';
+import { SEASON_END, halloweenSeason, seasonOn, type SeasonPref } from './game/season';
+
+/** Favicon during the Halloween season. */
+const PUMPKIN_ICON =
+  'data:image/svg+xml,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M32 16c-4-3-11-4-17-1C7 19 4 29 6 38c2 10 11 16 26 16s24-6 26-16c2-9-1-19-9-23-6-3-13-2-17 1Z" fill="#f07a1c"/><path d="M32 16V7c3 0 6 1 8 3" stroke="#4a5a22" stroke-width="4" fill="none" stroke-linecap="round"/><path d="m18 30 5-6 5 6Zm18 0 5-6 5 6ZM17 39c4 5 9 7 15 7s11-2 15-7l-5 2-3-3-3 3-4-3-4 3-3-3-3 3Z" fill="#3a1a08"/></svg>',
+  );
 
 // Upgrade saves from older builds before anything reads them.
 migrateStorage();
@@ -81,6 +89,22 @@ const worlds = new WorldDirector(core, {
   },
   shown: (w) => core.ui?.setWorldBadge(w),
 });
+applySeason();
+
+/** Halloween look (title tour, colors, favicon) while the season is on and not turned off. */
+function applySeason() {
+  const on = seasonOn(core.settings.seasonal);
+  const was = document.body.classList.contains('season-halloween');
+  document.body.classList.toggle('season-halloween', on);
+  worlds.setSeason(on);
+  const link = document.querySelector<HTMLLinkElement>('link[rel=icon]');
+  if (link) {
+    link.dataset.base ??= link.href;
+    link.href = on ? PUMPKIN_ICON : link.dataset.base;
+  }
+  // Switching it on the title shows the Hollow right away.
+  if (on !== was && session.kind === 'title') worlds.startTour();
+}
 
 const rides = new Rides(core, {
   lockReason: () => (rides.locked ? (session.kind === 'daily' ? "the daily's ride" : challenge() > 0 ? "the challenger's ride" : "this level's ride") : null),
@@ -292,7 +316,7 @@ const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('di
     run.stop();
     track.setWorld(cfg);
     worlds.applyNow(cfg);
-    ui.flash(`${env.config.biome[0].toUpperCase()}${env.config.biome.slice(1)} · ${env.config.time} · ${env.config.weather}`);
+    ui.flash(worldLabel(env.config));
     return env.config;
   },
   settings: () => openSettings(),
@@ -451,12 +475,21 @@ async function closeUp<T>(show: () => Promise<T>): Promise<T> {
 async function titleFlow() {
   for (;;) {
     const progress = loadProgress();
-    const choice = await ui.showTitle(savedTrack() !== null, totalStars(progress), LEVELS.length * 3, dailyCard());
+    const choice = await ui.showTitle(savedTrack() !== null, totalStars(progress), LEVELS.length * 3, dailyCard(), seasonCard(progress));
     if (choice === 'wardrobe') {
       const stars = totalStars(progress);
       await closeUp(() =>
         ui.showWardrobe(
-          OUTFITS.map((o) => ({ id: o.id, name: o.name, stars: o.stars, colors: [o.jacket, o.scarf, o.hat, o.sled], unlocked: outfitUnlocked(o, stars), world: o.hint })),
+          OUTFITS.map((o) => ({
+            id: o.id,
+            name: o.name,
+            stars: o.stars,
+            colors: [o.jacket, o.scarf, o.hat, o.sled],
+            unlocked: outfitUnlocked(o, stars),
+            world: o.hint,
+            lock: o.season ? ACHIEVEMENTS.find((a) => a.id === o.achievement)?.desc : undefined,
+            tag: o.season ? (halloweenSeason() ? `🎃 Free until ${SEASON_END}` : '🎃 Halloween') : undefined,
+          })),
           stars,
           selectedOutfit().id,
           (id) => {
@@ -510,8 +543,8 @@ async function titleFlow() {
       enterDaily(dayKey());
       return;
     }
-    if (choice === 'levels') {
-      const idx = await pickLevel();
+    if (choice === 'levels' || choice === 'season') {
+      const idx = await pickLevel(choice === 'season' ? 'halloween' : undefined);
       if (idx === null) continue;
       startLevel(idx);
       return;
@@ -534,7 +567,14 @@ async function titleFlow() {
   }
 }
 
-function pickLevel(): Promise<number | null> {
+/** The Haunted Hollow button on the title, during the season. */
+function seasonCard(progress: ReturnType<typeof loadProgress>) {
+  if (!seasonOn(core.settings.seasonal)) return null;
+  const hollow = LEVELS.filter((l) => chapterOf(l) === 'halloween');
+  return { stars: hollow.reduce((n, l) => n + (progress[l.id]?.stars ?? 0), 0), max: hollow.length * 3 };
+}
+
+function pickLevel(focus?: BiomeId): Promise<number | null> {
   const progress = loadProgress();
   return ui.showLevels(
     LEVELS.map((l, i) => ({
@@ -548,6 +588,7 @@ function pickLevel(): Promise<number | null> {
       medal: levelMedal(l.id),
     })),
     totalStars(progress),
+    focus,
   );
 }
 
@@ -921,8 +962,10 @@ async function openSettings() {
         camera: v.camera as CameraMode,
         cameraDistance: v.cameraDistance,
         reducedMotion: v.reducedMotion,
+        seasonal: v.seasonal as SeasonPref,
       });
       saveSettings(settings);
+      applySeason();
       if (qualityChanged && settings.quality === 'auto') quality.restartAuto();
       quality.apply();
     },

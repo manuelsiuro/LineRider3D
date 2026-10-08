@@ -1,4 +1,5 @@
 import type { CameraMode } from '../render/CameraRig';
+import type { SeasonPref } from './season';
 import { KEYS, PROGRESS_KEYS, readJSON, removeKey, writeJSON } from './storage';
 
 export type Quality = 'auto' | 'low' | 'medium' | 'high';
@@ -15,6 +16,8 @@ export interface Settings {
   cameraDistance: number;
   /** No camera shake, zoom punches or screen flashes. */
   reducedMotion: boolean;
+  /** Seasonal events (Halloween look on the title, etc.). */
+  seasonal: SeasonPref;
 }
 
 
@@ -25,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   camera: 'side',
   cameraDistance: 1,
   reducedMotion: matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+  seasonal: 'auto',
 };
 
 export function loadSettings(): Settings {

@@ -5,10 +5,10 @@ import type { BiomeId, WorldConfig } from '../../world/worlds';
 import type { DailyCard, ScreenCtx, TitleChoice } from '../types';
 
 /** Badge icon of each world (the logo follows the world on screen). */
-export const BADGE: Record<BiomeId, string> = { alpine: 'snowflake', forest: 'forest', beach: 'beach', desert: 'desert', city: 'city' };
+export const BADGE: Record<BiomeId, string> = { alpine: 'snowflake', forest: 'forest', beach: 'beach', desert: 'desert', city: 'city', halloween: 'pumpkin' };
 
 /** Title screen; resolves with the player's choice. */
-export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxStars: number, daily: DailyCard): Promise<TitleChoice> {
+export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxStars: number, daily: DailyCard, season: { stars: number; max: number } | null = null): Promise<TitleChoice> {
   document.body.classList.add('on-title');
   return new Promise((resolve) => {
     const overlay = h(
@@ -18,7 +18,7 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
         <div class="logo">
           <div class="logo-mark" data-world="${ctx.world.biome}">${icon(BADGE[ctx.world.biome], 46)}</div>
           <h1>Line Rider<span>3D</span></h1>
-          <p class="tagline">Draw it. Ride it. Wipe out in style.</p>
+          <p class="tagline">${season ? 'Draw it. Ride it. Get spooked.' : 'Draw it. Ride it. Wipe out in style.'}</p>
           <p class="title-world">${worldCaption(ctx.world)}</p>
         </div>
         <div class="title-actions">
@@ -28,6 +28,15 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
             <span class="daily-text"><b>Daily ride #${daily.number}</b><small>${daily.best > 0 ? `Today's best ${daily.best.toLocaleString()}` : `${daily.name} · new every day`}</small></span>
             ${daily.streak > 0 ? `<span class="pill streak" title="Days in a row">${icon('flame', 14)} ${daily.streak}</span>` : ''}
           </button>
+          ${
+            season
+              ? `<button class="big-btn daily-btn season-btn" data-c="season">
+            <span class="daily-ic">${icon('pumpkin', 22)}</span>
+            <span class="daily-text"><b>Haunted Hollow</b><small>Halloween is here · 5 spooky levels</small></span>
+            <span class="pill">${icon('star', 14)} ${season.stars}/${season.max}</span>
+          </button>`
+              : ''
+          }
           <button class="big-btn secondary" data-c="${hasSave ? 'create' : 'new'}">${icon('pencil', 20)} ${hasSave ? 'Continue my track' : 'Create a track'}</button>
           <div class="title-row">
             <button class="big-btn menu-btn" data-c="puzzles"><span class="menu-ic">${icon('pencil', 18)}</span><span class="menu-label">Puzzles</span>${icon('chevronRight', 16)}</button>
@@ -48,7 +57,7 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
       if (!c) return;
       ctx.click();
       overlay.classList.add('leaving');
-      if (c !== 'levels' && c !== 'puzzles' && c !== 'gallery' && c !== 'wardrobe' && c !== 'garage' && c !== 'settings' && c !== 'trophies' && c !== 'phone') document.body.classList.remove('on-title');
+      if (c !== 'levels' && c !== 'season' && c !== 'puzzles' && c !== 'gallery' && c !== 'wardrobe' && c !== 'garage' && c !== 'settings' && c !== 'trophies' && c !== 'phone') document.body.classList.remove('on-title');
       setTimeout(() => overlay.remove(), 450);
       resolve(c);
     };

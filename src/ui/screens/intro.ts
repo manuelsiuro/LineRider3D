@@ -35,7 +35,12 @@ export function worldPicker(ctx: ScreenCtx, card: HTMLElement, picker: WorldPick
       d.home !== undefined
         ? picker.home
         : d.biome
-          ? { ...w, biome: d.biome as BiomeId, weather: d.biome === picker.home.biome ? picker.home.weather : biomeById(d.biome).weathers[0] }
+          ? {
+              ...w,
+              biome: d.biome as BiomeId,
+              weather: d.biome === picker.home.biome ? picker.home.weather : biomeById(d.biome).weathers[0],
+              time: d.biome === picker.home.biome ? picker.home.time : (biomeById(d.biome).time ?? w.time),
+            }
           : d.time
             ? { ...w, time: d.time as WorldConfig['time'] }
             : { ...w, weather: d.weather as WorldConfig['weather'] };

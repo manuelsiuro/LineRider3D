@@ -14,3 +14,5 @@ Motorbike  →   6=- 10=- 14=crash 18=crash 22=BAIL 26=- 30=P:B 34=P:B 38=BAIL 4
 Motorbike  ←   6=- 10=BAIL 14=S:F 18=P:F 22=P:F 26=G:F 30=BAIL 34=BAIL 38=BAIL 42=BAIL 46=BAIL
 Buggy      →   6=- 10=- 14=crash 18=BAIL 22=- 26=P:B 30=G:B 34=BAIL 38=BAIL 42=BAIL 46=BAIL
 Buggy      ←   6=P:air 10=crash 14=BAIL 18=S:F 22=S:F 26=P:F 30=G:F 34=BAIL 38=BAIL 42=BAIL 46=BAIL
+Coffin     →   6=- 10=S:air 14=S:F 18=S:F 22=S:F 26=P:F 30=S:F 34=S:F 38=BAIL 42=BAIL 46=BAIL
+Coffin     ←   6=- 10=crash 14=S:air 18=S:air 22=crash 26=- 30=P:B 34=S:B 38=BAIL 42=BAIL 46=BAIL

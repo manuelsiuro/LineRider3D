@@ -5,6 +5,7 @@ import { fxStyle, type FxStyle } from './fxStyles';
 import { DEFAULT_WORLD } from '../world/worlds';
 
 const SPARK = new THREE.Color(2.2, 1.3, 0.45);
+const BATS = 14;
 
 const MAX = 1500;
 const GRAVITY = -6;
@@ -31,7 +32,21 @@ export class Effects {
   private wasCrashed = false;
   private lastFrame = -1;
 
+  /** Bats that burst out of a Haunted Hollow wipeout. */
+  private bats: THREE.InstancedMesh;
+  private batData = Array.from({ length: BATS }, () => ({ pos: new THREE.Vector3(), vel: new THREE.Vector3(), life: 0, flap: 0 }));
+  private batM = new THREE.Matrix4();
+  private batQ = new THREE.Quaternion();
+  private batS = new THREE.Vector3();
+
   constructor(scene: THREE.Scene) {
+    const batGeo = new THREE.BufferGeometry();
+    batGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0, -0.18, 0.06, 0.45, 0.14, 0, 0, 0, 0, 0, 0.14, 0, 0, -0.18, 0.06, -0.45]), 3));
+    batGeo.computeVertexNormals();
+    this.bats = new THREE.InstancedMesh(batGeo, new THREE.MeshBasicMaterial({ color: 0x150a1c, side: THREE.DoubleSide }), BATS);
+    this.bats.frustumCulled = false;
+    this.bats.count = 0;
+    scene.add(this.bats);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
     geo.setAttribute('size', new THREE.BufferAttribute(this.size, 1));
@@ -208,7 +223,39 @@ export class Effects {
     this.airFrames = 0;
   }
 
+  /** A flurry of bats flapping away from `at`. */
+  batBurst(at: THREE.Vector3) {
+    for (const b of this.batData) {
+      b.pos.copy(at);
+      const a = Math.random() * Math.PI * 2;
+      b.vel.set(Math.cos(a) * (2 + Math.random() * 3), 2.5 + Math.random() * 3, Math.sin(a) * (2 + Math.random() * 3));
+      b.life = 2 + Math.random() * 1.2;
+      b.flap = Math.random() * 10;
+    }
+  }
+
+  private updateBats(dt: number) {
+    let n = 0;
+    for (const b of this.batData) {
+      if (b.life <= 0) continue;
+      b.life -= dt;
+      b.flap += dt * 22;
+      b.vel.y += Math.sin(b.flap * 0.3) * dt * 2;
+      b.pos.addScaledVector(b.vel, dt);
+      const dir = Math.atan2(-b.vel.z, b.vel.x);
+      this.batQ.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, dir);
+      const f = Math.sin(b.flap);
+      const fade = Math.min(1, b.life * 2);
+      this.batS.set(fade, (1 + f * 0.8) * fade, fade);
+      this.batM.compose(b.pos, this.batQ, this.batS);
+      this.bats.setMatrixAt(n++, this.batM);
+    }
+    this.bats.count = n;
+    if (n) this.bats.instanceMatrix.needsUpdate = true;
+  }
+
   update(dt: number) {
+    this.updateBats(dt);
     for (let i = 0; i < MAX; i++) {
       if (this.life[i] <= 0) {
         this.alpha[i] = 0;

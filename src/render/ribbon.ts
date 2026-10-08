@@ -7,7 +7,7 @@ const THICKNESS = 0.18;
 const TEX = 128;
 
 /** Track surface style of a world. */
-export type Skin = 'ice' | 'timber' | 'boardwalk' | 'sandstone' | 'asphalt';
+export type Skin = 'ice' | 'timber' | 'boardwalk' | 'sandstone' | 'asphalt' | 'haunted';
 
 /** Material each skin is made of (mixed with the line type's color). */
 const SKIN_BASE: Record<Exclude<Skin, 'ice'>, { color: number; mix: number }> = {
@@ -15,6 +15,7 @@ const SKIN_BASE: Record<Exclude<Skin, 'ice'>, { color: number; mix: number }> = 
   boardwalk: { color: 0xd2ad7c, mix: 0.45 },
   sandstone: { color: 0xc8865a, mix: 0.45 },
   asphalt: { color: 0x3a3c42, mix: 0.5 },
+  haunted: { color: 0x4a2e3e, mix: 0.78 },
 };
 
 function makeTexture(type: LineType, skin: Skin): THREE.CanvasTexture {
@@ -58,6 +59,29 @@ function makeTexture(type: LineType, skin: Skin): THREE.CanvasTexture {
         for (const x of [22, TEX - 24]) ctx.fillRect(x, y + plank / 2 - 1, 2, 2);
       }
     }
+  } else if (sk === 'haunted') {
+    // Old, cracked boards with cobwebby scratches.
+    for (let i = 0; i < 120; i++) {
+      ctx.fillStyle = `rgba(10,0,20,${0.06 + rand() * 0.1})`;
+      ctx.fillRect(10 + rand() * (TEX - 20), rand() * TEX, 4 + rand() * 26, 1);
+    }
+    for (let y = 0; y < TEX; y += 26) {
+      ctx.fillStyle = 'rgba(10,0,20,0.55)';
+      ctx.fillRect(0, y + rand() * 3, TEX, 2);
+    }
+    ctx.strokeStyle = 'rgba(220,210,240,0.12)';
+    ctx.lineWidth = 1;
+    for (let k = 0; k < 3; k++) {
+      const x = 20 + rand() * 88;
+      const y = rand() * TEX;
+      for (let j = 0; j < 6; j++) {
+        const a = (j / 6) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(a) * 12, y + Math.sin(a) * 12);
+        ctx.stroke();
+      }
+    }
   } else if (sk === 'sandstone') {
     // Gritty stone with soft strata.
     for (let i = 0; i < 500; i++) {
@@ -80,7 +104,8 @@ function makeTexture(type: LineType, skin: Skin): THREE.CanvasTexture {
     }
   }
   // Bright edges so the ribbon reads well from far away.
-  ctx.fillStyle = sk === 'ice' ? 'rgba(255,255,255,0.75)' : line.clone().lerp(new THREE.Color(0xffffff), 0.35).getStyle();
+  // Haunted tracks get a pumpkin-orange glow along the edges.
+  ctx.fillStyle = sk === 'ice' ? 'rgba(255,255,255,0.75)' : sk === 'haunted' && type === 'normal' ? '#ff8a20' : line.clone().lerp(new THREE.Color(0xffffff), 0.35).getStyle();
   ctx.fillRect(0, 0, 8, TEX);
   ctx.fillRect(TEX - 8, 0, 8, TEX);
   ctx.fillStyle = 'rgba(0,0,0,0.12)';
@@ -159,6 +184,7 @@ const FINISH: Record<Skin, { roughness: number; clearcoat: number }> = {
   boardwalk: { roughness: 0.78, clearcoat: 0.05 },
   sandstone: { roughness: 0.88, clearcoat: 0 },
   asphalt: { roughness: 0.82, clearcoat: 0.05 },
+  haunted: { roughness: 0.8, clearcoat: 0.08 },
 };
 
 export function topMaterial(type: LineType) {
@@ -210,7 +236,7 @@ export function setRibbonStyle(s: Skin, nightAmount: number, wetAmount: number) 
   for (const m of topMaterials.values()) applyLight(m);
 }
 
-const UNDER: Record<Skin, number> = { ice: 0x9aa5b4, timber: 0x6e4a2e, boardwalk: 0x9a7a54, sandstone: 0x9a5a3a, asphalt: 0x55585e };
+const UNDER: Record<Skin, number> = { ice: 0x9aa5b4, timber: 0x6e4a2e, boardwalk: 0x9a7a54, sandstone: 0x9a5a3a, asphalt: 0x55585e, haunted: 0x2e2236 };
 
 /** Underside / sides: neutral so the solid top face is always obvious. */
 export const underMaterial = new THREE.MeshStandardMaterial({ color: 0x9aa5b4, roughness: 0.75 });
