@@ -3,6 +3,8 @@
 A 3D take on the classic Line Rider, built with Three.js + TypeScript + Vite.
 Draw tracks in a snowy landscape and watch Bosh sled down them. Works on desktop and mobile.
 
+**Play it:** https://manuelsiuro.github.io/LineRider3D/ (on a phone, use "Add to Home Screen" to install it; it then plays offline).
+
 ```bash
 npm install
 npm run dev            # http://localhost:5173 (also exposed on your LAN for phones)
@@ -15,7 +17,12 @@ npm test -- -u         # accept intended changes as the new golden outputs
 The simulation is deterministic, so every test's output is compared with a golden copy in
 `scripts/snapshots/`: any drift in a trajectory, score or timing fails the run. One-off
 investigation probes live in `scripts/dev/` (run them with `npx tsx scripts/dev/<name>.ts`).
-CI (`.github/workflows/ci.yml`) runs the build and the tests on every push.
+CI (`.github/workflows/ci.yml`) runs the build and the tests on every push, and publishes `main` to GitHub Pages.
+
+The production build is an installable web app: `public/manifest.webmanifest` and the icons, plus `sw.js`, a
+service worker written by `vite-sw.ts` after each build that stores the whole game on the device. A new
+deploy downloads in the background and takes over on the next launch. On the title screen, "Play on phone"
+shows a QR code of the game's address (in dev, the server's Wi-Fi address).
 
 ## How it plays
 

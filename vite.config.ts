@@ -1,4 +1,5 @@
 import { defineConfig, type Plugin } from 'vite';
+import { serviceWorker } from './vite-sw.ts';
 
 /**
  * Dev and preview only: `/__lan` answers with the server's network URLs, so the
@@ -23,5 +24,5 @@ const lanUrls = (): Plugin => ({
 export default defineConfig({
   base: './',
   server: { host: true },
-  plugins: [lanUrls()],
+  plugins: [lanUrls(), serviceWorker()],
 });
