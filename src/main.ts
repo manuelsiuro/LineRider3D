@@ -10,13 +10,13 @@ import { EVENT, INPUT, P } from './physics/Rider';
 import { VEHICLES, vehicleById, type VehicleDef } from './physics/vehicles';
 import { Environment } from './world/Environment';
 import { terrainHeight } from './world/terrain';
-import type { WorldConfig } from './world/worlds';
+import { SURFACES, surfaceOf, type WorldConfig } from './world/worlds';
 import { Editor } from './editor/Editor';
 import { UI, overlayOpen, type SettingsView } from './ui/UI';
 import { loadSettings, resetProgress, saveSettings, type Quality, type Settings } from './game/settings';
 import { Effects } from './render/Effects';
 import { Trail } from './render/Trail';
-import { SnowTracks } from './render/SnowTracks';
+import { SurfaceTracks } from './render/SurfaceTracks';
 import { PostFX } from './render/PostFX';
 import { Sound } from './audio/Sound';
 import { RunStats } from './game/RunStats';
@@ -73,7 +73,7 @@ const rig = new CameraRig(camera, controls);
 const effects = new Effects(scene);
 effects.setViewportHeight(innerHeight * renderer.getPixelRatio());
 const trail = new Trail(scene);
-const snowTracks = new SnowTracks(scene);
+const groundMarks = new SurfaceTracks(scene);
 const sound = new Sound();
 const runStats = new RunStats();
 const ground = env.ground;
@@ -152,10 +152,32 @@ function applyWorld(w: Partial<WorldConfig>, force = false) {
   footprint.push(track.start);
   if (!env.setWorld(w, footprint, force)) return false;
   postfx.setGrade(env.atm.grade);
-  trackView.setWorld(env.config);
+  trackView.setWorld(env.config, env.atm.night, env.atm.wet);
+  const ground = surfaceOf(env.config);
+  effects.setSurface(ground, env.atm.night);
+  groundMarks.setSurface(ground, env.atm.wet, env.atm.night);
+  sim.setGroundDrag(SURFACES[ground].drag);
+  sound.setWorld(env.config.biome, env.config.time, env.config.weather, ground);
+  ghost = null;
   return true;
 }
 postfx.setGrade(env.atm.grade);
+
+env.weather.onStrike = (d) => sound.thunder(d);
+
+/** The rider's lamp after dark: a soft spot ahead of the ride. */
+const headlight = new THREE.SpotLight(0xfff1d6, 0, 46, 0.55, 0.6, 1.2);
+scene.add(headlight, headlight.target);
+const lampDir = new THREE.Vector3(1, -0.15, 0);
+function updateHeadlight() {
+  const n = env.atm.night;
+  headlight.visible = n > 0.05 && mode === 'game';
+  if (!headlight.visible) return;
+  if (riderVel.lengthSq() > 1e-4) lampDir.lerp(riderVel.clone().normalize(), 0.2).normalize();
+  headlight.intensity = 60 * n;
+  headlight.position.copy(riderCenter).add(new THREE.Vector3(0, 1.2, 0)).addScaledVector(lampDir, 0.6);
+  headlight.target.position.copy(riderCenter).addScaledVector(lampDir, 14).add(new THREE.Vector3(0, -2, 0));
+}
 
 // ------------------------------------------------------------------ rides
 /** The ride in use (the player's choice, or the one a level or challenge sets). */
@@ -169,7 +191,7 @@ function applyVehicle(def: VehicleDef) {
   riderView.setVehicle(def);
   sound.setRide(def.sound);
   dressRider();
-  snowTracks.width = { sled: 0.07, skis: 0.07, snowboard: 0.18, bike: 0.08, moto: 0.12, buggy: 0.17 }[def.id];
+  groundMarks.width = { sled: 0.07, skis: 0.07, snowboard: 0.18, bike: 0.08, moto: 0.12, buggy: 0.17 }[def.id];
   ui.setVehicle(def.id, def.name, lockReason());
   ghost = null;
   resetRun();
@@ -344,7 +366,7 @@ function resetRun() {
   runTricks.length = 0;
   effects.reset();
   trail.reset();
-  snowTracks.reset();
+  groundMarks.reset();
   runStats.reset();
   ui.hideSummary();
 }
@@ -355,7 +377,7 @@ function play() {
   if (frame === 0 && !replaying) sim.clearInputs();
   if (frame === 0) {
     const record = mode === 'game' ? loadGhost(ghostKey()) : null;
-    ghost = record ? new GhostRun(track, record, vehicle) : null;
+    ghost = record ? new GhostRun(track, record, vehicle, sim.rider.groundDrag) : null;
     ghostView.setVehicle(vehicle);
   }
   if (frame === 0) focusRider();
@@ -398,9 +420,11 @@ function trackKey() {
   return String(h >>> 0);
 }
 
-/** Ghosts are per ride (the sled keeps the original keys). */
+/** Ghosts are per ride and ground (the sled on snow keeps the original keys). */
 function ghostKey() {
-  return vehicle.id === 'sled' ? trackKey() : `${trackKey()}:${vehicle.id}`;
+  const ground = surfaceOf(env.config);
+  const base = vehicle.id === 'sled' ? trackKey() : `${trackKey()}:${vehicle.id}`;
+  return ground === 'snow' ? base : `${base}:${ground}`;
 }
 
 interface BestRecord {
@@ -1129,7 +1153,7 @@ function loop(time: number) {
     side.subVectors(riderView.pts[P.tailR], riderView.pts[P.tailL]).normalize();
     tail.addVectors(riderView.pts[P.tailL], riderView.pts[P.tailR]).multiplyScalar(0.5);
     trail.push(tail, side, stats.speed);
-    snowTracks.update(frame, rider.pos, rider.contact, rider.crashed);
+    groundMarks.update(frame, rider.pos, rider.contact, rider.crashed);
     if (mode === 'game') handleRideEvents(events, justCrashed);
     if (frame % 10 === 0) checkAchievements(false);
   }
@@ -1172,12 +1196,14 @@ function loop(time: number) {
 
   if (mode === 'game') checkRunEnd(dt);
   flash = Math.max(0, flash - dt * 1.5);
-  postfx.flash = settings.reducedMotion ? 0 : flash;
+  // Lightning flashes the screen a little (barely with reduced motion).
+  postfx.flash = Math.max(settings.reducedMotion ? 0 : flash, env.weather.flash * (settings.reducedMotion ? 0.04 : 0.22));
   governQuality(rawDt);
 
   editor.update(!playing && mode === 'game' && currentLevel === null);
   trackView.update(t, riderCenter, sim.rider.stars);
   env.update(dt, controls.target, t, camera.position);
+  updateHeadlight();
   ui.setTime(frame, sim.recorded, STEPS_PER_SECOND);
   ui.setHud(mode === 'game' && (playing || frame > 0) && !summaryShown, stats, track.stars.size);
   ui.setTouchPad(isTouch && riderOn() && mode === 'game' && playing && !replaying, vehicle.handling.yaw !== null);

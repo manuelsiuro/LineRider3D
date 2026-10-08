@@ -65,7 +65,7 @@ const TIME: Record<TimeId, TimePreset> = {
     fog: 0xe8d0cc,
     fogNear: 100,
     fogFar: 480,
-    sun: [78, 16, -34],
+    sun: [78, 16, 30],
     sunColor: 0xffc49a,
     sunIntensity: 2.1,
     glow: [1, 0.74, 0.6],
@@ -122,13 +122,13 @@ const TIME: Record<TimeId, TimePreset> = {
     fog: 0x161f38,
     fogNear: 70,
     fogFar: 400,
-    sun: [40, 70, -50],
+    sun: [-45, 70, 50],
     sunColor: 0x9fb8ff,
-    sunIntensity: 0.7,
+    sunIntensity: 0.85,
     glow: [0.85, 0.9, 1],
-    hemiSky: 0x4a5c94,
-    hemiGround: 0x22283e,
-    hemi: 0.75,
+    hemiSky: 0x6a7cb4,
+    hemiGround: 0x3a4262,
+    hemi: 1.9,
     exposure: 1.08,
     env: 0.16,
     night: 1,
@@ -233,7 +233,8 @@ export function resolveAtmosphere(w: WorldConfig): Atmosphere {
   for (const [k, v] of Object.entries(b.tints)) tint(map[k as keyof typeof map], v[0], v[1]);
 
   if (w.time === 'night') {
-    // Moonlit blue grade.
+    // Moonlit blue grade, colors fade in the dark.
+    a.grade.saturation -= 0.3;
     a.grade.shadows.set(-0.01, 0, 0.035);
     a.grade.highlights.set(0, 0.01, 0.02);
   } else if (w.time === 'sunset' || w.time === 'dawn') {

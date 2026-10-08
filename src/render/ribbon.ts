@@ -6,11 +6,25 @@ const THICKNESS = 0.18;
 
 const TEX = 128;
 
-function makeTexture(type: LineType): THREE.CanvasTexture {
+/** Track surface style of a world. */
+export type Skin = 'ice' | 'timber' | 'boardwalk' | 'sandstone' | 'asphalt';
+
+/** Material each skin is made of (mixed with the line type's color). */
+const SKIN_BASE: Record<Exclude<Skin, 'ice'>, { color: number; mix: number }> = {
+  timber: { color: 0x8a5a36, mix: 0.42 },
+  boardwalk: { color: 0xd2ad7c, mix: 0.45 },
+  sandstone: { color: 0xc8865a, mix: 0.45 },
+  asphalt: { color: 0x3a3c42, mix: 0.5 },
+};
+
+function makeTexture(type: LineType, skin: Skin): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = c.height = TEX;
   const ctx = c.getContext('2d')!;
-  const base = new THREE.Color(LINE_COLORS[type]);
+  const line = new THREE.Color(LINE_COLORS[type]);
+  // Ice lanes always look like ice; other lines take on the world's material.
+  const sk = type === 'ice' || type === 'scenery' ? 'ice' : skin;
+  const base = sk === 'ice' ? line.clone() : line.clone().lerp(new THREE.Color(SKIN_BASE[sk].color), SKIN_BASE[sk].mix);
   // Subtle vertical gradient across the width gives the ribbon a rounded look.
   const grad = ctx.createLinearGradient(0, 0, TEX, 0);
   const dark = base.clone().multiplyScalar(0.78).getStyle();
@@ -19,15 +33,54 @@ function makeTexture(type: LineType): THREE.CanvasTexture {
   grad.addColorStop(1, dark);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, TEX, TEX);
-  // Frosty speckles.
   let seed = 11;
   const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
-  for (let i = 0; i < 260; i++) {
-    ctx.fillStyle = `rgba(255,255,255,${0.04 + rand() * 0.1})`;
-    ctx.fillRect(rand() * TEX, rand() * TEX, 1 + rand() * 2, 1 + rand() * 2);
+  if (sk === 'ice') {
+    // Frosty speckles.
+    for (let i = 0; i < 260; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${0.04 + rand() * 0.1})`;
+      ctx.fillRect(rand() * TEX, rand() * TEX, 1 + rand() * 2, 1 + rand() * 2);
+    }
+  } else if (sk === 'timber' || sk === 'boardwalk') {
+    // Planks across the track with grain and nails.
+    for (let i = 0; i < 90; i++) {
+      ctx.fillStyle = `rgba(40,20,5,${0.05 + rand() * 0.08})`;
+      ctx.fillRect(10 + rand() * (TEX - 20), rand() * TEX, 6 + rand() * 30, 1);
+    }
+    const plank = sk === 'timber' ? 32 : 21;
+    for (let y = 0; y < TEX; y += plank) {
+      ctx.fillStyle = 'rgba(30,15,5,0.45)';
+      ctx.fillRect(0, y, TEX, 2);
+      ctx.fillStyle = 'rgba(255,240,210,0.15)';
+      ctx.fillRect(0, y + 2, TEX, 1);
+      if (sk === 'boardwalk') {
+        ctx.fillStyle = 'rgba(60,60,60,0.6)';
+        for (const x of [22, TEX - 24]) ctx.fillRect(x, y + plank / 2 - 1, 2, 2);
+      }
+    }
+  } else if (sk === 'sandstone') {
+    // Gritty stone with soft strata.
+    for (let i = 0; i < 500; i++) {
+      ctx.fillStyle = rand() < 0.5 ? `rgba(255,230,200,${rand() * 0.12})` : `rgba(80,30,10,${rand() * 0.12})`;
+      ctx.fillRect(rand() * TEX, rand() * TEX, 1 + rand() * 2, 1 + rand() * 2);
+    }
+    for (let y = 0; y < TEX; y += 16) {
+      ctx.fillStyle = `rgba(90,40,15,${0.05 + rand() * 0.06})`;
+      ctx.fillRect(0, y + rand() * 4, TEX, 3);
+    }
+  } else {
+    // Asphalt aggregate and a dashed center line.
+    for (let i = 0; i < 700; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${rand() * 0.08})`;
+      ctx.fillRect(rand() * TEX, rand() * TEX, 1, 1);
+    }
+    if (type === 'normal') {
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillRect(TEX / 2 - 3, 8, 6, 52);
+    }
   }
   // Bright edges so the ribbon reads well from far away.
-  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillStyle = sk === 'ice' ? 'rgba(255,255,255,0.75)' : line.clone().lerp(new THREE.Color(0xffffff), 0.35).getStyle();
   ctx.fillRect(0, 0, 8, TEX);
   ctx.fillRect(TEX - 8, 0, 8, TEX);
   ctx.fillStyle = 'rgba(0,0,0,0.12)';
@@ -45,8 +98,10 @@ function makeTexture(type: LineType): THREE.CanvasTexture {
     ctx.lineTo(96, 88);
     ctx.stroke();
   } else if (type === 'normal') {
-    ctx.fillStyle = 'rgba(255,255,255,0.16)';
-    ctx.fillRect(20, 0, TEX - 40, 6);
+    if (sk === 'ice') {
+      ctx.fillStyle = 'rgba(255,255,255,0.16)';
+      ctx.fillRect(20, 0, TEX - 40, 6);
+    }
   } else if (type === 'ice') {
     // Cracks in clear ice.
     ctx.strokeStyle = 'rgba(255,255,255,0.75)';
@@ -92,30 +147,70 @@ function makeTexture(type: LineType): THREE.CanvasTexture {
   return tex;
 }
 
-const textures = new Map<LineType, THREE.CanvasTexture>();
-const topMaterials = new Map<LineType, THREE.MeshPhysicalMaterial>();
+const topMaterials = new Map<string, THREE.MeshPhysicalMaterial>();
+let skin: Skin = 'ice';
+let night = 0;
+let wet = 0;
+
+/** Finish of each skin: roughness and clear coat (ice keeps its gloss). */
+const FINISH: Record<Skin, { roughness: number; clearcoat: number }> = {
+  ice: { roughness: 0.45, clearcoat: 0.9 },
+  timber: { roughness: 0.7, clearcoat: 0.15 },
+  boardwalk: { roughness: 0.78, clearcoat: 0.05 },
+  sandstone: { roughness: 0.88, clearcoat: 0 },
+  asphalt: { roughness: 0.82, clearcoat: 0.05 },
+};
 
 export function topMaterial(type: LineType) {
-  let m = topMaterials.get(type);
+  const key = `${skin}:${type}`;
+  let m = topMaterials.get(key);
   if (!m) {
-    let tex = textures.get(type);
-    if (!tex) textures.set(type, (tex = makeTexture(type)));
-    // Glossy, icy finish.
+    const tex = makeTexture(type, skin);
+    const f = FINISH[type === 'ice' || type === 'scenery' ? 'ice' : skin];
     m = new THREE.MeshPhysicalMaterial({
       map: tex,
-      roughness: type === 'ice' ? 0.05 : type === 'bouncy' ? 0.6 : 0.45,
+      roughness: type === 'ice' ? 0.05 : type === 'bouncy' ? 0.6 : f.roughness,
       metalness: 0,
-      clearcoat: type === 'scenery' || type === 'bouncy' ? 0 : 0.9,
+      clearcoat: type === 'scenery' || type === 'bouncy' ? 0 : f.clearcoat,
       clearcoatRoughness: type === 'ice' ? 0.02 : 0.25,
       transparent: type === 'scenery' || type === 'ice',
       opacity: type === 'scenery' ? 0.8 : type === 'ice' ? 0.82 : 1,
       emissive: type === 'scenery' ? new THREE.Color(0x1d5a2e) : new THREE.Color(0x000000),
       emissiveIntensity: 0.4,
     });
-    topMaterials.set(type, m);
+    m.userData.type = type;
+    topMaterials.set(key, m);
   }
+  applyLight(m);
   return m;
 }
+
+/** At night the track glows softly so it stays readable; rain makes it shine. */
+function applyLight(m: THREE.MeshPhysicalMaterial) {
+  const type = m.userData.type as LineType;
+  if (type === 'scenery') return;
+  m.emissive.setRGB(1, 1, 1);
+  m.emissiveMap = night > 0 ? m.map : null;
+  m.emissiveIntensity = night * (type === 'ice' ? 0.22 : 0.3);
+  if (night === 0) m.emissive.setRGB(0, 0, 0);
+  const f = FINISH[type === 'ice' ? 'ice' : skin];
+  if (type !== 'ice' && type !== 'bouncy') {
+    m.roughness = f.roughness - wet * 0.45;
+    m.clearcoat = Math.max(f.clearcoat, wet * 0.8);
+  }
+  m.needsUpdate = true;
+}
+
+/** Track look for a world (new ribbons use it; `topMaterial` returns the restyled ones). */
+export function setRibbonStyle(s: Skin, nightAmount: number, wetAmount: number) {
+  skin = s;
+  night = nightAmount;
+  wet = wetAmount;
+  underMaterial.color.setHex(UNDER[s]);
+  for (const m of topMaterials.values()) applyLight(m);
+}
+
+const UNDER: Record<Skin, number> = { ice: 0x9aa5b4, timber: 0x6e4a2e, boardwalk: 0x9a7a54, sandstone: 0x9a5a3a, asphalt: 0x55585e };
 
 /** Underside / sides: neutral so the solid top face is always obvious. */
 export const underMaterial = new THREE.MeshStandardMaterial({ color: 0x9aa5b4, roughness: 0.75 });

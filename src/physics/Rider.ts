@@ -95,6 +95,9 @@ export class Rider {
   private scratch: THREE.Vector3[];
   private original: THREE.Vector3[];
 
+  /** Ground drag multiplier of the world's surface (snow = 1). */
+  groundDrag = 1;
+
   constructor(readonly def: VehicleDef = SLED) {
     this.count = def.points.length;
     const vecs = () => def.points.map(() => new THREE.Vector3());
@@ -540,9 +543,10 @@ export class Rider {
         }
         vel.subVectors(p, this.prev[i]);
         vel.y = 0;
-        // Snow drag, capped so fast arrivals slow down instead of stopping dead.
+        // Ground drag, capped so fast arrivals slow down instead of stopping dead.
         const speed = vel.length();
-        if (speed > 1e-9) vel.multiplyScalar(Math.max(0, speed - Math.min(speed * GROUND_FRICTION * h.snowDrag, SNOW_MAX_DRAG * h.snowDrag)) / speed);
+        const drag = h.snowDrag * this.groundDrag;
+        if (speed > 1e-9) vel.multiplyScalar(Math.max(0, speed - Math.min(speed * GROUND_FRICTION * drag, SNOW_MAX_DRAG * drag)) / speed);
         this.prev[i].set(p.x - vel.x, p.y, p.z - vel.z);
       }
     }

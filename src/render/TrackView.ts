@@ -5,8 +5,8 @@ import { animateStar, buildFinish, buildStar } from './goalModels';
 import { animateRing, buildRing } from './ringModel';
 import { buildDecor, decorFor, M } from '../world/models';
 import { DEFAULT_WORLD, biomeById, isSnowy, type WorldConfig } from '../world/worlds';
-import { buildRibbonMesh } from './ribbon';
-import { buildSupports, supportMaterial } from './supports';
+import { buildRibbonMesh, setRibbonStyle, topMaterial, type Skin } from './ribbon';
+import { buildSupports, setSupportStyle, supportMaterial } from './supports';
 
 /** Keeps Three.js objects in sync with the track data. */
 export class TrackView {
@@ -108,8 +108,19 @@ export class TrackView {
   }
 
   /** Restyles decor (and track skin) for a world: a pine becomes a palm on the beach. */
-  setWorld(w: WorldConfig) {
+  setWorld(w: WorldConfig, night = 0, wet = 0) {
     this.world = w;
+    const skin: Skin = ({ alpine: 'ice', forest: 'timber', beach: 'boardwalk', desert: 'sandstone', city: 'asphalt' } as const)[w.biome];
+    setRibbonStyle(skin, night, wet);
+    setSupportStyle(({ alpine: 'timber', forest: 'timber', beach: 'driftwood', desert: 'rust', city: 'steel' } as const)[w.biome]);
+    for (const [id, mesh] of this.ribbonById) {
+      const stroke = this.track.strokes.get(id);
+      if (!stroke) continue;
+      const mats = (mesh.userData.originalMaterials ?? mesh.material) as THREE.Material[];
+      mats[0] = topMaterial(stroke.type);
+      if (mesh.userData.highlighted) this.highlightRefresh(mesh);
+      else mesh.material = [...mats];
+    }
     for (const id of [...this.decorById.keys()]) {
       const d = this.track.decor.get(id);
       this.removeDecor(id);
@@ -195,6 +206,13 @@ export class TrackView {
       const obj = this.starById.get(st.id);
       if (obj) animateStar(obj, time, k * 1.3, Math.floor(collected / 2 ** k) % 2 === 1);
     });
+  }
+
+  private highlightRefresh(mesh: THREE.Mesh) {
+    mesh.userData.highlighted = false;
+    for (const m of mesh.material as THREE.Material[]) m.dispose();
+    mesh.material = mesh.userData.originalMaterials;
+    this.highlight(mesh.userData.strokeId);
   }
 
   /** Highlights a ribbon (eraser / bank hover). */

@@ -11,6 +11,14 @@ const UNDER = 0.18;
 
 export const supportMaterial = new THREE.MeshStandardMaterial({ color: 0x8a5a36, roughness: 0.85, flatShading: true });
 
+/** Scaffolding material per world: timber, driftwood, rusty or painted steel. */
+export function setSupportStyle(style: 'timber' | 'driftwood' | 'rust' | 'steel') {
+  const s = { timber: [0x8a5a36, 0.85, 0], driftwood: [0xb8a48a, 0.9, 0], rust: [0x8a4a2e, 0.7, 0.35], steel: [0x5f6873, 0.45, 0.6] }[style];
+  supportMaterial.color.setHex(s[0]);
+  supportMaterial.roughness = s[1];
+  supportMaterial.metalness = s[2];
+}
+
 const box = new THREE.BoxGeometry(1, 1, 1);
 const m = new THREE.Matrix4();
 const q = new THREE.Quaternion();

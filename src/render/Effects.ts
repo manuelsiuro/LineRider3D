@@ -1,6 +1,16 @@
 import * as THREE from 'three';
 import { P } from '../physics/Rider';
 import { terrainHeight } from '../world/terrain';
+import type { SurfaceId } from '../world/worlds';
+
+/** Particle colors kicked up from each ground (two tones mixed at random). */
+const DUST: Record<SurfaceId, [THREE.Color, THREE.Color]> = {
+  snow: [new THREE.Color(1, 1, 1), new THREE.Color(0.94, 0.97, 1)],
+  sand: [new THREE.Color(0.95, 0.8, 0.56), new THREE.Color(0.82, 0.64, 0.42)],
+  grass: [new THREE.Color(0.42, 0.31, 0.2), new THREE.Color(0.36, 0.56, 0.24)],
+  asphalt: [new THREE.Color(0.62, 0.62, 0.64), new THREE.Color(0.45, 0.45, 0.48)],
+};
+const SPARK = new THREE.Color(2.2, 1.3, 0.45);
 
 const MAX = 1500;
 const GRAVITY = -6;
@@ -31,7 +41,7 @@ export class Effects {
     const mat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
-      uniforms: { scale: { value: 400 } },
+      uniforms: { scale: { value: 400 }, light: { value: 1 } },
       vertexShader: `
         attribute float size; attribute float alpha; attribute vec3 color; varying float vAlpha; varying vec3 vColor; uniform float scale;
         void main() {
@@ -42,16 +52,31 @@ export class Effects {
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
-        varying float vAlpha; varying vec3 vColor;
+        varying float vAlpha; varying vec3 vColor; uniform float light;
         void main() {
           float d = length(gl_PointCoord - 0.5);
           if (d > 0.5) discard;
-          gl_FragColor = vec4(vColor * vec3(0.97, 0.99, 1.0), vAlpha * smoothstep(0.5, 0.15, d));
+          // Bright sparks keep their glow in the dark.
+          float l = max(light, step(1.5, vColor.r));
+          gl_FragColor = vec4(vColor * vec3(0.97, 0.99, 1.0) * l, vAlpha * smoothstep(0.5, 0.15, d));
         }`,
     });
     this.points = new THREE.Points(geo, mat);
     this.points.frustumCulled = false;
     scene.add(this.points);
+  }
+
+  private surface: SurfaceId = 'snow';
+
+  /** Ground the particles come from, and how dark the world is (0..1). */
+  setSurface(surface: SurfaceId, night: number) {
+    this.surface = surface;
+    (this.points.material as THREE.ShaderMaterial).uniforms.light.value = 1 - night * 0.65;
+  }
+
+  private dust() {
+    const [a, b] = DUST[this.surface];
+    return Math.random() < 0.5 ? a : b;
   }
 
   setViewportHeight(h: number) {
@@ -75,7 +100,7 @@ export class Effects {
     const v = new THREE.Vector3();
     for (let k = 0; k < count; k++) {
       v.set(Math.random() - 0.5, Math.random() * 0.9 + 0.2, Math.random() - 0.5).normalize().multiplyScalar(speed * (0.4 + Math.random()));
-      this.emit(at, v, 0.25 + Math.random() * 0.35, 0.6 + Math.random() * 0.8);
+      this.emit(at, v, 0.25 + Math.random() * 0.35, 0.6 + Math.random() * 0.8, this.dust());
     }
   }
 
@@ -123,7 +148,12 @@ export class Effects {
           v.y = 1.5 + Math.random() * 2.5 + speed * 0.1;
           v.x += (Math.random() - 0.5) * 3;
           v.z += (Math.random() - 0.5) * 3;
-          this.emit(p, v, 0.25 + Math.random() * 0.3, 0.5 + Math.random() * 0.6);
+          this.emit(p, v, 0.25 + Math.random() * 0.3, 0.5 + Math.random() * 0.6, this.dust());
+          // Sparks when metal scrapes the road.
+          if (this.surface === 'asphalt' && i === P.shoulder && Math.random() < 0.5) {
+            v.multiplyScalar(1.4);
+            this.emit(p, v, 0.07 + Math.random() * 0.06, 0.25 + Math.random() * 0.25, SPARK);
+          }
         }
       } else if (i <= P.noseR && speed > 6 && Math.random() < 0.6) {
         // Fine ice spray from the runners on a track.

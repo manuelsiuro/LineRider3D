@@ -144,7 +144,7 @@ function sand(seed: number, tone: [number, number, number]): GroundTextures {
     c[2] = tone[2] * k;
   });
   const normal = normalMap(size, (x, y) => ripple(x, y) * 0.5 + grain[y * size + x] * 0.25, 2.2);
-  return { map, normal, normalScale: 0.7, roughness: 0.97, color: 0xffffff };
+  return { map, normal, normalScale: 0.42, roughness: 0.97, color: 0xffffff };
 }
 
 /** Concrete plaza slabs with expansion joints and aggregate speckles. */

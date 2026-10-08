@@ -6,13 +6,34 @@
  * - A soft generative ambient pad with bells for music.
  */
 
-const CHORDS = [
-  [48, 55, 59, 64], // Cmaj7
-  [45, 52, 55, 60], // Am7
-  [41, 48, 52, 57], // Fmaj7
-  [43, 50, 55, 59], // G
-];
-const BELLS = [72, 74, 76, 79, 81, 84, 86, 88];
+import type { BiomeId, SurfaceId, TimeId, WeatherId } from '../world/worlds';
+
+type Voice = 'bell' | 'pluck' | 'marimba' | 'twang' | 'keys';
+
+/** Music of each world: pad chords, a melodic voice and its scale. */
+const MUSIC: Record<BiomeId, { chords: number[][]; notes: number[]; voice: Voice; beat?: boolean }> = {
+  // Cmaj7 Am7 Fmaj7 G with sleigh-like bells.
+  alpine: { chords: [[48, 55, 59, 64], [45, 52, 55, 60], [41, 48, 52, 57], [43, 50, 55, 59]], notes: [72, 74, 76, 79, 81, 84, 86, 88], voice: 'bell' },
+  // G Em C D, plucked folk pentatonic.
+  forest: { chords: [[43, 50, 55, 59], [40, 47, 52, 55], [36, 43, 48, 52], [38, 45, 50, 54]], notes: [67, 69, 71, 74, 76, 79, 81, 83], voice: 'pluck' },
+  // F Bb C Dm, tropical marimba.
+  beach: { chords: [[41, 48, 53, 57], [46, 53, 58, 62], [48, 55, 60, 64], [38, 45, 50, 53]], notes: [65, 67, 69, 72, 74, 77, 79, 81], voice: 'marimba' },
+  // E phrygian: E F G E, twangy.
+  desert: { chords: [[40, 47, 52, 55], [41, 48, 53, 57], [43, 50, 55, 59], [40, 47, 52, 56]], notes: [64, 65, 67, 69, 71, 72, 76, 77], voice: 'twang' },
+  // Dm9 G13 Cmaj9 A7, lo-fi keys over a soft beat.
+  city: { chords: [[50, 53, 57, 60, 64], [43, 53, 57, 59, 64], [48, 52, 55, 59, 62], [45, 49, 55, 57, 61]], notes: [62, 64, 65, 69, 72, 74, 76, 77], voice: 'keys', beat: true },
+};
+
+/** How each ground sounds under the rider: filter and loudness. */
+const GROUND: Record<SurfaceId, { type: BiquadFilterType; freq: number; q: number; gain: number }> = {
+  snow: { type: 'lowpass', freq: 700, q: 0.8, gain: 1 },
+  sand: { type: 'bandpass', freq: 1500, q: 0.7, gain: 0.9 },
+  grass: { type: 'lowpass', freq: 1300, q: 0.4, gain: 0.7 },
+  asphalt: { type: 'lowpass', freq: 380, q: 1.6, gain: 1.15 },
+};
+
+const WIND: Record<BiomeId, number> = { alpine: 0.025, forest: 0.012, beach: 0.02, desert: 0.032, city: 0.01 };
+
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
 interface Layer {
@@ -48,6 +69,16 @@ export class Sound {
   private chordIndex = 0;
   private musicTimer = 0;
   private bellTimer = 0;
+  private beatTimer = 0;
+  private beatStep = 0;
+  private ambientTimer = 0;
+  private rain!: Layer;
+  private surf!: Layer;
+  private hum!: Layer;
+  private biome: BiomeId = 'alpine';
+  private time: TimeId = 'day';
+  private weather: WeatherId = 'snow';
+  private ground: SurfaceId = 'snow';
 
   sfxOn = true;
   musicOn = true;
@@ -118,10 +149,14 @@ export class Sound {
     this.wind = this.layer('lowpass', 400, 0.7);
     this.scrape = this.layer('bandpass', 3200, 1.2);
     this.snow = this.layer('lowpass', 700, 0.8);
-    // A faint wind is always there: it's the mountains.
-    this.wind.gain.gain.value = 0.025;
+    // Ambience beds: rain hiss, sea surf, city hum.
+    this.rain = this.layer('bandpass', 3800, 0.35);
+    this.surf = this.layer('lowpass', 520, 0.6);
+    this.hum = this.layer('lowpass', 160, 0.9);
+    this.applyWorld();
 
     this.scheduleMusic();
+    this.scheduleAmbience();
   }
 
   private impulse(seconds: number) {
@@ -212,7 +247,132 @@ export class Sound {
     osc.stop(t + 0.8);
   }
 
-  /** Updates ride layers. Speed in units/second. */
+  /** The world around: ambience beds and events, ground sound and music. */
+  setWorld(biome: BiomeId, time: TimeId, weather: WeatherId, ground: SurfaceId) {
+    this.biome = biome;
+    this.time = time;
+    this.weather = weather;
+    this.ground = ground;
+    this.applyWorld();
+  }
+
+  private applyWorld() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const storm = this.weather === 'storm' || this.weather === 'sandstorm';
+    const rain = this.weather === 'rain' ? 0.06 : this.weather === 'storm' && this.biome !== 'alpine' ? 0.1 : 0;
+    this.rain.gain.gain.setTargetAtTime(rain, t, 0.8);
+    this.surf.gain.gain.setTargetAtTime(this.biome === 'beach' ? (storm ? 0.09 : 0.05) : 0, t, 0.8);
+    this.hum.gain.gain.setTargetAtTime(this.biome === 'city' ? 0.05 : 0, t, 0.8);
+    const g = GROUND[this.ground];
+    this.snow.filter.type = g.type;
+    this.snow.filter.frequency.setTargetAtTime(g.freq, t, 0.2);
+    this.snow.filter.Q.setTargetAtTime(g.q, t, 0.2);
+    this.windBase = WIND[this.biome] * (storm ? 3 : 1);
+  }
+  private windBase = 0.025;
+
+  /** Distant rumble after a lightning strike (`distance` 0 near .. 1 far). */
+  thunder(distance: number) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime + 0.4 + distance * 2.2;
+    const n = ctx.createBufferSource();
+    n.buffer = this.noise;
+    n.loop = true;
+    n.playbackRate.value = 0.5;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(900 - distance * 600, t);
+    f.frequency.exponentialRampToValueAtTime(90, t + 3.5);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.55 - distance * 0.3, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.18, t + 0.9);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 4.2);
+    n.connect(f).connect(g).connect(this.sfx);
+    n.start(t);
+    n.stop(t + 4.4);
+  }
+
+  /** A short tone with a pitch glide, for birds, horns and other critters. */
+  private chirp(type: OscillatorType, f0: number, f1: number, start: number, dur: number, peak: number, filter?: number) {
+    const ctx = this.ctx!;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(f0, start);
+    osc.frequency.exponentialRampToValueAtTime(f1, start + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(peak, start + Math.min(0.02, dur * 0.3));
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    let out: AudioNode = osc;
+    if (filter) {
+      const f = ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = filter;
+      f.Q.value = 2;
+      out = osc.connect(f);
+    }
+    out.connect(g).connect(this.sfx);
+    osc.start(start);
+    osc.stop(start + dur + 0.05);
+  }
+
+  /** Occasional sounds of the place: birds, gulls, crickets, horns, a hawk. */
+  private scheduleAmbience() {
+    const next = () => {
+      const ctx = this.ctx!;
+      const t = ctx.currentTime + 0.05;
+      const night = this.time === 'night';
+      const wet = this.weather === 'rain' || this.weather === 'storm' || this.weather === 'sandstorm';
+      const r = Math.random;
+      if (this.sfxOn && !document.hidden) {
+        switch (this.biome) {
+          case 'forest':
+            if (night) {
+              // Crickets, and now and then an owl.
+              for (let k = 0; k < 6; k++) this.chirp('sine', 4400, 4300, t + k * 0.07, 0.04, 0.012);
+              if (r() < 0.25) for (let k = 0; k < 2; k++) this.chirp('sine', 420, 380, t + 0.5 + k * 0.45, 0.35, 0.03);
+            } else if (!wet) {
+              // Birdsong: a few quick whistles.
+              const base = 2400 + r() * 1600;
+              const n = 2 + Math.floor(r() * 4);
+              for (let k = 0; k < n; k++) this.chirp('sine', base * (1 + r() * 0.3), base * (0.7 + r() * 0.6), t + k * (0.09 + r() * 0.05), 0.08, 0.02);
+            }
+            break;
+          case 'beach':
+            if (!night && !wet) {
+              // Gulls: descending cries.
+              for (let k = 0; k < 2 + Math.floor(r() * 3); k++) this.chirp('sawtooth', 1500 + r() * 300, 900, t + k * 0.22, 0.18, 0.012, 1600);
+            }
+            break;
+          case 'desert':
+            if (!night && r() < 0.4) this.chirp('sine', 2600, 1300, t, 1.1, 0.018);
+            if (night) for (let k = 0; k < 5; k++) this.chirp('sine', 3900, 3850, t + k * 0.1, 0.05, 0.01);
+            break;
+          case 'city':
+            if (r() < 0.5) {
+              // A car horn far away.
+              const f = 380 + r() * 120;
+              this.chirp('square', f, f, t, 0.3, 0.01, 900);
+              this.chirp('square', f * 1.26, f * 1.26, t, 0.3, 0.008, 900);
+            } else if (night && r() < 0.5) {
+              // Distant siren.
+              for (let k = 0; k < 4; k++) this.chirp('triangle', 700, 1000, t + k * 0.6, 0.55, 0.008);
+            }
+            break;
+          case 'alpine':
+            if (!night && !wet && r() < 0.3) this.chirp('sine', 3200, 2600, t, 0.12, 0.01);
+            break;
+        }
+      }
+      this.ambientTimer = window.setTimeout(next, 2500 + Math.random() * 5500);
+    };
+    next();
+  }
+
   /** Which ride is playing (changes the runner sound and the engine). */
   setRide(kind: RideSound) {
     this.rideKind = kind;
@@ -231,14 +391,17 @@ export class Sound {
     const s = playing ? Math.min(speed / 30, 1.3) : 0;
     const kind = this.rideKind;
     const wheels = kind === 'pedal' || kind === 'engine' || kind === 'motor';
-    this.wind.gain.gain.setTargetAtTime(0.025 + s * 0.16, t, 0.15);
+    this.wind.gain.gain.setTargetAtTime(this.windBase + s * 0.16, t, 0.15);
+    // Waves roll in and out.
+    if (this.biome === 'beach') this.surf.filter.frequency.setTargetAtTime(380 + 260 * (0.5 + 0.5 * Math.sin(t * 0.7)), t, 0.3);
     this.wind.filter.frequency.setTargetAtTime(350 + s * 1600, t, 0.2);
     // Runners scrape, skis and boards hiss lower, tyres hum.
     const scrapeFreq = kind === 'sled' ? 2200 + s * 2500 : wheels ? 300 + s * 500 : 1100 + s * 1400;
     const scrapeGain = kind === 'sled' ? Math.min(0.05 + s * 0.12, 0.16) : wheels ? Math.min(0.03 + s * 0.08, 0.1) : Math.min(0.06 + s * 0.14, 0.2);
     this.scrape.gain.gain.setTargetAtTime(onTrack && playing ? scrapeGain : 0, t, 0.04);
     this.scrape.filter.frequency.setTargetAtTime(scrapeFreq, t, 0.1);
-    this.snow.gain.gain.setTargetAtTime(onSnow && playing && speed > 1 ? Math.min(0.1 + s * 0.4, 0.45) : 0, t, 0.05);
+    const ground = GROUND[this.ground].gain;
+    this.snow.gain.gain.setTargetAtTime(onSnow && playing && speed > 1 ? Math.min(0.1 + s * 0.4, 0.45) * ground : 0, t, 0.05);
     this.updateEngine(playing, speed, throttle, airborne);
     // BMX freewheel: ticks while coasting, faster with speed.
     if (kind === 'pedal' && playing && !throttle && speed > 2 && (onTrack || onSnow)) {
@@ -506,8 +669,12 @@ export class Sound {
     const playChord = () => {
       const ctx = this.ctx!;
       const t = ctx.currentTime + 0.05;
-      const chord = CHORDS[this.chordIndex++ % CHORDS.length];
-      for (const note of chord) {
+      const m = MUSIC[this.biome];
+      const chord = m.chords[this.chordIndex++ % m.chords.length];
+      // Darker, softer voicing at night.
+      const night = this.time === 'night';
+      for (const raw of chord) {
+        const note = night ? raw - 2 : raw;
         for (const detune of [-6, 6]) {
           const osc = ctx.createOscillator();
           osc.type = 'sine';
@@ -515,7 +682,7 @@ export class Sound {
           osc.detune.value = detune;
           const f = ctx.createBiquadFilter();
           f.type = 'lowpass';
-          f.frequency.value = 900;
+          f.frequency.value = night ? 600 : 900;
           const g = ctx.createGain();
           g.gain.setValueAtTime(0.0001, t);
           g.gain.linearRampToValueAtTime(0.022, t + 2.5);
@@ -529,26 +696,95 @@ export class Sound {
     };
     const playBell = () => {
       const ctx = this.ctx!;
-      if (this.musicOn && Math.random() < 0.7) {
+      const m = MUSIC[this.biome];
+      if (this.musicOn && Math.random() < 0.7) this.melody(m.voice, m.notes[Math.floor(Math.random() * m.notes.length)] - (this.time === 'night' ? 2 : 0), ctx.currentTime + 0.02);
+      const slow = this.time === 'night' ? 1.5 : 1;
+      this.bellTimer = window.setTimeout(playBell, (900 + Math.random() * 1600) * slow);
+    };
+    // City: a soft lo-fi beat (kick on 1 and 3, a hat on the off-beats).
+    const beat = () => {
+      const ctx = this.ctx!;
+      if (this.musicOn && MUSIC[this.biome].beat && !document.hidden) {
         const t = ctx.currentTime + 0.02;
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = midi(BELLS[Math.floor(Math.random() * BELLS.length)]);
-        const g = ctx.createGain();
-        this.env(g, t, 0.035, 0.005, 2.2);
-        osc.connect(g).connect(this.music);
-        osc.start(t);
-        osc.stop(t + 2.5);
+        const step = this.beatStep++ % 8;
+        if (step % 4 === 0 || (step === 6 && Math.random() < 0.4)) {
+          const osc = ctx.createOscillator();
+          osc.frequency.setValueAtTime(110, t);
+          osc.frequency.exponentialRampToValueAtTime(42, t + 0.18);
+          const g = ctx.createGain();
+          this.env(g, t, 0.09, 0.004, 0.3);
+          osc.connect(g).connect(this.music);
+          osc.start(t);
+          osc.stop(t + 0.35);
+        }
+        if (step % 2 === 1) {
+          const n = ctx.createBufferSource();
+          n.buffer = this.noise;
+          const f = ctx.createBiquadFilter();
+          f.type = 'highpass';
+          f.frequency.value = 7000;
+          const g = ctx.createGain();
+          this.env(g, t, 0.018, 0.002, 0.05);
+          n.connect(f).connect(g).connect(this.music);
+          n.start(t, Math.random());
+          n.stop(t + 0.08);
+        }
       }
-      this.bellTimer = window.setTimeout(playBell, 900 + Math.random() * 1600);
     };
     playChord();
     this.musicTimer = window.setInterval(playChord, 8000);
+    this.beatTimer = window.setInterval(beat, 375);
     playBell();
+  }
+
+  /** One melody note in the world's voice. */
+  private melody(voice: Voice, note: number, t: number) {
+    const ctx = this.ctx!;
+    const f = midi(note);
+    const tone = (type: OscillatorType, freq: number, peak: number, decay: number, filter?: number) => {
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.value = freq;
+      const g = ctx.createGain();
+      this.env(g, t, peak, 0.004, decay);
+      let out: AudioNode = osc;
+      if (filter) {
+        const bq = ctx.createBiquadFilter();
+        bq.type = 'lowpass';
+        bq.frequency.value = filter;
+        out = osc.connect(bq);
+      }
+      out.connect(g).connect(this.music);
+      osc.start(t);
+      osc.stop(t + decay + 0.1);
+    };
+    switch (voice) {
+      case 'bell':
+        tone('sine', f, 0.035, 2.2);
+        break;
+      case 'pluck':
+        tone('triangle', f, 0.04, 0.9, 2400);
+        tone('sine', f * 2, 0.01, 0.4);
+        break;
+      case 'marimba':
+        tone('sine', f, 0.05, 0.5);
+        tone('sine', f * 4, 0.012, 0.12);
+        break;
+      case 'twang':
+        tone('sawtooth', f, 0.018, 1.4, 1400);
+        tone('sine', f * 0.5, 0.012, 1.2);
+        break;
+      case 'keys':
+        tone('sine', f, 0.03, 1.6);
+        tone('triangle', f * 2, 0.008, 0.8, 1800);
+        break;
+    }
   }
 
   dispose() {
     clearInterval(this.musicTimer);
+    clearInterval(this.beatTimer);
+    clearTimeout(this.ambientTimer);
     clearTimeout(this.bellTimer);
     this.ctx?.close();
   }

@@ -1,15 +1,25 @@
 import * as THREE from 'three';
 import { P } from '../physics/vehicles';
 import { terrainHeight } from '../world/terrain';
+import type { SurfaceId } from '../world/worlds';
+
+/** Groove color and opacity per ground. */
+const MARKS: Record<SurfaceId, [number, number, number, number]> = {
+  snow: [0.34, 0.45, 0.64, 0.55],
+  sand: [0.55, 0.4, 0.26, 0.5],
+  grass: [0.2, 0.3, 0.12, 0.45],
+  asphalt: [0.06, 0.06, 0.07, 0.5],
+};
 
 /** Segments kept per lane (oldest are overwritten). */
 const MAX = 900;
 
 /**
- * Grooves left in the snow by runners, skis and tyres: two lanes (left and
- * right contacts), each a strip of quads written into a ring buffer.
+ * Grooves left in the ground by runners, skis and tyres (furrows in sand,
+ * flattened grass, skid marks on asphalt): two lanes (left and right
+ * contacts), each a strip of quads written into a ring buffer.
  */
-export class SnowTracks {
+export class SurfaceTracks {
   private mesh: THREE.Mesh;
   private positions = new Float32Array(MAX * 2 * 4 * 3);
   private uvs = new Float32Array(MAX * 2 * 4 * 2);
@@ -37,7 +47,7 @@ export class SnowTracks {
       polygonOffset: true,
       polygonOffsetFactor: -2,
       fog: true,
-      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog]),
+      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { mark: { value: new THREE.Vector4(...MARKS.snow) } }]),
       vertexShader: `#include <fog_pars_vertex>
         varying vec2 vUv;
         void main(){
@@ -47,11 +57,11 @@ export class SnowTracks {
           #include <fog_vertex>
         }`,
       fragmentShader: `#include <fog_pars_fragment>
-        varying vec2 vUv;
+        varying vec2 vUv; uniform vec4 mark;
         void main(){
-          // Soft groove: darker blue in the middle, fading at the edges.
+          // Soft groove: darker in the middle, fading at the edges.
           float e = 1.0 - pow(abs(vUv.x * 2.0 - 1.0), 2.0);
-          gl_FragColor = vec4(0.34, 0.45, 0.64, 0.55 * e);
+          gl_FragColor = vec4(mark.rgb, mark.a * e);
           #include <fog_fragment>
         }`,
     });
@@ -59,6 +69,13 @@ export class SnowTracks {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 1;
     scene.add(this.mesh);
+  }
+
+  /** Ground the marks are left in; rain makes them darker, night dims them. */
+  setSurface(surface: SurfaceId, wet: number, night: number) {
+    const [r, g, b, a] = MARKS[surface];
+    const k = (1 - wet * 0.3) * (1 - night * 0.6);
+    ((this.mesh.material as THREE.ShaderMaterial).uniforms.mark.value as THREE.Vector4).set(r * k, g * k, b * k, Math.min(0.8, a + wet * 0.15));
   }
 
   reset() {

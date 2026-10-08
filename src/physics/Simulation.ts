@@ -32,7 +32,17 @@ export class Simulation {
   /** Switches the ride; the recording starts over (inputs are kept). */
   setVehicle(vehicle: VehicleDef) {
     if (vehicle === this.rider.def) return;
+    const drag = this.rider.groundDrag;
     this.rider = new Rider(vehicle);
+    this.rider.groundDrag = drag;
+    this.history = [];
+    this.revision = -1;
+  }
+
+  /** Ground drag of the world's surface (snow = 1); the recording starts over. */
+  setGroundDrag(drag: number) {
+    if (drag === this.rider.groundDrag) return;
+    this.rider.groundDrag = drag;
     this.history = [];
     this.revision = -1;
   }
