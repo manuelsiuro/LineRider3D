@@ -82,3 +82,21 @@ console.log('corrupt and blocked storage handled');
   check(!mem.has(KEYS.track) && gallery.listSlots().length === 0, 'an empty old track is not kept');
   console.log('gallery migration ok');
 }
+
+// A migration that can't finish (storage full) is retried on the next start.
+{
+  mem.clear();
+  mem.set(KEYS.track, JSON.stringify({ strokes: [{ points: [0, 1, 0, 2, 1, 0] }] }));
+  mem.set(KEYS.version, '1');
+  const setItem = (globalThis as { localStorage: { setItem: (k: string, v: string) => void } }).localStorage.setItem;
+  (globalThis as { localStorage: { setItem: (k: string, v: string) => void } }).localStorage.setItem = (k, v) => {
+    if (k.startsWith('lr3d.slot.')) throw new Error('QuotaExceededError');
+    setItem(k, v);
+  };
+  migrateStorage();
+  check(mem.get(KEYS.version) === '1' && mem.has(KEYS.track), 'a failed migration keeps the old track and version');
+  (globalThis as { localStorage: { setItem: (k: string, v: string) => void } }).localStorage.setItem = setItem;
+  migrateStorage();
+  check(mem.get(KEYS.version) === String(SAVE_VERSION) && !mem.has(KEYS.track), 'it succeeds on the next start');
+  console.log('failed migration retried');
+}

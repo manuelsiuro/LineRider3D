@@ -32,7 +32,7 @@ export class Input {
     addEventListener('blur', () => (this.keys = 0));
     addEventListener('keydown', (e) => {
       // V: next ride while editing (levels and challenges pick theirs on the intro).
-      if ((e.key === 'v' || e.key === 'V') && canCycleRide() && !overlayOpen() && !(e.target instanceof HTMLInputElement)) cycleRide();
+      if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey && !e.altKey && canCycleRide() && !overlayOpen() && !(e.target instanceof HTMLInputElement)) cycleRide();
     });
   }
 

@@ -551,8 +551,11 @@ export class Editor {
     // Snap the end onto another stroke's endpoint.
     const endSnap = this.findSnap(e);
     if (endSnap && pts.length >= 2) {
-      if (this.tool === 'line') pts = this.lineThrough(pts[0], endSnap);
-      pts[pts.length - 1] = endSnap;
+      let snapped = this.tool === 'line' ? this.lineThrough(pts[0], endSnap) : pts.slice();
+      snapped[snapped.length - 1] = endSnap;
+      // Puzzles: a snap can't stretch the line past the ink left.
+      if (this.rules && pathLength(snapped) > this.rules.ink - this.inkSpent + 0.05) snapped = pts;
+      pts = snapped;
     }
     if (this.tool === 'pencil') pts = smooth(pts);
     const valid = pts.length >= 2 && pts[0].distanceTo(pts[pts.length - 1]) > 0.2;

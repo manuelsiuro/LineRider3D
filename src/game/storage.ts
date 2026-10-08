@@ -100,8 +100,8 @@ export function writeFlag(key: StorageKey, on: boolean) {
 
 export const SAVE_VERSION = 2;
 
-/** MIGRATIONS[n] upgrades saves from version n to n + 1. */
-const MIGRATIONS: Array<() => void> = [
+/** MIGRATIONS[n] upgrades saves from version n to n + 1; false means try again next time. */
+const MIGRATIONS: Array<() => boolean> = [
   // 0 → 1: early builds stored a bare number per best score; make them records.
   () => {
     const bests = readJSON<Record<string, unknown>>(KEYS.best, {});
@@ -112,12 +112,12 @@ const MIGRATIONS: Array<() => void> = [
         changed = true;
       }
     }
-    if (changed) writeJSON(KEYS.best, bests);
+    return !changed || writeJSON(KEYS.best, bests);
   },
   // 1 → 2: the single editor track becomes the first track of the gallery.
   () => {
     const raw = readText(KEYS.track);
-    if (raw === null) return;
+    if (raw === null) return true;
     let strokes = 0;
     let world = '';
     try {
@@ -125,13 +125,17 @@ const MIGRATIONS: Array<() => void> = [
       strokes = Array.isArray(data.strokes) ? data.strokes.length : 0;
       world = data.world?.biome ?? '';
     } catch {
-      return;
+      return true;
     }
-    if (strokes === 0) return removeKey(KEYS.track);
-    // Copy first, and only drop the old key once the copy is in place.
-    if (!writeText(slotKey('t1'), raw)) return;
-    if (!writeJSON(KEYS.tracks, { current: 't1', slots: [{ id: 't1', name: 'My track', savedAt: Date.now(), strokes, world }] })) return;
+    if (strokes === 0) {
+      removeKey(KEYS.track);
+      return true;
+    }
+    // Copy first, and only drop the old key once the copy is in place (storage full: retry later).
+    if (!writeText(slotKey('t1'), raw)) return false;
+    if (!writeJSON(KEYS.tracks, { current: 't1', slots: [{ id: 't1', name: 'My track', savedAt: Date.now(), strokes, world }] })) return false;
     removeKey(KEYS.track);
+    return true;
   },
 ];
 
@@ -143,12 +147,15 @@ export function migrateStorage(): number {
   let v = Number(readText(KEYS.version) ?? 0) || 0;
   if (v > SAVE_VERSION) return v;
   for (; v < SAVE_VERSION; v++) {
+    let ok = true;
     try {
-      MIGRATIONS[v]();
+      ok = MIGRATIONS[v]();
     } catch {
-      /* keep going: a broken old value falls back when read */
+      /* a broken old value falls back when read: move on */
     }
+    // Couldn't finish (storage full): stay on this version and try again next start.
+    if (!ok) break;
   }
-  writeText(KEYS.version, String(SAVE_VERSION));
+  writeText(KEYS.version, String(v));
   return v;
 }

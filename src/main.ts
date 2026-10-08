@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MOUSE, TOUCH } from 'three';
 import './styles/index.css';
 import { TrackFormatError, validateTrack, type SerializedTrack } from './track/Track';
 import { CAMERA_LABELS, type CameraMode } from './render/CameraRig';
@@ -163,6 +164,8 @@ function loadInto(fn: () => void) {
 }
 
 track.on((e) => {
+  // Moving the start flag by hand during a test keeps it (Stop won't put the old one back).
+  if (e.kind === 'startChanged' && !loading) testStart = null;
   if (loading || e.kind === 'cleared' || !autosaves(session)) return;
   pristine = false;
   clearTimeout(saveTimer);
@@ -173,7 +176,10 @@ track.on((e) => {
 function saveTrack() {
   saveTimer = 0;
   if (!slotId) slotId = createSlot(slotName || freshName());
-  if (!saveSlot(slotId, track.serialize())) ui.flash('Storage is full: export your track to keep it', 4000);
+  const data = track.serialize();
+  // While testing from another point, the real start is the one saved.
+  if (testStart) data.start = testStart.toArray();
+  if (!saveSlot(slotId, data)) ui.flash('Storage is full: export your track to keep it', 4000);
 }
 
 /** The track "Continue" opens (the last one edited). */
@@ -565,7 +571,8 @@ async function backToLevels() {
 /** Opens a track from a share link, with an intro (and the challenge score). */
 async function enterShared(data: SerializedTrack, score: number, vehicleId: string | null, ghost: number[] | null = null) {
   // A challenge is ridden on the challenger's ride, against their ghost.
-  enter({ kind: 'edit', challenge: score }, score > 0 && vehicleId ? vehicleById(vehicleId) : null, ghost);
+  // Links leave out the sled (the default ride).
+  enter({ kind: 'edit', challenge: score }, score > 0 ? vehicleById(vehicleId ?? 'sled') : null, ghost);
   slotId = null;
   slotName = freshName('Shared track');
   loadInto(() => track.load(data));
@@ -821,6 +828,11 @@ async function openPhoto() {
   rig.mode = 'follow';
   controls.target.copy(riderCenter);
   document.body.classList.add('photo');
+  // Dragging frames the shot: no drawing, the left button orbits.
+  const editorWasOn = editor.enabled;
+  editor.enabled = false;
+  controls.mouseButtons = { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN };
+  controls.touches = { ONE: TOUCH.ROTATE, TWO: TOUCH.DOLLY_PAN };
   // The look can change for the shot; the world itself comes back after.
   const original = { ...env.config };
   const label = <T extends { id: string; name: string }>(list: T[], id: string) => ({ icon: id, name: list.find((x) => x.id === id)?.name ?? id });
@@ -863,6 +875,8 @@ async function openPhoto() {
     },
   });
   core.riderView.root.visible = true;
+  editor.enabled = editorWasOn;
+  editor.setTool(editor.tool);
   if (!sameWorld(env.config, original)) worlds.preview(original);
   document.body.classList.remove('photo');
   rig.mode = prevMode;
