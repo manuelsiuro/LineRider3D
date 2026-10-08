@@ -1,0 +1,139 @@
+/* ------------------------------------------------------------ medals and ghost race */
+:root {
+  --medal-bronze: #c47a3d;
+  --medal-silver: #8e9bab;
+  --medal-gold: #e9a91b;
+  --medal-dev: #7a5cf0;
+}
+
+.medal-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 10px;
+}
+
+.medal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px 4px 6px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  background: rgba(18, 35, 58, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(18, 35, 58, 0.06);
+}
+
+.medal-chip.bronze .ic { color: var(--medal-bronze); }
+.medal-chip.silver .ic { color: var(--medal-silver); }
+.medal-chip.gold .ic { color: var(--medal-gold); }
+.medal-chip.dev .ic { color: var(--medal-dev); }
+
+/* Medals already won light up in their color. */
+.medal-chip.got {
+  color: white;
+  box-shadow: none;
+}
+.medal-chip.got .ic { color: white; }
+.medal-chip.bronze.got { background: var(--medal-bronze); }
+.medal-chip.silver.got { background: var(--medal-silver); }
+.medal-chip.gold.got { background: var(--medal-gold); }
+.medal-chip.dev.got { background: var(--medal-dev); }
+
+.medal-best {
+  margin-left: 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+/* Level select: the best medal next to the stars. */
+.level-medal {
+  display: inline-grid;
+  margin-left: 4px;
+}
+.level-medal.bronze { color: var(--medal-bronze); }
+.level-medal.silver { color: var(--medal-silver); }
+.level-medal.gold { color: var(--medal-gold); }
+.level-medal.dev { color: var(--medal-dev); }
+
+/* Summary: the medal won and how far the next one is. */
+.summary .medal-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.medal-won {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 7px;
+  border-radius: 999px;
+  font-weight: 800;
+  color: white;
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.5);
+}
+.medal-won.bronze { background: var(--medal-bronze); }
+.medal-won.silver { background: var(--medal-silver); }
+.medal-won.gold { background: var(--medal-gold); }
+.medal-won.dev { background: var(--medal-dev); }
+
+.medal-next {
+  opacity: 0.8;
+}
+
+/* Live gap to the ghost in the HUD. */
+.gap-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: white;
+  background: rgba(220, 70, 60, 0.85);
+  box-shadow: var(--shadow);
+}
+
+.gap-chip.ahead {
+  background: rgba(30, 170, 110, 0.9);
+}
+
+.race-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Section label like Ride and World (only once there is a row). */
+.intro .medal-row::before {
+  content: 'Medals · home world';
+  flex-basis: 100%;
+  font: 700 11px var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.gap-chip.tie {
+  background: rgba(18, 35, 58, 0.55);
+}
+
+.summary .medal-line > span:not(.medal-won) {
+  color: rgba(255, 255, 255, 0.92);
+}

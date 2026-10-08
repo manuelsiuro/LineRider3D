@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { STEPS_PER_SECOND } from '../physics/Simulation';
 import { EVENT, INPUT, P } from '../physics/Rider';
 import { terrainHeight } from '../world/terrain';
-import { GhostRun, loadGhost } from '../game/Ghost';
+import { GhostRun, type GhostRecord } from '../game/Ghost';
 import { bumpWipeouts, loadCounters } from '../game/achievements';
 import type { CameraMode } from '../render/CameraRig';
 import type { VehicleDef } from '../physics/vehicles';
@@ -20,8 +20,8 @@ export interface RunHooks {
   /** Live input bits. */
   input(): number;
   vehicle(): VehicleDef;
-  /** Where this run's ghost is kept. */
-  ghostKey(): string;
+  /** The ghost to race (the player's best, or a friend's from a link). */
+  ghostRecord(): GhostRecord | null;
   /** Centers the camera on the rider (a fresh start). */
   focus(): void;
   /** Every 10 steps while riding (mid-run achievements). */
@@ -51,6 +51,8 @@ export class Run {
   impact = 0;
   /** White screen flash (fades). */
   flash = 0;
+  /** Live time gap to the ghost (s, negative: ahead), null when there is none. */
+  gap: number | null = null;
   /** Tricks landed this run (for achievements). */
   readonly tricks: string[] = [];
   wipeouts = loadCounters().wipeouts;
@@ -100,7 +102,7 @@ export class Run {
     // A fresh attempt (or a classic run) starts with no recorded input.
     if (this.frame === 0 && !this.replaying) sim.clearInputs();
     if (this.frame === 0) {
-      const record = this.h.inGame() ? loadGhost(this.h.ghostKey()) : null;
+      const record = this.h.inGame() ? this.h.ghostRecord() : null;
       this.ghost = record ? new GhostRun(track, record, this.h.vehicle(), sim.rider.groundDrag) : null;
       ghostView.setVehicle(this.h.vehicle());
       this.h.focus();
@@ -210,6 +212,8 @@ export class Run {
     rider.velocity(riderVel);
 
     const events = runStats.advance(sim, frame, STEPS_PER_SECOND);
+    // Race the ghost: how far ahead or behind, from the distance covered.
+    this.gap = showGhost && ghost && this.playing && frame > STEPS_PER_SECOND && !runStats.stats.crashed ? ghost.gap(frame, runStats.stats.distance, STEPS_PER_SECOND) : null;
     if (this.playing) {
       const justCrashed = effects.fromRider(frame, rider.pos, rider.contact, rider.crashed, riderVel, STEPS_PER_SECOND);
       this.side.subVectors(riderView.pts[P.tailR], riderView.pts[P.tailL]).normalize();

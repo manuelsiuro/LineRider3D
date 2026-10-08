@@ -3,9 +3,11 @@ import { TrackFormatError, validateTrack, type SerializedTrack } from '../track/
 /**
  * Track share links: the whole track lives in the URL hash, compressed with
  * deflate (when the browser supports it) and base64url-encoded.
- *   #t=<code>[&c=<score to beat>][&v=<ride id>]
+ *   #t=<code>[&c=<score to beat>][&v=<ride id>][&g=<ghost inputs>]
  * A daily ride needs no track, only its day:
- *   #d=<YYYY-MM-DD>[&c=<score to beat>]
+ *   #d=<YYYY-MM-DD>[&c=<score to beat>][&g=<ghost inputs>]
+ * The ghost is the challenger's run-length encoded input ("mask.count.mask.count…"):
+ * the friend races it live.
  * The code's first letter is the encoding (z: deflate, j: plain JSON); the
  * track inside carries its format version, checked by validateTrack.
  */
@@ -66,20 +68,30 @@ export async function decodeTrack(code: string): Promise<SerializedTrack> {
   return validateTrack(raw);
 }
 
-export async function shareLink(data: SerializedTrack, challenge = 0, vehicle = 'sled'): Promise<string> {
+const ghostParam = (ghost?: number[]) => (ghost && ghost.length ? `&g=${ghost.join('.')}` : '');
+
+/** Reads a ghost parameter back (null when missing or malformed). */
+function readGhost(raw: string | null): number[] | null {
+  if (!raw) return null;
+  const rle = raw.split('.').map(Number);
+  const ok = rle.length % 2 === 0 && rle.length <= 4000 && rle.every((n, i) => Number.isInteger(n) && n >= 0 && (i % 2 ? n > 0 && n <= 24000 : n < 16));
+  return ok ? rle : null;
+}
+
+export async function shareLink(data: SerializedTrack, challenge = 0, vehicle = 'sled', ghost?: number[]): Promise<string> {
   const code = await encodeTrack(data);
   const base = `${location.origin}${location.pathname}`;
-  return `${base}#t=${code}${challenge > 0 ? `&c=${challenge}` : ''}${vehicle !== 'sled' ? `&v=${vehicle}` : ''}`;
+  return `${base}#t=${code}${challenge > 0 ? `&c=${challenge}` : ''}${vehicle !== 'sled' ? `&v=${vehicle}` : ''}${ghostParam(ghost)}`;
 }
 
 /** A link to a day's daily ride, with a score to beat. */
-export function dailyLink(day: string, challenge = 0): string {
-  return `${location.origin}${location.pathname}#d=${day}${challenge > 0 ? `&c=${challenge}` : ''}`;
+export function dailyLink(day: string, challenge = 0, ghost?: number[]): string {
+  return `${location.origin}${location.pathname}#d=${day}${challenge > 0 ? `&c=${challenge}` : ''}${ghostParam(ghost)}`;
 }
 
 export type SharedLink =
-  | { kind: 'track'; data: SerializedTrack; challenge: number; vehicle: string | null }
-  | { kind: 'daily'; day: string; challenge: number };
+  | { kind: 'track'; data: SerializedTrack; challenge: number; vehicle: string | null; ghost: number[] | null }
+  | { kind: 'daily'; day: string; challenge: number; ghost: number[] | null };
 
 /** Reads a shared track (or daily ride) from the current URL, if any. */
 export async function readSharedLink(): Promise<SharedLink | null> {
@@ -88,10 +100,10 @@ export async function readSharedLink(): Promise<SharedLink | null> {
   const day = params.get('d');
   if (day) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(`${day}T00:00:00Z`))) throw new TrackFormatError('That daily link looks broken');
-    return { kind: 'daily', day, challenge };
+    return { kind: 'daily', day, challenge, ghost: readGhost(params.get('g')) };
   }
   const code = params.get('t');
   if (!code) return null;
   const data = await decodeTrack(code);
-  return { kind: 'track', data, challenge, vehicle: params.get('v') };
+  return { kind: 'track', data, challenge, vehicle: params.get('v'), ghost: readGhost(params.get('g')) };
 }

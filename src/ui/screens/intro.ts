@@ -3,7 +3,7 @@ import { controlsHtml } from '../controls';
 import { closeOverlay, h } from '../dom';
 import { icon } from '../icons';
 import type { BiomeId, WorldConfig } from '../../world/worlds';
-import type { ScreenCtx, WorldPicker, RidePicker, Controls } from '../types';
+import type { ScreenCtx, WorldPicker, RidePicker, Controls, MedalRow } from '../types';
 
 /** World chips (landscape, time, weather) for an intro card. */
 export function worldPicker(ctx: ScreenCtx, card: HTMLElement, picker: WorldPicker | undefined) {
@@ -48,6 +48,11 @@ export function worldPicker(ctx: ScreenCtx, card: HTMLElement, picker: WorldPick
 export function ridePicker(ctx: ScreenCtx, card: HTMLElement, ride: RidePicker | undefined, keysEl: HTMLElement | null) {
   const slot = card.querySelector('.ride-pick') as HTMLElement | null;
   if (!slot || !ride) return;
+  const medalSlot = card.querySelector('.medal-pick') as HTMLElement | null;
+  const medals = (id: string) => {
+    if (medalSlot) medalSlot.innerHTML = medalRowHtml(ride.medals?.(id) ?? null);
+  };
+  medals(ride.selected);
   const render = (sel: string) => {
     if (ride.locked) {
       const o = ride.options.find((x) => x.id === sel)!;
@@ -66,12 +71,13 @@ export function ridePicker(ctx: ScreenCtx, card: HTMLElement, ride: RidePicker |
     ctx.click();
     const keys = ride.onPick(b.dataset.ride!);
     if (keysEl) keysEl.innerHTML = controlsHtml(keys);
+    medals(b.dataset.ride!);
     render(b.dataset.ride!);
   });
 }
 
 /** Intro for a track opened from a share link. */
-export function showSharedIntro(ctx: ScreenCtx, challenge: number, goals: string[], keys: Controls, ride?: RidePicker, world?: WorldPicker): Promise<void> {
+export function showSharedIntro(ctx: ScreenCtx, challenge: number, goals: string[], keys: Controls, ride?: RidePicker, world?: WorldPicker, racing = false): Promise<void> {
   return new Promise((resolve) => {
     const overlay = h(
       'div',
@@ -80,6 +86,7 @@ export function showSharedIntro(ctx: ScreenCtx, challenge: number, goals: string
         <span class="badge dark">${challenge ? 'Challenge' : 'Shared track'}</span>
         <h2>${challenge ? `Beat ${challenge.toLocaleString()} points!` : 'A friend shared a track'}</h2>
         <p>${challenge ? 'Your friend set this score on this track. Can you top it?' : 'Ride it, then edit it or make it your own.'}</p>
+        ${racing ? `<p class="race-note">${icon('eye', 15)} Their ghost rides with you: race it!</p>` : ''}
         <ul class="intro-goals">${goals.map((g) => `<li>${icon('star', 18)}${g}</li>`).join('')}</ul>
         <div class="ride-pick"></div>
         <div class="world-pick"></div>
@@ -110,6 +117,7 @@ export function showLevelIntro(ctx: ScreenCtx, number: number, name: string, tip
         <h2>${name}</h2>
         <p>${tip}</p>
         <ul class="intro-goals">${goals.map((g, i) => `<li class="${i < stars ? 'done' : ''}">${icon('star', 18)}${g}</li>`).join('')}</ul>
+        <div class="medal-pick"></div>
         <div class="ride-pick"></div>
         <div class="world-pick"></div>
         <div class="keys controls">${controlsHtml(keys)}</div>
@@ -129,7 +137,7 @@ export function showLevelIntro(ctx: ScreenCtx, number: number, name: string, tip
 }
 
 /** Intro for the daily ride: the same track, ride and world for everyone today. */
-export function showDailyIntro(ctx: ScreenCtx, info: { number: number; name: string; date: string; challenge: number; best: number; streak: number; world: string }, goals: string[], keys: Controls, ride?: RidePicker): Promise<void> {
+export function showDailyIntro(ctx: ScreenCtx, info: { number: number; name: string; date: string; challenge: number; best: number; streak: number; world: string; racing: boolean }, goals: string[], keys: Controls, ride?: RidePicker): Promise<void> {
   return new Promise((resolve) => {
     const overlay = h(
       'div',
@@ -138,6 +146,7 @@ export function showDailyIntro(ctx: ScreenCtx, info: { number: number; name: str
         <span class="badge dark daily">${icon('calendar', 13)} Daily ride #${info.number} · ${info.date}</span>
         <h2>${info.challenge ? `Beat ${info.challenge.toLocaleString()} points!` : info.name}</h2>
         <p>${info.challenge ? `A friend scored ${info.challenge.toLocaleString()} on ${info.name}. Can you top it?` : 'A new track every day, the same for everyone. Ride it as often as you like: your best score counts.'}</p>
+        ${info.racing ? `<p class="race-note">${icon('eye', 15)} Their ghost rides with you: race it!</p>` : ''}
         <div class="daily-facts">
           <span>${icon('globe', 15)} ${info.world}</span>
           ${info.best > 0 ? `<span>${icon('trophy', 15)} Best ${info.best.toLocaleString()}</span>` : ''}
@@ -160,3 +169,13 @@ export function showDailyIntro(ctx: ScreenCtx, info: { number: number; name: str
   });
 }
 
+const MEDAL_KEYS = ['bronze', 'silver', 'gold', 'dev'];
+
+/** Medal targets for the selected ride; the ones already won are lit. */
+function medalRowHtml(row: MedalRow | null) {
+  if (!row) return '';
+  const chips = row.times
+    .map((t, i) => `<span class="medal-chip ${MEDAL_KEYS[i]} ${row.best > 0 && row.best <= t + 1e-6 ? 'got' : ''}" title="${MEDAL_KEYS[i]}">${icon('medal', 15)}${t.toFixed(1)}s</span>`)
+    .join('');
+  return `<div class="medal-row" title="Finish times on the level's home world">${chips}${row.best > 0 ? `<span class="medal-best">Best ${row.best.toFixed(2)}s</span>` : ''}</div>`;
+}

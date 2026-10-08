@@ -1,1 +1,2 @@
 ghost rle [0,130,2,25,0,45,1,30,0,90] max divergence 0
+own ghost gap max 0.000s

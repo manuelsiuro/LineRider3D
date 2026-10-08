@@ -64,6 +64,7 @@ export class UI {
   private scoreChip: HTMLElement;
   private comboChip: HTMLElement;
   private starsChip: HTMLElement;
+  private gapChip: HTMLElement;
   private touchPad: HTMLElement;
   private riderBtn: HTMLButtonElement;
   private vehicleBtn: HTMLButtonElement;
@@ -221,6 +222,7 @@ export class UI {
         <div class="stars-chip hidden">${icon('star', 16)}<b>0/0</b></div>
         <div class="combo-chip hidden"><span>COMBO</span><b>x1</b><i><em></em></i></div>
         <div class="air-chip hidden">AIR <b>0.0s</b></div>
+        <div class="gap-chip hidden" title="Time gap to your ghost">${icon('eye', 14)}<b>0.00</b></div>
       </div>`,
     );
     this.gaugeArc = this.hud.querySelector('.gauge-fg')!;
@@ -229,6 +231,7 @@ export class UI {
     this.scoreChip = this.hud.querySelector('.score-chip')!;
     this.comboChip = this.hud.querySelector('.combo-chip')!;
     this.starsChip = this.hud.querySelector('.stars-chip')!;
+    this.gapChip = this.hud.querySelector('.gap-chip')!;
 
     // On-screen controls for touch devices in rider mode.
     this.touchPad = h(
@@ -473,6 +476,16 @@ export class UI {
   }
 
   /** Live speed and airtime readout. */
+  /** Live gap to the ghost in seconds (negative: ahead), or null to hide it. */
+  setGap(gap: number | null) {
+    this.gapChip.classList.toggle('hidden', gap === null);
+    if (gap === null) return;
+    const tie = Math.abs(gap) < 0.005;
+    setText(this.gapChip.querySelector('b')!, tie ? '0.00' : `${gap < 0 ? '−' : '+'}${Math.abs(gap).toFixed(2)}`);
+    this.gapChip.classList.toggle('ahead', !tie && gap < 0);
+    this.gapChip.classList.toggle('tie', tie);
+  }
+
   setHud(visible: boolean, stats: Stats, starsTotal = 0) {
     this.hud.classList.toggle('hidden', !visible);
     if (!visible) return;

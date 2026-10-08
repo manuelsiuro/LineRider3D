@@ -11,7 +11,7 @@ export function showLevels(ctx: ScreenCtx, levels: LevelCard[], stars: number): 
           <span class="level-num">${l.unlocked ? i + 1 : icon('lock', 20)}</span>
           ${l.ride ? `<span class="level-ride" title="Made for one ride">${icon(l.ride, 18)}</span>` : ''}
           <span class="level-name">${l.name}</span>
-          <span class="level-stars">${[0, 1, 2].map((k) => `<i class="${k < l.stars ? 'on' : ''}">${icon('star', 18)}</i>`).join('')}</span>
+          <span class="level-stars">${[0, 1, 2].map((k) => `<i class="${k < l.stars ? 'on' : ''}">${icon('star', 18)}</i>`).join('')}${l.medal ? `<b class="level-medal ${l.medal}" title="${l.medal} medal">${icon('medal', 16)}</b>` : ''}</span>
           <span class="level-best">${l.unlocked ? (l.score ? `Best ${l.score.toLocaleString()}` : 'Not played') : 'Get a star on the previous level'}</span>
         </button>`;
     // Group the levels by world, keeping their order.

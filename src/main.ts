@@ -5,13 +5,14 @@ import { CAMERA_LABELS, type CameraMode } from './render/CameraRig';
 import { STEPS_PER_SECOND } from './physics/Simulation';
 import { P } from './physics/Rider';
 import { vehicleById, type VehicleDef } from './physics/vehicles';
-import { DEFAULT_WORLD, normalizeWorld, surfaceOf, worldLabel, type WorldConfig } from './world/worlds';
-import { UI, type SettingsView } from './ui/UI';
+import { DEFAULT_WORLD, normalizeWorld, sameWorld, surfaceOf, worldLabel, type WorldConfig } from './world/worlds';
+import { UI, type SettingsView, type SummaryInfo } from './ui/UI';
 import { resetProgress, saveSettings, type Quality as QualitySetting } from './game/settings';
 import { buildDemoTrack } from './demoTrack';
 import { dailyLink, readSharedLink, shareLink } from './game/share';
 import { rateRun } from './game/rating';
-import { beats, encodeInputs, loadGhost, saveGhost } from './game/Ghost';
+import { beats, encodeInputs, loadGhost, saveGhost, type GhostRecord } from './game/Ghost';
+import { MEDALS, MEDAL_NAME, bestTime, levelMedal, medalFor, medalTimes, recordTime } from './game/medals';
 import { LEVELS, chapterOf } from './levels/levels';
 import { OUTFITS, champions, isUnlocked, outfitUnlocked, loadProgress, saveLevelResult, selectOutfit, selectedOutfit, totalStars } from './game/progress';
 import { ACHIEVEMENTS, evaluate, loadCounters, noteWorld, selectPaint, unlockedAchievements, type RunContext } from './game/achievements';
@@ -43,6 +44,8 @@ let session: Session = TITLE;
 const levelIndex = () => levelOf(session);
 const challenge = () => challengeOf(session);
 const playingGame = () => inGame(session);
+/** The challenger's run from a link, raced live (cleared with the session). */
+let friendGhost: GhostRecord | null = null;
 /** Rider controls: always on in levels, dailies and challenges, a toggle in the editor. */
 let riderMode = readFlag(KEYS.riderMode);
 const riderOn = () => fixedTrack(session) || challenge() > 0 || riderMode;
@@ -55,7 +58,8 @@ const run = new Run(core, {
   riderOn,
   input: () => input.mask,
   vehicle: () => rides.current,
-  ghostKey,
+  // A friend's ghost from a challenge link, else the player's own best.
+  ghostRecord: () => friendGhost ?? loadGhost(ghostKey()),
   focus: focusRider,
   tick: () => checkAchievements(false),
   ended: showSummary,
@@ -202,7 +206,9 @@ const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('di
   async share(score = 0) {
     // A daily needs no track in the link: everyone can build the day's ride.
     const daily = session.kind === 'daily' ? dailyInfo(session.day) : null;
-    const url = daily ? dailyLink(daily.day, score) : await shareLink(track.serialize(), score, rides.current.id);
+    // A score comes from the run just ended: its inputs become the friend's ghost.
+    const ghost = score > 0 && run.summaryShown && riderOn() ? encodeInputs(sim.inputsUpTo(run.frame)) : undefined;
+    const url = daily ? dailyLink(daily.day, score, ghost) : await shareLink(track.serialize(), score, rides.current.id, ghost);
     const text = daily
       ? `I scored ${score.toLocaleString()} on Line Rider 3D Daily #${daily.number} (${daily.name}). Can you beat it?`
       : score > 0
@@ -259,9 +265,10 @@ async function confirmReplace(title: string, action: string) {
  * Switches session: editor on or off, the ride lock, rider controls.
  * Levels lock their own ride; a challenge locks the challenger's.
  */
-function enter(next: Session, lockedRide: VehicleDef | null = null) {
+function enter(next: Session, lockedRide: VehicleDef | null = null, ghost: number[] | null = null) {
   const wasTitle = session.kind === 'title';
   session = next;
+  friendGhost = ghost && challengeOf(next) > 0 ? { rle: ghost, frames: ghost.reduce((n, v, i) => n + (i % 2 ? v : 0), 0), score: challengeOf(next), finishTime: 0 } : null;
   if (wasTitle && next.kind !== 'title') {
     run.playing = false;
     run.reset();
@@ -413,6 +420,7 @@ function pickLevel(): Promise<number | null> {
       unlocked: isUnlocked(i, progress),
       world: chapterOf(l),
       ride: l.vehicle,
+      medal: levelMedal(l.id),
     })),
     totalStars(progress),
   );
@@ -429,7 +437,11 @@ async function startLevel(index: number) {
   moves.showStart(track, 1.3);
   const best = loadProgress()[level.id]?.stars ?? 0;
   const goals = rateRun(track, runStats.stats).goals.map((g) => g.label);
-  await ui.showLevelIntro(index + 1, level.name, level.tip, goals, best, rides.keys(), rides.picker(), worlds.picker(worlds.levelWorld(index)));
+  const medals = (ride: string) => {
+    const times = medalTimes(level.id, ride);
+    return times ? { times, best: bestTime(level.id, ride) } : null;
+  };
+  await ui.showLevelIntro(index + 1, level.name, level.tip, goals, best, rides.keys(), rides.picker(medals), worlds.picker(worlds.levelWorld(index)));
   run.play();
 }
 
@@ -441,9 +453,9 @@ async function backToLevels() {
 }
 
 /** Opens a track from a share link, with an intro (and the challenge score). */
-async function enterShared(data: SerializedTrack, score: number, vehicleId: string | null) {
-  // A challenge is ridden on the challenger's ride.
-  enter({ kind: 'edit', challenge: score }, score > 0 && vehicleId ? vehicleById(vehicleId) : null);
+async function enterShared(data: SerializedTrack, score: number, vehicleId: string | null, ghost: number[] | null = null) {
+  // A challenge is ridden on the challenger's ride, against their ghost.
+  enter({ kind: 'edit', challenge: score }, score > 0 && vehicleId ? vehicleById(vehicleId) : null, ghost);
   loadInto(() => track.load(data));
   worlds.change(worlds.trackWorld());
   pristine = true;
@@ -451,7 +463,7 @@ async function enterShared(data: SerializedTrack, score: number, vehicleId: stri
   moves.showStart(track, 1.3);
   // Outside levels a world pick belongs to the track (saved, shared, exported).
   const picker = score > 0 ? undefined : worlds.picker(worlds.trackWorld(), (w) => track.setWorld(w));
-  await ui.showSharedIntro(score, rateRun(track, runStats.stats).goals.map((g) => g.label), rides.keys(), rides.picker(), picker);
+  await ui.showSharedIntro(score, rateRun(track, runStats.stats).goals.map((g) => g.label), rides.keys(), rides.picker(), picker, friendGhost !== null);
   run.play();
 }
 
@@ -464,10 +476,10 @@ function dailyCard() {
 }
 
 /** Plays a day's daily ride (today's, or an older one from a friend's link). */
-async function enterDaily(day: string, score = 0) {
+async function enterDaily(day: string, score = 0, ghost: number[] | null = null) {
   const info = dailyInfo(day);
   const session0: Session = { kind: 'daily', day, challenge: score };
-  enter(session0);
+  enter(session0, null, ghost);
   const slow = setTimeout(() => ui.flash("Building today's track…", 4000), 200);
   const data = await dailyTrack(day);
   clearTimeout(slow);
@@ -484,7 +496,7 @@ async function enterDaily(day: string, score = 0) {
   const rec = loadDaily();
   const date = new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
   await ui.showDailyIntro(
-    { number: info.number, name: info.name, date: day === today ? `Today, ${date}` : date, challenge: score, best: rec.days[day]?.score ?? 0, streak: streakOn(today, rec), world: worldLabel(info.world) },
+    { number: info.number, name: info.name, date: day === today ? `Today, ${date}` : date, challenge: score, best: rec.days[day]?.score ?? 0, streak: streakOn(today, rec), world: worldLabel(info.world), racing: friendGhost !== null },
     rateRun(track, runStats.stats).goals.map((g) => g.label),
     rides.keys(),
     rides.picker(),
@@ -545,6 +557,23 @@ function showSummary(wasReplay: boolean) {
       ghostSaved = true;
     }
   }
+  // Finish-time medals: clean finishes on the level's home world.
+  let medal: SummaryInfo['medal'];
+  const times = index !== null ? medalTimes(LEVELS[index].id, rides.current.id) : null;
+  if (index !== null && times && s.finished && !s.crashed && sameWorld(env.config, worlds.levelWorld(index))) {
+    const r = wasReplay ? { best: bestTime(LEVELS[index].id, rides.current.id), newBest: false, medal: null, newMedal: false } : recordTime(LEVELS[index].id, rides.current.id, s.finishTime);
+    // The medal this run earned, and the next one up.
+    const won = medalFor(times, s.finishTime);
+    const nextI = won ? MEDALS.indexOf(won) + 1 : 0;
+    medal = {
+      medal: won,
+      newMedal: r.newMedal,
+      time: s.finishTime,
+      best: r.best,
+      newBest: r.newBest,
+      next: nextI < MEDALS.length ? { name: MEDAL_NAME[MEDALS[nextI]], time: times[nextI] } : null,
+    };
+  }
   let daily: { number: number; name: string; streak: number } | undefined;
   let best = wasReplay ? { best: recordBest(ghostKey(), 0, 0).best, newBest: false } : recordBest(ghostKey(), s.score, rating.stars);
   if (session.kind === 'daily') {
@@ -568,6 +597,7 @@ function showSummary(wasReplay: boolean) {
       level: levelInfo,
       challenge: challenge(),
       daily,
+      medal,
       vehicle: rides.current.name,
     },
     () => {
@@ -720,6 +750,7 @@ function loop(time: number) {
   worlds.updateHeadlight(game);
   ui.setTime(run.frame, sim.recorded, STEPS_PER_SECOND);
   ui.setHud(game && (run.playing || run.frame > 0) && !run.summaryShown, runStats.stats, track.stars.size);
+  ui.setGap(game && !run.summaryShown ? run.gap : null);
   ui.setTouchPad(stage.isTouch && riderOn() && game && run.playing && !run.replaying, rides.current.handling.yaw !== null);
   stage.postfx.render(dt);
 
@@ -731,7 +762,7 @@ function loop(time: number) {
     // Start building today's daily ride in the background.
     void dailyTrack(dayKey());
     readSharedLink()
-      .then((shared) => (!shared ? enterTitle() : shared.kind === 'daily' ? enterDaily(shared.day, shared.challenge) : enterShared(shared.data, shared.challenge, shared.vehicle)))
+      .then((shared) => (!shared ? enterTitle() : shared.kind === 'daily' ? enterDaily(shared.day, shared.challenge, shared.ghost) : enterShared(shared.data, shared.challenge, shared.vehicle, shared.ghost)))
       .catch((e) => {
         ui.flash(e instanceof TrackFormatError ? e.message : 'That share link looks broken', 4500);
         enterTitle();

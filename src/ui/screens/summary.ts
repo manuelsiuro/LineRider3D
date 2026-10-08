@@ -37,6 +37,7 @@ export function showSummary(
             ? `<p class="challenge-line">${stats.score >= info.challenge ? `${icon('trophy', 16)} You beat the challenge of ${info.challenge.toLocaleString()}!` : `${(info.challenge - stats.score).toLocaleString()} points short of the ${info.challenge.toLocaleString()} challenge`}</p>`
             : ''
         }
+        ${medalLine(info)}
       </div>
       <ul class="goals">${info.goals.map((g) => `<li class="${g.done ? 'done' : ''}">${icon(g.done ? 'check' : 'circle', 16)}${g.label}</li>`).join('')}</ul>
       <div class="stats">
@@ -87,4 +88,15 @@ export function showSummary(
 
 export function hideSummary() {
   document.querySelector('.summary')?.remove();
+}
+
+const MEDAL_LABEL: Record<string, string> = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', dev: 'Dev' };
+
+/** Finish-time medal: the one won (or held), and how far the next one is. */
+function medalLine(info: SummaryInfo) {
+  const m = info.medal;
+  if (!m) return '';
+  const next = m.next ? `<span class="medal-next">${Math.max(0.01, m.time - m.next.time).toFixed(2)}s to ${m.next.name}</span>` : '';
+  if (!m.medal) return `<p class="medal-line">${icon('medal', 16)} <span>${m.time.toFixed(2)}s</span>${next}</p>`;
+  return `<p class="medal-line"><span class="medal-won ${m.medal}">${icon('medal', 16)} ${MEDAL_LABEL[m.medal]}${m.newMedal ? ' · new!' : ''}</span><span>${m.time.toFixed(2)}s${m.newBest ? '' : ` · best ${m.best.toFixed(2)}s`}</span>${next}</p>`;
 }

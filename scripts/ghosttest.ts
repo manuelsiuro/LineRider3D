@@ -23,3 +23,33 @@ for (let f = 0; f <= 320; f += 10) {
 }
 console.log('ghost rle', JSON.stringify(rle), 'max divergence', maxDiff);
 if (maxDiff !== 0) throw new Error('ghost diverged');
+
+// Racing your own run: the live gap stays at zero all the way.
+{
+  const { GhostRun: GR, encodeInputs: enc } = await import('../src/game/Ghost');
+  const { RunStats: RS } = await import('../src/game/RunStats');
+  const { buildDemoTrack: demo } = await import('../src/demoTrack');
+  const { Track: T } = await import('../src/track/Track');
+  const { Simulation: S } = await import('../src/physics/Simulation');
+  const { check } = await import('./assert');
+  const t = new T();
+  demo(t);
+  const sim = new S(t);
+  const stats = new RS();
+  for (let f = 0; f <= 300; f++) {
+    sim.seek(f);
+    stats.advance(sim, f, 40);
+  }
+  const ghost = new GR(t, { rle: enc(sim.inputsUpTo(300)), frames: 300, score: 0, finishTime: 0 });
+  const replay = new S(t);
+  const rs = new RS();
+  let worst = 0;
+  for (let f = 0; f <= 280; f++) {
+    replay.seek(f);
+    rs.advance(replay, f, 40);
+    const g = f > 40 ? ghost.gap(f, rs.stats.distance, 40) : 0;
+    if (g !== null) worst = Math.max(worst, Math.abs(g));
+  }
+  check(worst < 0.03, `own ghost gap should be ~0, got ${worst.toFixed(3)}s`);
+  console.log('own ghost gap max', worst.toFixed(3) + 's');
+}

@@ -59,6 +59,8 @@ export interface SummaryInfo {
   level?: { number: number; name: string; nextUnlocked: boolean; hasNext: boolean };
   /** Score to beat from a friend's challenge link. */
   challenge?: number;
+  /** Finish-time medal (levels on their home world). */
+  medal?: { medal: string | null; newMedal: boolean; time: number; best: number; newBest: boolean; next: { name: string; time: number } | null };
   /** Set when playing the daily ride. */
   daily?: { number: number; name: string; streak: number };
   /** Name of the ride used. */
@@ -108,6 +110,16 @@ export interface RidePicker {
   lockNote?: string;
   /** Picks a ride; returns its controls. */
   onPick(id: string): Controls;
+  /** Medal times for a ride on this level (levels only). */
+  medals?(id: string): MedalRow | null;
+}
+
+/** Medal targets on a level intro. */
+export interface MedalRow {
+  /** Bronze, silver, gold, dev (s). */
+  times: number[];
+  /** The player's best time with this ride (0: none). */
+  best: number;
 }
 
 /** A ride's controls, drawn as key caps. */
@@ -129,6 +141,8 @@ export interface LevelCard {
   world: BiomeId;
   /** Level made for one ride. */
   ride?: string;
+  /** Best medal won on the level (any ride). */
+  medal?: string | null;
 }
 
 export interface OutfitCard {

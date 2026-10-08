@@ -2,7 +2,7 @@ import { VEHICLES, vehicleById, type VehicleDef } from '../physics/vehicles';
 import { selectVehicle, selectedOutfit, selectedVehicleId } from '../game/progress';
 import { PAINTS, paintFor, rideProgress, unlockedAchievements } from '../game/achievements';
 import { applyOutfit, applyPaint } from '../render/RiderView';
-import type { Controls } from '../ui/UI';
+import type { Controls, MedalRow, RidePicker } from '../ui/UI';
 import type { Core } from './core';
 
 export interface RideHooks {
@@ -102,9 +102,10 @@ export class Rides {
     };
   }
 
-  /** Intro ride picker: free choice, or the level's own ride. */
-  picker() {
+  /** Intro ride picker: free choice, or the level's own ride (with its medal times on levels). */
+  picker(medals?: (id: string) => MedalRow | null): RidePicker {
     return {
+      medals,
       options: VEHICLES.map((v) => ({ id: v.id, name: v.name })),
       selected: this.current.id,
       locked: this.locked !== null,
