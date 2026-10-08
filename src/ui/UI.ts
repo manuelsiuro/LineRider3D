@@ -5,6 +5,7 @@ import { LINE_COLORS } from '../track/types';
 import type { Stats, Trick } from '../game/RunStats';
 import { GRADE_LABEL } from '../game/RunStats';
 import { icon } from './icons';
+import { BIOMES, TIMES, WEATHERS, biomeById, type BiomeId, type WorldConfig } from '../world/worlds';
 
 const hex = (n: number) => n.toString(16).padStart(6, '0');
 
@@ -49,7 +50,19 @@ export interface UIHandlers {
   cycleVehicle(): void;
   /** Touch pad input: bit mask from the on-screen buttons. */
   touchInput(mask: number): void;
+  /** The world of the track being edited. */
+  world(): WorldConfig;
+  /** Changes it; returns the (validated) world now shown. */
+  setWorld(w: Partial<WorldConfig>): WorldConfig;
   click(): void;
+}
+
+/** World choice shown on a level or shared-track intro. */
+export interface WorldPicker {
+  value: WorldConfig;
+  /** The level's own world. */
+  home: WorldConfig;
+  onPick(w: Partial<WorldConfig>): WorldConfig;
 }
 
 export interface SummaryInfo {
@@ -116,6 +129,10 @@ export interface LevelCard {
   stars: number;
   score: number;
   unlocked: boolean;
+  /** Chapter (home world). */
+  world: BiomeId;
+  /** Level made for one ride. */
+  ride?: string;
 }
 
 export interface OutfitCard {
@@ -190,6 +207,11 @@ export class UI {
   private musicBtn!: HTMLButtonElement;
   private hintTimer = 0;
   private playing = false;
+  private worldBtn!: HTMLButtonElement;
+  /** The editor panel shows the world options instead of the tool's. */
+  private worldOpen = false;
+  /** Decor palette shows every kind, not only the world's. */
+  private allDecor = false;
 
   constructor(root: HTMLElement, private editor: Editor, private handlers: UIHandlers, riderMode: boolean) {
     this.root = root;
@@ -372,6 +394,13 @@ export class UI {
       this.toolButtons.set(t.id, b);
       toolbar.append(b);
     }
+    // World: the track's landscape, time of day and weather.
+    this.worldBtn = button('tool world-tool', `${icon('globe')}<span class="label">World</span><kbd>G</kbd>`, 'World (G)');
+    this.worldBtn.onclick = () => {
+      handlers.click();
+      this.toggleWorldPanel();
+    };
+    toolbar.append(this.worldBtn);
     const bottom = h('div', 'bottom');
     bottom.append(this.panel, toolbar);
 
@@ -387,8 +416,18 @@ export class UI {
 
   // ---------------------------------------------------------------- tools
 
+  toggleWorldPanel() {
+    this.worldOpen = !this.worldOpen;
+    this.panel.classList.remove('folded');
+    this.worldBtn.classList.toggle('active', this.worldOpen);
+    for (const [id, b] of this.toolButtons) b.classList.toggle('active', !this.worldOpen && id === this.editor.tool);
+    this.renderPanel();
+  }
+
   selectTool(tool: Tool) {
     this.editor.setTool(tool);
+    this.worldOpen = false;
+    this.worldBtn?.classList.remove('active');
     this.panel.classList.remove('folded');
     for (const [id, b] of this.toolButtons) b.classList.toggle('active', id === tool);
     this.renderPanel();
@@ -450,6 +489,27 @@ export class UI {
       r.append(wrap);
     };
 
+    if (this.worldOpen) {
+      const w = this.handlers.world();
+      const set = (patch: Partial<WorldConfig>) => this.handlers.setWorld({ ...this.handlers.world(), ...patch });
+      seg(
+        row(),
+        BIOMES.map((b) => ({ id: b.id, label: `${icon(b.id, 16)} ${b.name}` })),
+        w.biome,
+        (v) => set({ biome: v, weather: biomeById(v).weathers[0] }),
+      );
+      const r2 = row();
+      seg(r2, TIMES.map((t) => ({ id: t.id, label: `${icon(t.id, 16)} ${t.name}` })), w.time, (v) => set({ time: v }));
+      seg(
+        r2,
+        WEATHERS.filter((x) => biomeById(w.biome).weathers.includes(x.id)).map((x) => ({ id: x.id, label: `${icon(x.id, 16)} ${x.name}` })),
+        w.weather,
+        (v) => set({ weather: v }),
+      );
+      row().append(h('span', 'tip', `${biomeById(w.biome).blurb} Saved with the track and its share link.`));
+      return;
+    }
+
     if (tool === 'pencil' || tool === 'line') {
       const r1 = row();
       seg(r1, LINE_TYPES.map((t) => ({ ...t, color: LINE_COLORS[t.id] })), s.lineType, (v) => (s.lineType = v));
@@ -483,12 +543,17 @@ export class UI {
       slider(r2, '3rd star target', 500, 30000, 500, this.editor.targetScore, ' pts', (v) => (this.editor.targetScore = v));
       r2.append(h('span', 'tip', s.item === 'star' ? 'Tap a track to float a star over it.' : s.item === 'ring' ? 'Tap a track to hang a ring over it.' : 'Tap a track to place the finish gate.'));
     } else if (tool === 'decor') {
+      // The world's own decor first; everything else on request.
+      const native = biomeById(this.handlers.world().biome).decor;
+      const kinds = this.allDecor ? (Object.keys(DECOR_LABELS) as DecorKind[]) : native;
+      const r = row();
       seg(
-        row(),
-        (Object.keys(DECOR_LABELS) as DecorKind[]).map((k) => ({ id: k, label: DECOR_LABELS[k] })),
+        r,
+        kinds.map((k) => ({ id: k, label: DECOR_LABELS[k] })),
         s.decor,
         (v) => (s.decor = v),
       );
+      toggle(r, this.allDecor, 'All worlds', (v) => (this.allDecor = v));
     } else {
       const tips: Partial<Record<Tool, string>> = {
         eraser: 'Tap or drag over a track, ring or decoration to remove it.',
@@ -689,18 +754,36 @@ export class UI {
     });
   }
 
-  /** Level select; resolves with a level index, or null to go back. */
+  /** Level select, chapter by chapter; resolves with a level index, or null to go back. */
   showLevels(levels: LevelCard[], stars: number): Promise<number | null> {
     return new Promise((resolve) => {
-      const cards = levels
-        .map(
-          (l, i) => `<button class="level-card ${l.unlocked ? '' : 'locked'}" data-i="${i}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${i * 0.04}s">
+      const card = (l: LevelCard, i: number) => `<button class="level-card ${l.unlocked ? '' : 'locked'}" data-world="${l.world}" data-i="${i}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${Math.min(i, 14) * 0.03}s">
             <span class="level-num">${l.unlocked ? i + 1 : icon('lock', 20)}</span>
+            ${l.ride ? `<span class="level-ride" title="Made for one ride">${icon(l.ride, 18)}</span>` : ''}
             <span class="level-name">${l.name}</span>
             <span class="level-stars">${[0, 1, 2].map((k) => `<i class="${k < l.stars ? 'on' : ''}">${icon('star', 18)}</i>`).join('')}</span>
             <span class="level-best">${l.unlocked ? (l.score ? `Best ${l.score.toLocaleString()}` : 'Not played') : 'Get a star on the previous level'}</span>
-          </button>`,
-        )
+          </button>`;
+      // Group the levels by world, keeping their order.
+      const chapters: { world: BiomeId; items: [LevelCard, number][] }[] = [];
+      levels.forEach((l, i) => {
+        let c = chapters.find((x) => x.world === l.world);
+        if (!c) chapters.push((c = { world: l.world, items: [] }));
+        c.items.push([l, i]);
+      });
+      const cards = chapters
+        .map((c) => {
+          const b = biomeById(c.world);
+          const got = c.items.reduce((n, [l]) => n + l.stars, 0);
+          return `<section class="chapter" data-world="${c.world}">
+            <header class="chapter-head">
+              <span class="chapter-icon">${icon(c.world, 26)}</span>
+              <div><h3>${b.name}</h3><p>${b.blurb}</p></div>
+              <span class="pill">${icon('star', 14)} ${got} / ${c.items.length * 3}</span>
+            </header>
+            <div class="level-grid">${c.items.map(([l, i]) => card(l, i)).join('')}</div>
+          </section>`;
+        })
         .join('');
       const overlay = h(
         'div',
@@ -711,7 +794,7 @@ export class UI {
             <h2>Levels</h2>
             <span class="pill big">${icon('star', 16)} ${stars} / ${levels.length * 3}</span>
           </div>
-          <div class="level-grid">${cards}</div>
+          <div class="chapters">${cards}</div>
         </div>`,
       );
       overlay.onclick = (e) => {
@@ -848,6 +931,45 @@ export class UI {
         overlay.querySelector('.ride-grid')!.innerHTML = render(id);
       };
       document.body.append(overlay);
+    });
+  }
+
+  /** World chips (landscape, time, weather) for an intro card. */
+  private worldPicker(card: HTMLElement, picker: WorldPicker | undefined) {
+    const slot = card.querySelector('.world-pick') as HTMLElement | null;
+    if (!slot || !picker) return;
+    let w = picker.value;
+    const render = () => {
+      const home = picker.home;
+      const isHome = w.biome === home.biome && w.time === home.time && w.weather === home.weather;
+      const weathers = WEATHERS.filter((x) => biomeById(w.biome).weathers.includes(x.id));
+      slot.innerHTML = `<div class="world-row">${BIOMES.map(
+        (b) => `<button class="world-chip ${b.id === w.biome ? 'active' : ''}" data-biome="${b.id}" title="${b.name}">${icon(b.id, 18)}<span>${b.name}</span>${b.id === home.biome ? '<i class="home-dot" title="Home world"></i>' : ''}</button>`,
+      ).join('')}</div>
+        <div class="world-row small">
+          <div class="mini-seg">${TIMES.map((t) => `<button class="${t.id === w.time ? 'active' : ''}" data-time="${t.id}" title="${t.name}">${icon(t.id, 16)}</button>`).join('')}</div>
+          <div class="mini-seg">${weathers.map((x) => `<button class="${x.id === w.weather ? 'active' : ''}" data-weather="${x.id}" title="${x.name}">${icon(x.id, 16)}</button>`).join('')}</div>
+          <span class="world-label">${TIMES.find((t) => t.id === w.time)!.name} · ${WEATHERS.find((x) => x.id === w.weather)!.name}</span>
+          ${isHome ? '' : `<button class="world-home" data-home>${icon('replay', 14)} Home</button>`}
+        </div>`;
+    };
+    render();
+    slot.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('button') as HTMLElement | null;
+      if (!b) return;
+      e.stopPropagation();
+      this.handlers.click();
+      const d = b.dataset;
+      const next: Partial<WorldConfig> =
+        d.home !== undefined
+          ? picker.home
+          : d.biome
+            ? { ...w, biome: d.biome as BiomeId, weather: d.biome === picker.home.biome ? picker.home.weather : biomeById(d.biome).weathers[0] }
+            : d.time
+              ? { ...w, time: d.time as WorldConfig['time'] }
+              : { ...w, weather: d.weather as WorldConfig['weather'] };
+      w = picker.onPick(next);
+      render();
     });
   }
 
@@ -1161,7 +1283,7 @@ export class UI {
   }
 
   /** Intro for a track opened from a share link. */
-  showSharedIntro(challenge: number, goals: string[], keys: string, ride?: RidePicker): Promise<void> {
+  showSharedIntro(challenge: number, goals: string[], keys: string, ride?: RidePicker, world?: WorldPicker): Promise<void> {
     return new Promise((resolve) => {
       const overlay = h(
         'div',
@@ -1172,6 +1294,7 @@ export class UI {
           <p>${challenge ? 'Your friend set this score on this track. Can you top it?' : 'Ride it, then edit it or make it your own.'}</p>
           <ul class="intro-goals">${goals.map((g) => `<li>${icon('star', 18)}${g}</li>`).join('')}</ul>
           <div class="ride-pick"></div>
+          <div class="world-pick"></div>
           <p class="keys">${icon('gamepad', 14)} ${keys}</p>
           <div class="actions"><button class="big-btn primary">${icon('play', 18)} Ride!</button></div>
         </div>`,
@@ -1184,12 +1307,13 @@ export class UI {
         resolve();
       };
       this.ridePicker(overlay, ride, overlay.querySelector('.keys'));
+      this.worldPicker(overlay, world);
       document.body.append(overlay);
     });
   }
 
   /** Level intro card with its goals. */
-  showLevelIntro(number: number, name: string, tip: string, goals: string[], stars: number, keys: string, ride?: RidePicker): Promise<void> {
+  showLevelIntro(number: number, name: string, tip: string, goals: string[], stars: number, keys: string, ride?: RidePicker, world?: WorldPicker): Promise<void> {
     return new Promise((resolve) => {
       const overlay = h(
         'div',
@@ -1200,6 +1324,7 @@ export class UI {
           <p>${tip}</p>
           <ul class="intro-goals">${goals.map((g, i) => `<li class="${i < stars ? 'done' : ''}">${icon('star', 18)}${g}</li>`).join('')}</ul>
           <div class="ride-pick"></div>
+          <div class="world-pick"></div>
           <p class="keys">${icon('gamepad', 14)} ${keys}</p>
           <div class="actions"><button class="big-btn primary">${icon('play', 18)} Ride!</button></div>
         </div>`,
@@ -1212,6 +1337,7 @@ export class UI {
         resolve();
       };
       this.ridePicker(overlay, ride, overlay.querySelector('.keys'));
+      this.worldPicker(overlay, world);
       document.body.append(overlay);
     });
   }
@@ -1363,6 +1489,7 @@ export class UI {
       if (e.key.toLowerCase() === 'c') return this.cycleCamera();
       if (e.key.toLowerCase() === 'f') return this.handlers.focusRider();
       if (e.key.toLowerCase() === 'p') return this.handlers.photo();
+      if (e.key.toLowerCase() === 'g' && this.editor.enabled) return this.toggleWorldPanel();
       const tool = TOOLS.find((t) => t.key === e.key.toUpperCase());
       if (tool) this.selectTool(tool.id);
     });

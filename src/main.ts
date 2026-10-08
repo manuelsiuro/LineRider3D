@@ -10,7 +10,7 @@ import { EVENT, INPUT, P } from './physics/Rider';
 import { VEHICLES, vehicleById, type VehicleDef } from './physics/vehicles';
 import { Environment } from './world/Environment';
 import { terrainHeight } from './world/terrain';
-import { SURFACES, surfaceOf, type WorldConfig } from './world/worlds';
+import { DEFAULT_WORLD, SURFACES, normalizeWorld, sameWorld, surfaceOf, type WorldConfig } from './world/worlds';
 import { Editor } from './editor/Editor';
 import { UI, overlayOpen, type SettingsView } from './ui/UI';
 import { loadSettings, resetProgress, saveSettings, type Quality, type Settings } from './game/settings';
@@ -24,7 +24,7 @@ import { buildDemoTrack } from './demoTrack';
 import { readSharedLink, shareLink } from './game/share';
 import { rateRun } from './game/rating';
 import { GhostRun, beats, encodeInputs, loadGhost, saveGhost } from './game/Ghost';
-import { LEVELS } from './levels/levels';
+import { LEVELS, chapterOf } from './levels/levels';
 import { OUTFITS, isUnlocked, loadProgress, saveLevelResult, selectOutfit, selectVehicle, selectedOutfit, selectedVehicleId, totalStars } from './game/progress';
 import { applyOutfit, applyPaint } from './render/RiderView';
 import { ACHIEVEMENTS, PAINTS, bumpWipeouts, evaluate, loadCounters, paintFor, rideProgress, selectPaint, unlockedAchievements, type RunContext } from './game/achievements';
@@ -164,6 +164,38 @@ function applyWorld(w: Partial<WorldConfig>, force = false) {
 postfx.setGrade(env.atm.grade);
 
 env.weather.onStrike = (d) => sound.thunder(d);
+
+/** The world a track asks for (its author's pick, or the default). */
+const trackWorld = () => normalizeWorld(track.world as Partial<WorldConfig> | null);
+const levelWorld = (i: number) => normalizeWorld(LEVELS[i].world);
+
+/** Switches world behind a quick fade so the rebuild never shows. */
+function changeWorld(w: Partial<WorldConfig>) {
+  if (sameWorld(normalizeWorld(w), env.config)) return applyWorld(w);
+  const fade = document.querySelector('.world-fade') ?? document.body.appendChild(Object.assign(document.createElement('div'), { className: 'world-fade' }));
+  fade.classList.add('on');
+  // Two frames so the fade is on screen before the (blocking) rebuild.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      applyWorld(w);
+      fade.classList.remove('on');
+    }),
+  );
+  return true;
+}
+
+/** World chips on an intro card: pick any world, the home one is marked. */
+function worldPicker(home: WorldConfig) {
+  return {
+    // The intro opens on the home world (switched to just before).
+    value: home,
+    home,
+    onPick: (w: Partial<WorldConfig>) => {
+      applyWorld(w);
+      return env.config;
+    },
+  };
+}
 
 /** The rider's lamp after dark: a soft spot ahead of the ride. */
 const headlight = new THREE.SpotLight(0xfff1d6, 0, 46, 0.55, 0.6, 1.2);
@@ -502,6 +534,7 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
     challengeScore = 0;
     setLevel(null);
     loadInto(() => buildDemoTrack(track));
+    changeWorld(DEFAULT_WORLD);
     pristine = true;
     editor.history.clear();
     stop();
@@ -522,6 +555,7 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
         challengeScore = 0;
         setLevel(null);
         track.load(JSON.parse(text) as SerializedTrack);
+        changeWorld(trackWorld());
         editor.history.clear();
         stop();
         const v = startView();
@@ -533,6 +567,14 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
     });
   },
   focusRider,
+  world: () => env.config,
+  setWorld(w) {
+    const cfg = normalizeWorld(w);
+    track.setWorld(cfg);
+    applyWorld(cfg);
+    ui.flash(`${env.config.biome[0].toUpperCase()}${env.config.biome.slice(1)} · ${env.config.time} · ${env.config.weather}`);
+    return env.config;
+  },
   settings: () => openSettings(),
   escape() {
     if (mode === 'game' && playing) openPause();
@@ -585,6 +627,7 @@ function startNewTrack() {
     track.clear();
     track.setStart(new THREE.Vector3(0, 12, 0));
   });
+  changeWorld(DEFAULT_WORLD);
   pristine = true;
   editor.history.clear();
   stop();
@@ -603,6 +646,8 @@ function enterTitle() {
   ghost = null;
   setLevel(null);
   loadInto(() => buildDemoTrack(track));
+  titleClock = 0;
+  changeWorld(TITLE_WORLDS[titleWorld]);
   pristine = true;
   resetRun();
   sim.clearInputs();
@@ -686,6 +731,7 @@ async function titleFlow() {
         loadInto(() => track.load(data));
         pristine = false;
       }
+      changeWorld(trackWorld());
       const v = startView();
       flyTo(v.pos, v.target);
     } else {
@@ -712,6 +758,8 @@ function pickLevel(): Promise<number | null> {
       stars: progress[l.id]?.stars ?? 0,
       score: progress[l.id]?.score ?? 0,
       unlocked: isUnlocked(i, progress),
+      world: chapterOf(l),
+      ride: l.vehicle,
     })),
     totalStars(progress),
   );
@@ -747,6 +795,7 @@ async function startLevel(index: number) {
   setLevel(index);
   const level = LEVELS[index];
   loadInto(() => level.build(track));
+  changeWorld(levelWorld(index));
   pristine = true;
   editor.history.clear();
   stop();
@@ -754,7 +803,7 @@ async function startLevel(index: number) {
   flyTo(v.pos, v.target, 1.3);
   const best = loadProgress()[level.id]?.stars ?? 0;
   const goals = rateRun(track, runStats.stats).goals.map((g) => g.label);
-  await ui.showLevelIntro(index + 1, level.name, level.tip, goals, best, keysFor(vehicle), ridePicker());
+  await ui.showLevelIntro(index + 1, level.name, level.tip, goals, best, keysFor(vehicle), ridePicker(), worldPicker(levelWorld(index)));
   play();
 }
 
@@ -763,6 +812,28 @@ async function backToLevels() {
   const idx = await pickLevel();
   if (idx === null) enterTitle();
   else startLevel(idx);
+}
+
+/** The title screen tours the worlds. */
+const TITLE_WORLDS: Partial<WorldConfig>[] = [
+  { biome: 'alpine', time: 'day', weather: 'snow' },
+  { biome: 'forest', time: 'sunset', weather: 'clear' },
+  { biome: 'beach', time: 'day', weather: 'clear' },
+  { biome: 'city', time: 'night', weather: 'clear' },
+  { biome: 'desert', time: 'sunset', weather: 'clear' },
+  { biome: 'forest', time: 'night', weather: 'clear' },
+];
+let titleWorld = 0;
+let titleClock = 0;
+
+/** Next world on the title, only while the title menu itself is showing. */
+function tourWorlds(dt: number) {
+  if (devView || closeUp || !document.querySelector('.title-screen') || document.querySelector('.screen, .modal')) return;
+  titleClock += dt;
+  if (titleClock < 16) return;
+  titleClock = 0;
+  titleWorld = (titleWorld + 1) % TITLE_WORLDS.length;
+  changeWorld(TITLE_WORLDS[titleWorld]);
 }
 
 /** Dev screenshots: a fixed title camera [position, target]. */
@@ -1174,6 +1245,7 @@ function loop(time: number) {
   if (mode === 'title') {
     // Loop the demo run behind the title.
     if (stats.still > 1 || stats.crashed || frame > 900) resetRun();
+    tourWorlds(dt);
     if (devView) {
       camera.position.copy(devView[0]);
       camera.lookAt(devView[1]);
@@ -1235,12 +1307,13 @@ async function enterShared(data: SerializedTrack, challenge: number, vehicleId: 
     applyVehicle(lockedVehicle);
   }
   loadInto(() => track.load(data));
+  changeWorld(trackWorld());
   pristine = true;
   history.replaceState(null, '', location.pathname + location.search);
   if (challenge > 0) ui.setRiderMode(true);
   const v = startView();
   flyTo(v.pos, v.target, 1.3);
-  await ui.showSharedIntro(challenge, rateRun(track, runStats.stats).goals.map((g) => g.label), keysFor(vehicle), ridePicker());
+  await ui.showSharedIntro(challenge, rateRun(track, runStats.stats).goals.map((g) => g.label), keysFor(vehicle), ridePicker(), worldPicker(trackWorld()));
   play();
 }
 

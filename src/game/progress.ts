@@ -1,4 +1,4 @@
-import { LEVELS } from '../levels/levels';
+import { LEVELS, chapterOf } from '../levels/levels';
 
 export interface LevelProgress {
   stars: number;
@@ -33,10 +33,17 @@ export function totalStars(progress = loadProgress()) {
   return Object.values(progress).reduce((n, p) => n + p.stars, 0);
 }
 
-/** A level opens once the previous one has at least one star. */
+/**
+ * A level opens once the previous one of its world has at least one star;
+ * the first level of every world is open from the start.
+ */
 export function isUnlocked(index: number, progress = loadProgress()) {
-  if (index === 0) return true;
-  return (progress[LEVELS[index - 1].id]?.stars ?? 0) >= 1;
+  if (index <= 0 || index >= LEVELS.length) return index === 0;
+  // Levels already won stay open (e.g. after levels were reordered).
+  if ((progress[LEVELS[index].id]?.stars ?? 0) > 0) return true;
+  const prev = LEVELS[index - 1];
+  if (chapterOf(prev) !== chapterOf(LEVELS[index])) return true;
+  return (progress[prev.id]?.stars ?? 0) >= 1;
 }
 
 export interface Outfit {

@@ -1,4 +1,5 @@
 import { Track } from '../src/track/Track';
+import { SURFACES, normalizeWorld, surfaceOf } from '../src/world/worlds';
 import { Simulation } from '../src/physics/Simulation';
 import { RunStats } from '../src/game/RunStats';
 import { rateRun } from '../src/game/rating';
@@ -23,6 +24,7 @@ for (const v of VEHICLES) {
     const t = new Track();
     level.build(t);
     const sim = new Simulation(t, v);
+    if ('world' in level) sim.setGroundDrag(SURFACES[surfaceOf(normalizeWorld(level.world))].drag);
     const stats = new RunStats();
     let f = 0;
     let bad = '';

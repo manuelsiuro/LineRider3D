@@ -20,6 +20,7 @@ export type TrackEvent =
   | { kind: 'finishChanged' }
   | { kind: 'goalsChanged' }
   | { kind: 'startChanged' }
+  | { kind: 'worldChanged' }
   | { kind: 'cleared' };
 
 interface SerializedTrack {
@@ -41,6 +42,8 @@ interface SerializedTrack {
   finish?: { position: number[]; axis: number[]; halfWidth: number } | null;
   targetScore?: number;
   name?: string;
+  /** Landscape, time of day and weather (Alpine by day when missing). */
+  world?: { biome?: string; time?: string; weather?: string };
 }
 
 export class Track {
@@ -52,6 +55,8 @@ export class Track {
   /** Score needed for the third star. */
   targetScore = 2000;
   start = new THREE.Vector3(0, 12, 0);
+  /** The world the track's author picked (null: the default). */
+  world: { biome?: string; time?: string; weather?: string } | null = null;
 
   private nextId = 1;
   private grid = new Map<string, Segment[]>();
@@ -65,7 +70,8 @@ export class Track {
   }
 
   private emit(e: TrackEvent) {
-    if (e.kind !== 'decorAdded' && e.kind !== 'decorRemoved' && e.kind !== 'goalsChanged') this.revision++;
+    // Decor, goals and the world don't change the track itself (the world's ground drag is set on the simulation).
+    if (e.kind !== 'decorAdded' && e.kind !== 'decorRemoved' && e.kind !== 'goalsChanged' && e.kind !== 'worldChanged') this.revision++;
     for (const l of this.listeners) l(e);
   }
 
@@ -159,7 +165,13 @@ export class Track {
     this.emit({ kind: 'startChanged' });
   }
 
+  setWorld(w: { biome?: string; time?: string; weather?: string } | null) {
+    this.world = w ? { ...w } : null;
+    this.emit({ kind: 'worldChanged' });
+  }
+
   clear() {
+    this.world = null;
     this.strokes.clear();
     this.decor.clear();
     this.rings.clear();
@@ -309,6 +321,7 @@ export class Track {
         ? { position: this.finish.position.toArray().map(r), axis: this.finish.axis.toArray().map(r), halfWidth: this.finish.halfWidth }
         : null,
       targetScore: this.targetScore,
+      ...(this.world ? { world: { ...this.world } } : {}),
     };
   }
 
@@ -353,6 +366,8 @@ export class Track {
       });
     }
     this.targetScore = data.targetScore ?? 2000;
+    const w = data.world;
+    this.world = w && typeof w === 'object' ? { biome: String(w.biome ?? ''), time: String(w.time ?? ''), weather: String(w.weather ?? '') } : null;
     this.emit({ kind: 'startChanged' });
   }
 }

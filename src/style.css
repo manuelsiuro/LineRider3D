@@ -1783,24 +1783,99 @@ body.is-playing .bottom > * {
   animation: card-in 0.4s var(--spring) backwards;
 }
 
-.level-card:nth-child(4n + 2) {
-  background: linear-gradient(150deg, #7b6cff, #4f3fd1);
+/* Chapters: one per world, each card painted in its world's colors with a skyline. */
+.chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
 }
 
-.level-card:nth-child(4n + 3) {
-  background: linear-gradient(150deg, #34c992, #1b8f63);
+.chapter-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
-.level-card:nth-child(4n + 4) {
-  background: linear-gradient(150deg, #ff9f55, #e2602a);
+.chapter-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--ink);
+}
+
+.chapter-head p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.chapter-head .pill {
+  margin-left: auto;
+}
+
+.chapter-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 15px;
+  color: white;
+  background: var(--world, #4b98ec);
+  box-shadow: 0 8px 18px -8px var(--world, #4b98ec);
+}
+
+[data-world='alpine'] {
+  --world: #3f8ae6;
+  --world-2: #2a5fb8;
+  --scene: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 60'%3E%3Cpath d='M0 60 30 22 48 40 75 8 104 44 126 26 160 52 182 30 200 46V60Z' fill='white' fill-opacity='.22'/%3E%3C/svg%3E");
+}
+[data-world='forest'] {
+  --world: #3aa65e;
+  --world-2: #1d7340;
+  --scene: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 60'%3E%3Cpath d='M0 60V44l8-18 8 18 6-26 8 26 10-22 8 22 7-30 8 30 9-20 8 20 10-28 8 28 9-18 8 18 7-24 8 24 10-20 8 20 9-26 8 26V60Z' fill='white' fill-opacity='.22'/%3E%3C/svg%3E");
+}
+[data-world='beach'] {
+  --world: #18b6c9;
+  --world-2: #0b7fa3;
+  --scene: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 60'%3E%3Cpath d='M0 48c20-6 40-6 60 0s40 6 60 0 40-6 80 0V60H0Z' fill='white' fill-opacity='.22'/%3E%3Cpath d='M150 48c2-14 6-24 12-30M162 18c-8-4-16-2-20 4M162 18c8-5 16-4 20 2M162 18c-2-7-8-10-14-10M162 18c4-7 10-9 16-7' stroke='white' stroke-opacity='.3' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+[data-world='desert'] {
+  --world: #f08a3c;
+  --world-2: #c4532a;
+  --scene: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 60'%3E%3Cpath d='M0 60V40h20l4-14h36l4 14h30V60Zm120 0V30h10l3-12h24l3 12h12l2 8h26V60Z' fill='white' fill-opacity='.22'/%3E%3Cpath d='M104 60V40m0 6h-5v-6m5 3h5v-5' stroke='white' stroke-opacity='.3' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+[data-world='city'] {
+  --world: #7466f0;
+  --world-2: #3c2fb4;
+  --scene: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 60'%3E%3Cpath d='M0 60V36h14V20h12v16h8V8h16v28h10V24h14v36Zm84 0V30h12V14h14v16h10V2h18v34h10V22h16v12h12v26Z' fill='white' fill-opacity='.22'/%3E%3C/svg%3E");
+}
+
+.level-card[data-world] {
+  background: var(--scene) no-repeat bottom / 100% auto, linear-gradient(150deg, var(--world), var(--world-2));
+  box-shadow: 0 14px 30px -12px var(--world-2), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.level-ride {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .level-card:hover {
   transform: translateY(-4px) scale(1.02);
 }
 
-.level-card.locked {
-  background: linear-gradient(150deg, #a7b4c4, #8392a5);
+.level-card.locked,
+.level-card.locked[data-world] {
+  background: var(--scene, none) no-repeat bottom / 100% auto, linear-gradient(150deg, #a7b4c4, #8392a5);
   box-shadow: var(--shadow);
   cursor: default;
 }
@@ -2721,4 +2796,130 @@ body.photo .ui * {
 /* Dev screenshots: hide the title overlay. */
 body.dev-shot .title-screen {
   opacity: 0 !important;
+}
+
+/* World picker on intro cards. */
+.world-pick:empty {
+  display: none;
+}
+
+.world-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.world-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.world-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 8px;
+  border-radius: 999px;
+  font: 600 12.5px var(--font-ui);
+  color: var(--ink-soft);
+  background: #eef3f8;
+  border: 2px solid transparent;
+  transition: transform 0.15s var(--spring), background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.world-chip:hover {
+  transform: translateY(-2px);
+}
+
+.world-chip.active {
+  color: white;
+  background: linear-gradient(150deg, var(--world), var(--world-2));
+  border-color: transparent;
+}
+
+.world-chip[data-biome='alpine'] { --world: #3f8ae6; --world-2: #2a5fb8; }
+.world-chip[data-biome='forest'] { --world: #3aa65e; --world-2: #1d7340; }
+.world-chip[data-biome='beach'] { --world: #18b6c9; --world-2: #0b7fa3; }
+.world-chip[data-biome='desert'] { --world: #f08a3c; --world-2: #c4532a; }
+.world-chip[data-biome='city'] { --world: #7466f0; --world-2: #3c2fb4; }
+
+.home-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffc23d;
+  box-shadow: 0 0 0 2px white;
+}
+
+.mini-seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: #eef3f8;
+}
+
+.mini-seg button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  transition: background 0.2s, color 0.2s;
+}
+
+.mini-seg button.active {
+  color: var(--accent);
+  background: white;
+  box-shadow: 0 2px 6px rgba(18, 35, 58, 0.15);
+}
+
+.world-label {
+  font: 600 12px var(--font-ui);
+  color: var(--ink-soft);
+}
+
+.world-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font: 600 12px var(--font-ui);
+  color: var(--accent);
+  background: rgba(47, 127, 216, 0.1);
+}
+
+@media (max-width: 480px) {
+  .world-chip:not(.active) span {
+    display: none;
+  }
+}
+
+/* Quick dip to the world's fog color while the landscape is rebuilt. */
+.world-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: #0d1424;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.world-fade.on {
+  opacity: 0.85;
+  transition: opacity 0.12s ease;
+}
+
+.panel .seg .ic {
+  vertical-align: -3px;
 }

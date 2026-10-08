@@ -76,13 +76,16 @@ export function finish(track: Track, x: number, y: number, z = 0, axis = new THR
   track.setFinish({ position: new THREE.Vector3(x, y, z), axis: axis.normalize(), halfWidth: 2.3 });
 }
 
-/** Scatter decor on both sides of a run between x0 and x1. */
-export function forest(track: Track, x0: number, x1: number, seed: number, kinds: DecorKind[] = ['pine', 'pine', 'pine', 'rock', 'snowman']) {
+/**
+ * Scatter decor on both sides of a run between x0 and x1, `near`..`near +
+ * spread` away from the center line.
+ */
+export function forest(track: Track, x0: number, x1: number, seed: number, kinds: DecorKind[] = ['pine', 'pine', 'pine', 'rock', 'snowman'], near = 4, spread = 7) {
   let s = seed;
   const rand = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
   for (let x = x0; x < x1; x += 5 + rand() * 5) {
     const side = rand() < 0.5 ? -1 : 1;
     const kind = kinds[Math.floor(rand() * kinds.length)];
-    track.addDecor({ kind, position: new THREE.Vector3(x, 0, side * (4 + rand() * 7)), rotation: rand() * 6.28, scale: 0.9 + rand() * 0.7 });
+    track.addDecor({ kind, position: new THREE.Vector3(x, 0, side * (near + rand() * spread)), rotation: rand() * 6.28, scale: 0.9 + rand() * 0.7 });
   }
 }

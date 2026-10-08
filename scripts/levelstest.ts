@@ -1,4 +1,5 @@
 import { Track } from '../src/track/Track';
+import { SURFACES, normalizeWorld, surfaceOf } from '../src/world/worlds';
 import { Simulation } from '../src/physics/Simulation';
 import { INPUT } from '../src/physics/Rider';
 import { RunStats } from '../src/game/RunStats';
@@ -14,6 +15,8 @@ for (const level of LEVELS) {
   level.build(t);
   const buildMs = performance.now() - t0;
   const sim = new Simulation(t, level.vehicle ? vehicleById(level.vehicle) : undefined);
+  // On its home ground (sand drags more, asphalt less).
+  sim.setGroundDrag(SURFACES[surfaceOf(normalizeWorld(level.world))].drag);
   const stats = new RunStats();
   let f = 0;
   for (; f <= 1600; f++) {
