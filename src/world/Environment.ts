@@ -95,7 +95,8 @@ export class Environment {
     scene.add(this.clouds);
     scene.add(this.weather.group);
 
-    this.apply(true);
+    // The landscape is built by the first setWorld (with the track's footprint).
+    this.apply(false);
   }
 
   private footprintSig = '';
@@ -124,11 +125,9 @@ export class Environment {
     return true;
   }
 
-  /** Landscape density and particle counts (rebuilds the landscape if changed). */
+  /** Landscape density and particle counts, used from the next world switch (never mid-ride). */
   setDetail(d: Detail) {
-    if (d === this.detail) return;
     this.detail = d;
-    this.apply(true);
   }
 
   /** Shadow quality: 0 = off, otherwise the shadow map size. */

@@ -769,10 +769,10 @@ export const DECOR_LABELS: Record<DecorKind, string> = {
   planter: '🌳 Planter',
 };
 
-export const isDecorKind = (k: unknown): k is DecorKind => typeof k === 'string' && k in BUILDERS;
+export const isDecorKind = (k: unknown): k is DecorKind => typeof k === 'string' && Object.hasOwn(BUILDERS, k);
 
 export function buildDecor(kind: DecorKind, o: DecorOptions = {}): THREE.Group {
-  return (BUILDERS[kind] ?? rock)(o);
+  return (isDecorKind(kind) ? BUILDERS[kind] : rock)(o);
 }
 
 // ------------------------------------------------------------------ restyling
@@ -826,8 +826,9 @@ const NATIVE: Record<BiomeId, Record<Role, DecorKind[]>> = {
  * others turn into the local equivalent (a pine becomes a palm on the beach).
  */
 export function decorFor(kind: DecorKind, biome: BiomeId, id: number, natives: DecorKind[]): DecorKind {
+  if (!isDecorKind(kind)) return 'rock';
   if (natives.includes(kind)) return kind;
-  const list = NATIVE[biome][ROLE[kind] ?? 'rock'];
+  const list = NATIVE[biome][ROLE[kind]];
   return list[id % list.length];
 }
 

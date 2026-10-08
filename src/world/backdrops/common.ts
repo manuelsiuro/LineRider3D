@@ -36,6 +36,8 @@ export function shared<T extends { userData: Record<string, unknown> }>(x: T): T
 export function disposeTree(root: THREE.Object3D) {
   const seen = new Set<unknown>();
   root.traverse((o) => {
+    // Instanced meshes free their instance buffers on dispose.
+    if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
     const m = o as THREE.Mesh;
     if (m.geometry && !m.geometry.userData.shared && !seen.has(m.geometry)) {
       seen.add(m.geometry);

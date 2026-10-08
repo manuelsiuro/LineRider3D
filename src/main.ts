@@ -157,6 +157,12 @@ function applyWorld(w: Partial<WorldConfig>, force = false) {
   effects.setSurface(ground, env.atm.night);
   groundMarks.setSurface(ground, env.atm.wet, env.atm.night);
   sim.setGroundDrag(SURFACES[ground].drag);
+  // The title's demo run restarts on the new ground (no mid-run re-simulation).
+  if (mode === 'title') {
+    frame = 0;
+    acc = 0;
+    groundMarks.reset();
+  }
   sound.setWorld(env.config.biome, env.config.time, env.config.weather, ground);
   ghost = null;
   return true;
@@ -170,13 +176,20 @@ const trackWorld = () => normalizeWorld(track.world as Partial<WorldConfig> | nu
 const levelWorld = (i: number) => normalizeWorld(LEVELS[i].world);
 
 /** Switches world behind a quick fade so the rebuild never shows. */
+let worldGen = 0;
 function changeWorld(w: Partial<WorldConfig>) {
-  if (sameWorld(normalizeWorld(w), env.config)) return applyWorld(w);
+  // Any newer switch (deferred or not) cancels a pending one.
+  const gen = ++worldGen;
   const fade = document.querySelector('.world-fade') ?? document.body.appendChild(Object.assign(document.createElement('div'), { className: 'world-fade' }));
+  if (sameWorld(normalizeWorld(w), env.config)) {
+    fade.classList.remove('on');
+    return applyWorld(w);
+  }
   fade.classList.add('on');
   // Two frames so the fade is on screen before the (blocking) rebuild.
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
+      if (gen !== worldGen) return;
       applyWorld(w);
       fade.classList.remove('on');
     }),
@@ -191,7 +204,10 @@ function worldPicker(home: WorldConfig) {
     value: home,
     home,
     onPick: (w: Partial<WorldConfig>) => {
+      worldGen++;
       applyWorld(w);
+      // Outside levels the pick belongs to the track (saved, shared, exported).
+      if (currentLevel === null) track.setWorld(env.config);
       return env.config;
     },
   };
@@ -203,10 +219,10 @@ scene.add(headlight, headlight.target);
 const lampDir = new THREE.Vector3(1, -0.15, 0);
 function updateHeadlight() {
   const n = env.atm.night;
-  headlight.visible = n > 0.05 && mode === 'game';
-  if (!headlight.visible) return;
+  // Stays "visible" (0 intensity by day): toggling a light recompiles every material.
+  headlight.intensity = mode === 'game' ? 60 * n : 0;
+  if (headlight.intensity === 0) return;
   if (riderVel.lengthSq() > 1e-4) lampDir.lerp(riderVel.clone().normalize(), 0.2).normalize();
-  headlight.intensity = 60 * n;
   headlight.position.copy(riderCenter).add(new THREE.Vector3(0, 1.2, 0)).addScaledVector(lampDir, 0.6);
   headlight.target.position.copy(riderCenter).addScaledVector(lampDir, 14).add(new THREE.Vector3(0, -2, 0));
 }
@@ -570,6 +586,9 @@ const ui = new UI(app.appendChild(Object.assign(document.createElement('div'), {
   world: () => env.config,
   setWorld(w) {
     const cfg = normalizeWorld(w);
+    // The ground changes the physics: the run starts over.
+    stop();
+    worldGen++;
     track.setWorld(cfg);
     applyWorld(cfg);
     ui.flash(`${env.config.biome[0].toUpperCase()}${env.config.biome.slice(1)} · ${env.config.time} · ${env.config.weather}`);
@@ -1076,11 +1095,14 @@ function handleRideEvents(events: number, justCrashed: boolean) {
 let wipeouts = loadCounters().wipeouts;
 
 /** Unlocks achievements for the current run state (mid-run or at the end). */
+let worldsSeen = loadCounters();
 function checkAchievements(ended: boolean, rating = 0) {
   if (mode !== 'game' || replaying) return;
   const s = runStats.stats;
   const levelDone = ended && s.finished && !s.crashed && currentLevel !== null;
-  const worlds = noteWorld(env.config.biome, levelDone);
+  // Storage is only touched when something new happens.
+  if (levelDone || !worldsSeen.rode.includes(env.config.biome)) worldsSeen = noteWorld(env.config.biome, levelDone);
+  const worlds = worldsSeen;
   const ctx: RunContext = {
     stats: s,
     vehicle: vehicle.id,
@@ -1321,7 +1343,7 @@ async function enterShared(data: SerializedTrack, challenge: number, vehicleId: 
   if (challenge > 0) ui.setRiderMode(true);
   const v = startView();
   flyTo(v.pos, v.target, 1.3);
-  await ui.showSharedIntro(challenge, rateRun(track, runStats.stats).goals.map((g) => g.label), keysFor(vehicle), ridePicker(), worldPicker(trackWorld()));
+  await ui.showSharedIntro(challenge, rateRun(track, runStats.stats).goals.map((g) => g.label), keysFor(vehicle), ridePicker(), challenge > 0 ? undefined : worldPicker(trackWorld()));
   play();
 }
 
