@@ -194,9 +194,12 @@
   .logo h1 {
     font-size: clamp(40px, 7.5vw, 64px);
   }
-  .logo-mark,
+  /* Back from the 640px rule that hides them (the badge centers its icon as a grid). */
+  .logo-mark {
+    display: grid;
+  }
   .tagline {
-    display: flex;
+    display: block;
   }
   .logo-mark {
     width: 56px;
