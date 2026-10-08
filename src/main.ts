@@ -146,6 +146,9 @@ addEventListener('keydown', (e) => {
 });
 
 // ------------------------------------------------------------------ worlds
+/** Told about each world shown (the UI logo badges; set once the UI exists). */
+let onWorldShown: ((w: WorldConfig) => void) | null = null;
+
 /** Shows a world: landscape, sky, decor style, grade. */
 function applyWorld(w: Partial<WorldConfig>, force = false) {
   const footprint: THREE.Vector3[] = [];
@@ -167,6 +170,7 @@ function applyWorld(w: Partial<WorldConfig>, force = false) {
     groundMarks.reset();
   }
   sound.setWorld(env.config.biome, env.config.time, env.config.weather, ground);
+  onWorldShown?.(env.config);
   ghost = null;
   return true;
 }
@@ -1039,7 +1043,9 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
   postfx.setSize(innerWidth, innerHeight);
   effects.setViewportHeight(innerHeight * renderer.getPixelRatio());
-});
+});onWorldShown = (w) => ui.setWorldBadge(w);
+ui.setWorldBadge(env.config);
+
 
 const timer = new THREE.Timer();
 timer.connect(document);

@@ -5,7 +5,10 @@ import { LINE_COLORS } from '../track/types';
 import type { Stats, Trick } from '../game/RunStats';
 import { GRADE_LABEL } from '../game/RunStats';
 import { icon } from './icons';
-import { BIOMES, TIMES, WEATHERS, biomeById, type BiomeId, type WorldConfig } from '../world/worlds';
+import { BIOMES, DEFAULT_WORLD, TIMES, WEATHERS, biomeById, type BiomeId, type WorldConfig } from '../world/worlds';
+
+/** Badge icon of each world (the logo follows the world on screen). */
+const BADGE: Record<BiomeId, string> = { alpine: 'snowflake', forest: 'forest', beach: 'beach', desert: 'desert', city: 'city' };
 
 const hex = (n: number) => n.toString(16).padStart(6, '0');
 
@@ -238,6 +241,8 @@ export class UI {
   private hintTimer = 0;
   private playing = false;
   private worldBtn!: HTMLButtonElement;
+  private brandMark!: HTMLElement;
+  private shownWorld: WorldConfig = { ...DEFAULT_WORLD };
   /** The editor panel shows the world options instead of the tool's. */
   private worldOpen = false;
   /** Decor palette shows every kind, not only the world's. */
@@ -250,7 +255,8 @@ export class UI {
     const top = h('div', 'topbar');
     const left = h('div', 'top-left');
     const menuBtn = button('btn icon-btn', icon('menu'), 'Menu');
-    const brand = h('div', 'brand', `${icon('snowflake', 20)}<span>Line Rider</span><b>3D</b>`);
+    const brand = h('div', 'brand', `<i class="brand-mark">${icon('snowflake', 20)}</i><span>Line Rider</span><b>3D</b>`);
+    this.brandMark = brand.querySelector('.brand-mark')!;
     const menu = h('div', 'menu hidden');
     const fileInput = h('input') as HTMLInputElement;
     fileInput.type = 'file';
@@ -758,9 +764,10 @@ export class UI {
         'title-screen',
         `<div class="title-inner">
           <div class="logo">
-            <div class="logo-mark">${icon('snowflake', 46)}</div>
+            <div class="logo-mark" data-world="${this.shownWorld.biome}">${icon(BADGE[this.shownWorld.biome], 46)}</div>
             <h1>Line Rider<span>3D</span></h1>
             <p class="tagline">Draw it. Ride it. Wipe out in style.</p>
+            <p class="title-world">${this.worldCaption(this.shownWorld)}</p>
           </div>
           <div class="title-actions">
             <button class="big-btn primary" data-c="levels">${icon('play', 20)} Play <span class="pill">${icon('star', 14)} ${stars}/${maxStars}</span></button>
@@ -787,6 +794,31 @@ export class UI {
       };
       document.body.append(overlay);
     });
+  }
+
+  /** The logo badges follow the world on screen (title tour, levels, editor). */
+  setWorldBadge(w: WorldConfig) {
+    const changed = w.biome !== this.shownWorld.biome;
+    this.shownWorld = { ...w };
+    this.brandMark.innerHTML = icon(BADGE[w.biome], 20);
+    this.brandMark.dataset.world = w.biome;
+    const mark = document.querySelector<HTMLElement>('.title-screen .logo-mark');
+    if (mark) {
+      mark.dataset.world = w.biome;
+      mark.innerHTML = icon(BADGE[w.biome], 46);
+      if (changed) {
+        // Restart the pop animation.
+        mark.classList.remove('pop');
+        void mark.offsetWidth;
+        mark.classList.add('pop');
+      }
+    }
+    const cap = document.querySelector('.title-screen .title-world');
+    if (cap) cap.innerHTML = this.worldCaption(w);
+  }
+
+  private worldCaption(w: WorldConfig) {
+    return `${icon(w.time, 15)}<span>${biomeById(w.biome).name}</span>·<span>${TIMES.find((t) => t.id === w.time)!.name}</span>`;
   }
 
   /** Level select, chapter by chapter; resolves with a level index, or null to go back. */
