@@ -1,9 +1,56 @@
 # Line Rider 3D
 
-A 3D take on the classic Line Rider, built with Three.js + TypeScript + Vite.
-Draw tracks in a snowy landscape and watch Bosh sled down them. Works on desktop and mobile.
+**Draw it. Ride it. Wipe out in style.** A 3D take on the classic Line Rider: draw a track, then watch
+Bosh ride it on a sled, skis, a snowboard, a BMX, a motorbike or a buggy, across five worlds.
 
-**Play it:** https://manuelsiuro.github.io/LineRider3D/ (on a phone, use "Add to Home Screen" to install it; it then plays offline).
+<p align="center">
+  <a href="https://manuelsiuro.github.io/LineRider3D/"><b>▶&nbsp; Play now: manuelsiuro.github.io/LineRider3D</b></a>
+  <br />
+  <sub>Free, in the browser, on desktop and mobile. On a phone, use “Add to Home Screen” to install it: it then plays offline.</sub>
+</p>
+
+<p align="center">
+  <a href="https://manuelsiuro.github.io/LineRider3D/"><img src="docs/screenshots/title.jpg" alt="Line Rider 3D title screen" width="100%" /></a>
+</p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/city-night.jpg" alt="Big air on a motorbike over the city at night" /></td>
+    <td width="50%"><img src="docs/screenshots/desert.jpg" alt="Jumping off a mesa in the desert" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Neon Nights: big air over the city after dark</sub></td>
+    <td align="center"><sub>Mesa Drop: off the top of the mesa</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/beach.jpg" alt="A jump between boardwalk ramps on the beach" /></td>
+    <td width="50%"><img src="docs/screenshots/editor.jpg" alt="The track editor" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Boardwalk: bouncy pads by the sea</sub></td>
+    <td align="center"><sub>The editor: draw tracks, boosts, ice and trampolines</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/levels.jpg" alt="Level select with five worlds" /></td>
+    <td width="50%"><img src="docs/screenshots/summary.jpg" alt="Run summary with stars, medal and achievements" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>25 levels in five worlds: Alpine, Forest, Beach, Desert, City</sub></td>
+    <td align="center"><sub>Stars, medals, tricks, combos and achievements</sub></td>
+  </tr>
+</table>
+
+## Highlights
+
+- **Draw anything**: pencil and line tools, boost, ice and bouncy lines, banked turns, rings, stars, a finish gate and scenery.
+- **Six rides**, each with its own physics, and a **rider mode** to push, brake, spin and flip yourself.
+- **Five worlds** with dawn, day, sunset and night, plus rain, snow, fog, storms and sandstorms.
+- **25 levels**, a **daily ride** that's new every day, **puzzles** to fix broken tracks, medals and a ghost to race.
+- **Share** any track or challenge as a link, take shots in **photo mode**, and play offline as an installed app.
+
+## Development
+
+Built with Three.js, TypeScript and Vite.
 
 ```bash
 npm install
