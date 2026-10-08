@@ -1496,17 +1496,54 @@ export class UI {
       'modal',
       `<div class="card help">
         <h2>How to play</h2>
-        <div class="help-grid">
-          <div>${icon('pencil')}<p><b>Draw</b> tracks on the grid plane. <b>Profile</b> draws like classic Line Rider; orbit the camera to turn the plane. <b>Path</b> draws winding descents from above, auto-banked like a bobsled run.</p></div>
-          <div>${icon('line')}<p>Start a stroke on the <b>end of another track</b> (orange ring) to connect them. The <b>colored side</b> is solid: draw left → right for a floor.</p></div>
-          <div>${icon('ring')}<p><b>Boost</b> speeds up, <b>Ice</b> has no grip, <b>Bouncy</b> is a trampoline. With <b>Items</b>, add <b>stars</b> to collect, <b>rings</b> that launch Bosh and a <b>finish gate</b>.</p></div>
-          <div>${icon('play')}<p>Press <b>Play</b> and watch Bosh ride. Scrub the timeline, try slow-mo and switch cameras.</p></div>
-          <div>${icon('gamepad')}<p><b>Rider mode</b>: <b>→</b> pushes and <b>←</b> brakes on the track. In the air they <b>flip</b> Bosh forward or backward (on bikes and the buggy, → lifts the nose). On skis and the snowboard, <b>↑</b> spins 360s. Land clean to score!</p></div>
-          <div>${icon('garage')}<p><b>Garage</b>: ride a sled, skis, a snowboard, a BMX, a motorbike or a buggy. Press <b>V</b> to switch while editing.</p></div>
+        <div class="help-cols">
+          <div class="help-grid">
+            <div style="--tone:#2f7fd8">${icon('pencil')}<p><b>Draw</b> tracks on the grid. <b>Profile</b> draws like classic Line Rider (orbit to turn the plane); <b>Path</b> draws winding, auto-banked descents from above.</p></div>
+            <div style="--tone:#7466f0">${icon('line')}<p>Start on the <b>end of a track</b> (orange ring) to connect. The <b>colored side</b> is solid: draw left to right for a floor.</p></div>
+            <div style="--tone:#e2602a">${icon('ring')}<p><b>Boost</b> speeds up, <b>Ice</b> has no grip, <b>Bouncy</b> is a trampoline. <b>Items</b> adds stars, boost rings and a finish gate.</p></div>
+            <div style="--tone:#1b8f63">${icon('play')}<p>Press <b>Play</b> and watch Bosh ride. Scrub the timeline, try slow-mo, switch cameras.</p></div>
+            <div style="--tone:#c92f74">${icon('gamepad')}<p><b>Rider mode</b>: you steer. Push and brake on the track, flip in the air, spin on skis and the snowboard. <b>Let go before landing</b> and touch down flat.</p></div>
+            <div style="--tone:#0b7fa3">${icon('globe')}<p><b>Garage</b> has six rides; <b>World</b> picks the landscape, time of day and weather of your track.</p></div>
+          </div>
+          <div class="help-keys">
+            ${this.keyGroup('Ride', 'gamepad', [
+              [['→'], 'Push · pedal · gas'],
+              [['←'], 'Brake'],
+              [['←', '→'], 'Flip in the air'],
+              [['↑'], 'Spin (skis, snowboard)'],
+            ])}
+            ${this.keyGroup('Play', 'play', [
+              [['Space'], 'Play / pause'],
+              [['Esc'], 'Pause menu'],
+              [['Enter'], 'Confirm'],
+              [['V'], 'Next ride'],
+              [['C'], 'Camera'],
+              [['F'], 'Find Bosh'],
+              [['P'], 'Photo mode'],
+            ])}
+            ${this.keyGroup('Build', 'pencil', [
+              [['Q'], 'Pencil'],
+              [['W'], 'Line'],
+              [['E'], 'Eraser'],
+              [['B'], 'Bank'],
+              [['R'], 'Items'],
+              [['D'], 'Decor'],
+              [['S'], 'Start'],
+              [['H'], 'Camera'],
+              [['G'], 'World'],
+              [['Ctrl', 'Z'], 'Undo'],
+              [['Ctrl', 'Y'], 'Redo'],
+            ])}
+            ${this.keyGroup('Mouse & touch', 'move', [
+              [['Left drag'], 'Draw'],
+              [['Right drag'], 'Orbit'],
+              [['Middle drag'], 'Pan'],
+              [['Wheel'], 'Zoom'],
+              [['1 finger'], 'Draw'],
+              [['2 fingers'], 'Orbit & zoom'],
+            ])}
+          </div>
         </div>
-        <p class="keys"><b>Desktop</b> left-drag draw · right-drag orbit · middle-drag pan · wheel zoom<br/>
-        <b>Touch</b> one finger draw · two fingers orbit &amp; zoom · Camera tool to pan<br/>
-        <b>Keys</b> ← → ride · ↑ spin · V ride · Space play · Esc pause · P photo · Q W E B R D S H tools · C camera · F focus · Ctrl+Z undo</p>
         <div class="actions"><button class="big-btn primary">Let's ride!</button></div>
       </div>`,
     );
@@ -1518,6 +1555,14 @@ export class UI {
       }
     };
     document.body.append(overlay);
+  }
+
+  /** A titled block of key caps for the help card. */
+  private keyGroup(title: string, ic: string, items: [string[], string][]) {
+    const cap = (k: string) => `<kbd class="key ${k.length > 1 ? 'wide' : ''}">${k}</kbd>`;
+    return `<section class="key-group"><h4>${icon(ic, 14)} ${title}</h4><div class="key-list">${items
+      .map(([keys, label]) => `<span class="key-item"><span class="caps">${keys.map(cap).join(keys[0] === 'Ctrl' ? '<i>+</i>' : '<i>/</i>')}</span>${label}</span>`)
+      .join('')}</div></section>`;
   }
 
   private bindKeys() {
