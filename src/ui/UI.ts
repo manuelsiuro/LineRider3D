@@ -1484,6 +1484,23 @@ export class UI {
   }
 
   private bindKeys() {
+    // Enter presses the main button of the card on top (Next, Retry, Ride!...).
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key !== 'Enter' || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
+        const t = e.target as HTMLElement;
+        if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
+        const layer = [...document.querySelectorAll('.modal, .summary')].filter((l) => !l.classList.contains('leaving')).pop();
+        const main = layer?.querySelector('.big-btn.primary') as HTMLButtonElement | null;
+        if (!main || main.disabled) return;
+        // Also stops a focused button from being clicked a second time.
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        main.click();
+      },
+      true,
+    );
     window.addEventListener('keydown', (e) => {
       // Esc backs out of full screens (levels, garage, wardrobe).
       if (e.key === 'Escape') {
