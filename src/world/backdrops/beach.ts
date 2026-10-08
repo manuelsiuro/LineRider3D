@@ -36,10 +36,30 @@ function lighthouse(): { group: THREE.Group; beam: THREE.Mesh } {
   g.add(deck, lamp, roof);
   for (const o of g.children) (o as THREE.Mesh).castShadow = true;
   // Sweeping light beam (visible from dusk to dawn).
-  const beamGeo = new THREE.ConeGeometry(9, 130, 16, 1, true).translate(0, -65, 0).rotateZ(Math.PI / 2);
+  const beamGeo = new THREE.ConeGeometry(7, 130, 20, 1, true).translate(0, -65, 0).rotateZ(Math.PI / 2);
+  // Bright at the lamp, fading out along the beam (alpha gradient along v).
+  const c = document.createElement('canvas');
+  c.width = 4;
+  c.height = 64;
+  const ctx = c.getContext('2d')!;
+  const fade = ctx.createLinearGradient(0, 64, 0, 0);
+  fade.addColorStop(0, '#000');
+  fade.addColorStop(0.6, '#222');
+  fade.addColorStop(1, '#fff');
+  ctx.fillStyle = fade;
+  ctx.fillRect(0, 0, 4, 64);
   const beam = new THREE.Mesh(
     beamGeo,
-    new THREE.MeshBasicMaterial({ color: 0xfff2c8, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }),
+    new THREE.MeshBasicMaterial({
+      color: 0xfff2c8,
+      alphaMap: new THREE.CanvasTexture(c),
+      transparent: true,
+      opacity: 0.3,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false,
+    }),
   );
   beam.position.y = top + 1.6;
   g.add(beam);
@@ -123,7 +143,8 @@ export function beach(ctx: BackdropCtx): Backdrop {
   lh.group.position.set(-330, vh(-330, SHORE - 40) + 1, SHORE - 40);
   group.add(lh.group);
   const beamMat = lh.beam.material as THREE.MeshBasicMaterial;
-  beamMat.opacity = 0.03 + atm.night * 0.14 + atm.overcast * 0.05;
+  beamMat.opacity = atm.night * 0.35 + atm.overcast * 0.12;
+  lh.beam.visible = beamMat.opacity > 0.03;
 
   const boats = new THREE.Group();
   [M.lifeRed, M.teal, M.gold, M.pastelBlue].forEach((m, i) => {

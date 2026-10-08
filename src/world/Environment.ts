@@ -179,7 +179,7 @@ export class Environment {
     this.cloudMat.opacity = 0.95;
     this.clouds.children.forEach((cl, i) => {
       // Fewer clouds on clear nights, a low deck under storms.
-      cl.visible = atm.overcast > 0.3 || i % (atm.night > 0.5 ? 3 : 1) === 0;
+      cl.visible = (atm.overcast > 0.3 || i % (atm.night > 0.5 ? 3 : 1) === 0) && atm.fogFar > 200;
       const s = 1 + atm.overcast * 1.4;
       cl.scale.set(s, 1 + atm.overcast * 0.8, s);
       cl.position.y = cl.userData.baseY * (1 - atm.overcast * 0.45);
@@ -294,9 +294,11 @@ export class Environment {
           col = mix(fogCol, col, smoothstep(-0.08, 0.02, d.y));
           if (night > 0.0) {
             // Stars, twinkling, fading toward the horizon and under clouds.
-            vec3 cell = floor(d * 260.0);
+            vec3 g = d * 260.0;
+            vec3 cell = floor(g);
             float h = hash(cell);
-            float star = step(0.9965, h) * (0.6 + 0.4 * sin(time * 2.0 + h * 400.0));
+            float round = smoothstep(0.42, 0.05, length(fract(g) - 0.5));
+            float star = step(0.9965, h) * round * (0.6 + 0.4 * sin(time * 2.0 + h * 400.0)) * 1.6;
             col += vec3(0.9, 0.95, 1.0) * star * smoothstep(0.05, 0.35, d.y) * night * (1.0 - overcast);
             // Moon: crisp disc with soft maria and a pale halo.
             float m = smoothstep(0.99935, 0.99955, s);
