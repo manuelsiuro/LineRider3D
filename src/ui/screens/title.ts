@@ -35,7 +35,7 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
             <button class="big-btn menu-btn" data-c="wardrobe"><span class="menu-ic">${icon('sled', 18)}</span><span class="menu-label">Wardrobe</span>${icon('chevronRight', 16)}</button>
             <button class="big-btn menu-btn" data-c="trophies"><span class="menu-ic">${icon('trophy', 18)}</span><span class="menu-label">Trophies</span>${icon('chevronRight', 16)}</button>
             <button class="big-btn menu-btn" data-c="settings"><span class="menu-ic">${icon('gear', 18)}</span><span class="menu-label">Settings</span>${icon('chevronRight', 16)}</button>
-            ${hasSave ? `<button class="big-btn menu-btn" data-c="new"><span class="menu-ic">${icon('plus', 18)}</span><span class="menu-label">New track</span>${icon('chevronRight', 16)}</button>` : ''}
+            ${hasSave ? `<button class="big-btn menu-btn" data-c="gallery"><span class="menu-ic">${icon('folder', 18)}</span><span class="menu-label">My tracks</span>${icon('chevronRight', 16)}</button>` : ''}
           </div>
         </div>
         <p class="title-foot">${icon('sound', 16)} Best with sound on · works with mouse and touch</p>
@@ -46,7 +46,7 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
       if (!c) return;
       ctx.click();
       overlay.classList.add('leaving');
-      if (c !== 'levels' && c !== 'puzzles' && c !== 'wardrobe' && c !== 'garage' && c !== 'settings' && c !== 'trophies') document.body.classList.remove('on-title');
+      if (c !== 'levels' && c !== 'puzzles' && c !== 'gallery' && c !== 'wardrobe' && c !== 'garage' && c !== 'settings' && c !== 'trophies') document.body.classList.remove('on-title');
       setTimeout(() => overlay.remove(), 450);
       resolve(c);
     };

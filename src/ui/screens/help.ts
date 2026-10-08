@@ -73,8 +73,9 @@ export function showHelp(ctx: ScreenCtx) {
           ${keyGroup('Build', 'pencil', [
             [['Q'], 'Pencil'],
             [['W'], 'Line'],
+            [['X'], 'Select'],
             [['E'], 'Eraser'],
-            [['D'], 'Decor'],
+            [['T'], 'Test here'],
             [['G'], 'World'],
             [['Ctrl', 'Z'], 'Undo'],
           ])}

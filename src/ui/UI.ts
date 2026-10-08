@@ -19,6 +19,7 @@ import { hideSummary, showSummary } from './screens/summary';
 import { showPause, showPhotoMode, showSettings } from './screens/menus';
 import { showHelp } from './screens/help';
 import { showPuzzleIntro, showPuzzles } from './screens/puzzles';
+import { showGallery } from './screens/gallery';
 
 export type * from './types';
 export { overlayOpen };
@@ -30,6 +31,7 @@ type Rest<F> = F extends (ctx: ScreenCtx, ...a: infer A) => unknown ? A : never;
 const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
   { id: 'pencil', icon: 'pencil', label: 'Pencil', key: 'Q' },
   { id: 'line', icon: 'line', label: 'Line', key: 'W' },
+  { id: 'select', icon: 'select', label: 'Select', key: 'X' },
   { id: 'eraser', icon: 'eraser', label: 'Eraser', key: 'E' },
   { id: 'bank', icon: 'bank', label: 'Bank', key: 'B' },
   { id: 'item', icon: 'star', label: 'Items', key: 'R' },
@@ -124,6 +126,7 @@ export class UI {
     };
     item('home', 'Main menu', handlers.mainMenu);
     item('star', 'Levels', handlers.levels);
+    item('folder', 'My tracks', handlers.gallery);
     item('plus', 'New track', handlers.newTrack);
     item('sled', 'Demo track', handlers.loadDemo);
     item('share', 'Share link', () => handlers.share());
@@ -296,6 +299,9 @@ export class UI {
     root.append(h('div', 'letterbox'), top, player, this.hud, this.popups, this.touchPad, bottom, this.hint, replayTag);
     this.setRiderMode(riderMode);
     editor.onHint = (t) => this.flash(t);
+    editor.selection.onChange = () => {
+      if (this.editor.tool === 'select' && !this.worldOpen) this.renderPanel();
+    };
 
     this.selectTool('pencil');
     this.bindKeys();
@@ -448,6 +454,27 @@ export class UI {
       slider(r2, 'Width', 1, 6, 0.2, s.width, '', (v) => (s.width = v));
       slider(r2, 'Bank', -90, 90, 5, s.bank, '°', (v) => (s.bank = v));
       if (s.mode === 'path') slider(r2, 'Descent', 0, 60, 1, s.grade, '%', (v) => (s.grade = v));
+    } else if (tool === 'select') {
+      const sel = this.editor.selection;
+      const r = row();
+      const act = (ic: string, label: string, keys: string, enabled: boolean, fn: () => void) => {
+        const b = button(`chip action ${enabled ? '' : 'disabled'}`, `${icon(ic, 16)}<span>${label}</span><kbd>${keys}</kbd>`, `${label} (${keys})`);
+        b.disabled = !enabled;
+        b.onclick = () => {
+          this.handlers.click();
+          fn();
+          this.renderPanel();
+        };
+        r.append(b);
+      };
+      const n = sel.ids.size;
+      const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
+      act('copy', 'Copy', `${mod} C`, n > 0, () => this.flash(`Copied ${sel.copy()} line${n > 1 ? 's' : ''}`));
+      act('paste', 'Paste', `${mod} V`, sel.hasClipboard(), () => sel.paste());
+      act('mirror', 'Mirror', 'M', n > 0, () => sel.mirror());
+      act('smooth', 'Smooth', 'N', n > 0, () => sel.smooth());
+      act('trash', 'Delete', 'Del', n > 0, () => sel.remove());
+      row().append(h('span', 'tip', n ? `${n} line${n > 1 ? 's' : ''} selected · drag one to move them · shift-click to add or remove` : 'Drag a box around lines, or click one. Shift-click adds more.'));
     } else if (tool === 'item') {
       seg(
         row(),
@@ -762,6 +789,25 @@ export class UI {
         this.editor.history.redo();
         return;
       }
+      // Selection: copy, paste (switches to Select), mirror, smooth, delete.
+      const sel = this.editor.selection;
+      const selecting = this.editor.enabled && this.editor.allows('select');
+      if (selecting && mod && e.key.toLowerCase() === 'c' && sel.ids.size) {
+        e.preventDefault();
+        this.flash(`Copied ${sel.copy()} line${sel.ids.size > 1 ? 's' : ''}`);
+        return this.renderPanel();
+      }
+      if (selecting && mod && e.key.toLowerCase() === 'v' && sel.hasClipboard()) {
+        e.preventDefault();
+        if (this.editor.tool !== 'select') this.selectTool('select');
+        sel.paste();
+        return;
+      }
+      if (selecting && this.editor.tool === 'select' && sel.ids.size && !mod) {
+        if (e.key === 'Delete' || e.key === 'Backspace') return sel.remove();
+        if (e.key.toLowerCase() === 'm') return sel.mirror();
+        if (e.key.toLowerCase() === 'n') return sel.smooth();
+      }
       if (mod) return;
       if (e.code === 'Space') {
         e.preventDefault();
@@ -773,7 +819,8 @@ export class UI {
       if (e.key.toLowerCase() === 'c') return this.cycleCamera();
       if (e.key.toLowerCase() === 'f') return this.handlers.focusRider();
       if (e.key.toLowerCase() === 'p') return this.handlers.photo();
-      if (e.key.toLowerCase() === 'g' && this.editor.enabled) return this.toggleWorldPanel();
+      if (e.key.toLowerCase() === 'g' && this.editor.enabled && !this.editor.rules) return this.toggleWorldPanel();
+      if (e.key.toLowerCase() === 't' && this.editor.enabled) return this.handlers.testHere();
       const tool = TOOLS.find((t) => t.key === e.key.toUpperCase());
       if (tool) this.selectTool(tool.id);
     });
@@ -832,6 +879,9 @@ export class UI {
   }
   showHelp() {
     showHelp(this.ctx);
+  }
+  showGallery(...a: Rest<typeof showGallery>) {
+    return showGallery(this.ctx, ...a);
   }
   showPuzzles(...a: Rest<typeof showPuzzles>) {
     return showPuzzles(this.ctx, ...a);

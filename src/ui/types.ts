@@ -1,7 +1,7 @@
 import type { WorldConfig } from '../world/worlds';
 import type { BiomeId } from '../world/worlds';
 
-export type TitleChoice = 'daily' | 'puzzles' | 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies';
+export type TitleChoice = 'daily' | 'puzzles' | 'gallery' | 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies';
 export type PauseChoice = 'resume' | 'restart' | 'settings' | 'levels' | 'menu';
 
 export interface UIHandlers {
@@ -28,6 +28,10 @@ export interface UIHandlers {
   escape(): void;
   /** Enters photo mode. */
   photo(): void;
+  /** Opens the gallery of saved tracks. */
+  gallery(): void;
+  /** Rides from the point under the pointer (the start goes back on Stop). */
+  testHere(): void;
   /** Next ride (editor quick switch). */
   cycleVehicle(): void;
   /** Touch pad input: bit mask from the on-screen buttons. */
@@ -187,4 +191,21 @@ export interface PuzzleCard {
   /** Best ink used (m), 0 when unsolved. */
   ink: number;
   par: number;
+}
+
+/** A saved track in the gallery. */
+export interface GalleryCard {
+  id: string;
+  name: string;
+  savedAt: number;
+  strokes: number;
+  world: string;
+  current: boolean;
+}
+
+/** Gallery actions that change the list (it is shown again after each). */
+export interface GalleryActions {
+  rename(id: string, name: string): GalleryCard[];
+  duplicate(id: string): GalleryCard[];
+  remove(id: string): GalleryCard[];
 }

@@ -17,7 +17,8 @@ import { MEDALS, MEDAL_NAME, bestTime, levelMedal, medalFor, medalTimes, recordT
 import { LEVELS, chapterOf } from './levels/levels';
 import { OUTFITS, champions, isUnlocked, outfitUnlocked, loadProgress, saveLevelResult, selectOutfit, selectedOutfit, totalStars } from './game/progress';
 import { ACHIEVEMENTS, evaluate, loadCounters, noteWorld, selectPaint, unlockedAchievements, type RunContext } from './game/achievements';
-import { KEYS, migrateStorage, readFlag, readJSON, readText, writeFlag, writeJSON, writeText } from './game/storage';
+import { KEYS, migrateStorage, readFlag, readText, writeFlag, writeText } from './game/storage';
+import { createSlot, currentSlot, deleteSlot, duplicateSlot, freshName, listSlots, loadSlot, renameSlot, saveSlot, setCurrent } from './game/gallery';
 import { createStage, fitToWindow } from './app/stage';
 import { createCore, type Core } from './app/core';
 import { EDIT, TITLE, autosaves, challengeOf, editing, fixedTrack, freeEdit, inGame, levelOf, type Session } from './app/session';
@@ -88,7 +89,31 @@ const rides = new Rides(core, {
 /** Stops the run; in a puzzle the camera goes back to the side view to fix the track. */
 function stopRun() {
   run.stop();
+  restoreTestStart();
   if (session.kind === 'puzzle') moves.showSide(track, 0.8);
+}
+
+/** The real start while testing from another point (put back on Stop). */
+let testStart: THREE.Vector3 | null = null;
+
+function restoreTestStart() {
+  if (!testStart) return;
+  const back = testStart;
+  testStart = null;
+  loadInto(() => track.setStart(back));
+}
+
+/** T: ride from the point under the pointer without moving the start flag for good. */
+function testHere() {
+  // Puzzles keep their own start.
+  if (session.kind !== 'edit' || run.playing) return;
+  const p = editor.cursorPoint();
+  if (!p) return ui.flash('Point at a track or the drawing grid, then press T');
+  run.stop();
+  if (!testStart) testStart = track.start.clone();
+  loadInto(() => track.setStart(p));
+  ui.flash('Testing from here: Stop puts the start flag back', 2500);
+  run.play();
 }
 
 /** Ghosts and bests are per track, ride and ground. */
@@ -114,12 +139,24 @@ function cycleVehicle() {
 
 /** A freshly loaded demo is not saved, so it never overwrites the player's own track. */
 let pristine = true;
+/**
+ * The gallery slot of the track in the editor; null until a new, demo or
+ * shared track is first edited, which then becomes a new saved track.
+ */
+let slotId: string | null = null;
+let slotName = '';
 let loading = false;
 let saveTimer = 0;
 
-function loadInto(fn: () => void) {
-  // A pending autosave belongs to the track being replaced.
+/** Saves now if an autosave is pending (before the track or its slot changes). */
+function flushSave() {
+  if (!saveTimer) return;
   clearTimeout(saveTimer);
+  saveTrack();
+}
+
+function loadInto(fn: () => void) {
+  flushSave();
   loading = true;
   fn();
   loading = false;
@@ -129,17 +166,56 @@ track.on((e) => {
   if (loading || e.kind === 'cleared' || !autosaves(session)) return;
   pristine = false;
   clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(() => writeJSON(KEYS.track, track.serialize()), 400);
+  saveTimer = window.setTimeout(saveTrack, 400);
 });
 
-function savedTrack(): SerializedTrack | null {
-  try {
-    const data = validateTrack(readJSON<unknown>(KEYS.track, null));
-    return data.strokes.length > 0 ? data : null;
-  } catch {
-    return null;
-  }
+/** Saves the editor track into its gallery slot (a new one on the first edit). */
+function saveTrack() {
+  saveTimer = 0;
+  if (!slotId) slotId = createSlot(slotName || freshName());
+  if (!saveSlot(slotId, track.serialize())) ui.flash('Storage is full: export your track to keep it', 4000);
 }
+
+/** The track "Continue" opens (the last one edited). */
+function savedTrack(): SerializedTrack | null {
+  const id = currentSlot();
+  const data = id ? loadSlot(id) : null;
+  return data && data.strokes.length > 0 ? data : null;
+}
+
+/** Opens a saved track from the gallery. */
+function openSlot(id: string) {
+  const data = loadSlot(id);
+  if (!data) return ui.flash("That track can't be read");
+  openTrack(() => track.load(data), null, false);
+  slotId = id;
+  setCurrent(id);
+}
+
+function galleryCards() {
+  const current = currentSlot();
+  return listSlots().map((s) => ({ ...s, current: s.id === current }));
+}
+
+/** My tracks: open, create, rename, duplicate, delete. Resolves when a track is opened. */
+async function openGallery(): Promise<boolean> {
+  const pick = await ui.showGallery(galleryCards(), {
+    rename: (id, name) => (renameSlot(id, name), galleryCards()),
+    duplicate: (id) => (duplicateSlot(id), galleryCards()),
+    remove: (id) => {
+      deleteSlot(id);
+      if (slotId === id) slotId = null;
+      return galleryCards();
+    },
+  });
+  if (!pick) return false;
+  if ('create' in pick) startNewTrack();
+  else openSlot(pick.open);
+  return true;
+}
+
+// Closing the tab right after an edit still saves it.
+addEventListener('pagehide', flushSave);
 
 loadInto(() => buildDemoTrack(track));
 worlds.apply(env.config);
@@ -166,12 +242,12 @@ const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('di
     run.stop();
     enterTitle();
   },
-  async newTrack() {
-    if (!(await confirmReplace('Start a new track?', 'Start fresh'))) return;
+  newTrack() {
+    noteSaved();
     startNewTrack();
   },
-  async loadDemo() {
-    if (!(await confirmReplace('Load the demo?', 'Load demo'))) return;
+  loadDemo() {
+    noteSaved();
     openTrack(() => buildDemoTrack(track), DEFAULT_WORLD);
   },
   exportTrack() {
@@ -186,9 +262,11 @@ const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('di
     file.text().then((text) => {
       try {
         const data = validateTrack(JSON.parse(text));
-        // An imported track is the player's own: it is saved like any edit.
+        // An imported track becomes a new saved track, named after its file.
         openTrack(() => track.load(data), null, false);
-        writeJSON(KEYS.track, track.serialize());
+        slotId = null;
+        slotName = file.name.replace(/\.json$/i, '').replace(/[-_]+/g, ' ').slice(0, 40) || freshName();
+        saveTrack();
         ui.flash('Track loaded');
       } catch (e) {
         ui.flash(e instanceof TrackFormatError ? e.message : 'Invalid track file', 4500);
@@ -251,6 +329,11 @@ const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('di
     input.touch = mask;
   },
   cycleVehicle,
+  testHere,
+  async gallery() {
+    run.stop();
+    await openGallery();
+  },
   click: () => sound.click(),
 }, riderMode);
 core.ui = ui;
@@ -264,10 +347,9 @@ fitToWindow(stage, () => core.effects.setViewportHeight(innerHeight * stage.rend
 
 // ------------------------------------------------------------------ sessions
 
-/** Asks before replacing a track the player has worked on. */
-async function confirmReplace(title: string, action: string) {
-  if (pristine || track.strokes.size === 0) return true;
-  return ui.confirm(title, 'Your current track will be replaced. Export it first if you want to keep it.', action);
+/** Leaving an edited track: it is kept in the gallery (say so once). */
+function noteSaved() {
+  if (session.kind === 'edit' && !pristine && track.strokes.size > 0) ui.flash('Your track is saved in My tracks', 2500);
 }
 
 /**
@@ -275,6 +357,9 @@ async function confirmReplace(title: string, action: string) {
  * Levels lock their own ride; a challenge locks the challenger's.
  */
 function enter(next: Session, lockedRide: VehicleDef | null = null, ghost: number[] | null = null) {
+  // The track being left keeps its pending edits, and its real start flag.
+  restoreTestStart();
+  flushSave();
   const wasTitle = session.kind === 'title';
   session = next;
   friendGhost = ghost && challengeOf(next) > 0 ? { rle: ghost, frames: ghost.reduce((n, v, i) => n + (i % 2 ? v : 0), 0), score: challengeOf(next), finishTime: 0 } : null;
@@ -303,6 +388,9 @@ function enter(next: Session, lockedRide: VehicleDef | null = null, ghost: numbe
  */
 function openTrack(load: () => void, world: Partial<WorldConfig> | null, fresh = true) {
   enter(EDIT);
+  // A fresh track (demo, shared) is saved as a new track once edited.
+  slotId = null;
+  slotName = '';
   loadInto(load);
   worlds.change(world ?? worlds.trackWorld());
   pristine = fresh;
@@ -313,6 +401,8 @@ function openTrack(load: () => void, world: Partial<WorldConfig> | null, fresh =
 
 function startNewTrack() {
   enter(EDIT);
+  slotId = null;
+  slotName = '';
   loadInto(() => {
     track.clear();
     track.setStart(new THREE.Vector3(0, 12, 0));
@@ -411,15 +501,14 @@ async function titleFlow() {
       startLevel(idx);
       return;
     }
+    if (choice === 'gallery') {
+      if (await openGallery()) return;
+      continue;
+    }
     if (choice === 'create') {
-      const data = savedTrack();
-      enter(EDIT);
-      if (data) {
-        loadInto(() => track.load(data));
-        pristine = false;
-      }
-      worlds.change(worlds.trackWorld());
-      moves.showStart(track);
+      const id = currentSlot();
+      if (id) openSlot(id);
+      else startNewTrack();
     } else {
       startNewTrack();
       const seen = readText(KEYS.helpSeen) !== null;
@@ -477,6 +566,8 @@ async function backToLevels() {
 async function enterShared(data: SerializedTrack, score: number, vehicleId: string | null, ghost: number[] | null = null) {
   // A challenge is ridden on the challenger's ride, against their ghost.
   enter({ kind: 'edit', challenge: score }, score > 0 && vehicleId ? vehicleById(vehicleId) : null, ghost);
+  slotId = null;
+  slotName = freshName('Shared track');
   loadInto(() => track.load(data));
   worlds.change(worlds.trackWorld());
   pristine = true;
@@ -671,7 +762,7 @@ function showSummary(wasReplay: boolean) {
       run.reset();
       run.play();
     },
-    () => run.stop(),
+    () => stopRun(),
     () => run.watchReplay(),
     () => (session.kind === 'daily' ? enterTitle() : backToLevels()),
     () => {

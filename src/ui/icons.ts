@@ -1,5 +1,12 @@
 /** Minimal stroke icon set (24×24, currentColor). */
 const P: Record<string, string> = {
+  select: '<path d="M4 9V5a1 1 0 0 1 1-1h4"/><path d="M14 4h1"/><path d="M4 14v1"/><path d="M9 20H5a1 1 0 0 1-1-1v-1"/><path d="m12 12 8.5 3.2-3.6 1.5-1.5 3.6Z"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  paste: '<rect x="7" y="4" width="10" height="4" rx="1"/><path d="M15 6h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2"/>',
+  mirror: '<path d="M12 3v18"/><path d="M8 7 3 12l5 5Z"/><path d="m16 7 5 5-5 5Z"/>',
+  smooth: '<path d="M3 17c3 0 3-10 6-10s3 10 6 10 3-10 6-10"/>',
+  trash: '<path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
   medal: '<path d="M7.5 2h3l2 5-2.5 1.5Z"/><path d="M16.5 2h-3l-2 5 2.5 1.5Z"/><circle cx="12" cy="15" r="6.5"/><path d="m12 11.6 1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3Z" fill="currentColor" stroke="none"/>',
   calendar: '<rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/><path d="M8 14h3v3H8z" fill="currentColor"/>',
   flame: '<path d="M12 22c4 0 7-2.7 7-6.8 0-3.4-2.2-5.6-3.6-7.6-.4 2-1.4 3.2-2.6 3.6.4-3.5-1.3-6.7-4.3-9.2.2 3.4-1.5 5.6-3 7.6C4.3 11.3 5 12.6 5 15.2 5 19.3 8 22 12 22Z"/><path d="M12 22c-1.7 0-3-1.2-3-3 0-1.7 1.4-2.8 2.4-4 .6 1.3 3.6 2.2 3.6 4 0 1.8-1.3 3-3 3Z"/>',

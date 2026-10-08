@@ -1,0 +1,135 @@
+/* ------------------------------------------------------------ editor: select tool */
+/* Box selection drawn over the canvas. */
+.select-box {
+  position: fixed;
+  z-index: 30;
+  border: 1.5px dashed #ff9a2e;
+  border-radius: 4px;
+  background: rgba(255, 163, 64, 0.12);
+  pointer-events: none;
+}
+
+.chip.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip.action kbd {
+  padding: 1px 5px;
+  border-radius: 4px;
+  font: 600 10.5px var(--font-ui);
+  color: var(--muted);
+  background: rgba(18, 35, 58, 0.06);
+}
+
+.chip.action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------ gallery (My tracks) */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.gallery-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 150px;
+  border-radius: 22px;
+  background: var(--glass-strong);
+  box-shadow: var(--shadow);
+  animation: card-in 0.4s var(--spring) backwards;
+}
+
+.gallery-card.current {
+  box-shadow: var(--shadow), inset 0 0 0 2px var(--accent-2);
+}
+
+.gallery-open,
+.gallery-card.new {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px 16px 8px;
+  border-radius: 22px;
+  text-align: left;
+  transition: transform 0.18s var(--spring);
+}
+
+.gallery-open:hover,
+.gallery-card.new:hover {
+  transform: translateY(-2px);
+}
+
+.gallery-card.new {
+  justify-content: center;
+  align-items: center;
+  padding-bottom: 16px;
+  text-align: center;
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 2px rgba(47, 127, 216, 0.35);
+}
+
+.gallery-card.new small,
+.gallery-open small {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.gallery-ic {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  color: white;
+  background: linear-gradient(160deg, #5fb2ff, #2a6fc4);
+}
+
+.gallery-card.new .gallery-ic {
+  color: var(--accent);
+  background: rgba(47, 127, 216, 0.12);
+}
+
+.gallery-ic[data-world='forest'] { background: linear-gradient(160deg, #6fcf7a, #2d8a4a); }
+.gallery-ic[data-world='beach'] { background: linear-gradient(160deg, #5fd8e0, #1b98b0); }
+.gallery-ic[data-world='desert'] { background: linear-gradient(160deg, #ffb066, #d9692a); }
+.gallery-ic[data-world='city'] { background: linear-gradient(160deg, #a08cff, #5b3fd6); }
+
+.gallery-name,
+.gallery-rename {
+  font: 600 17px var(--font-display);
+  color: var(--ink);
+}
+
+.gallery-rename {
+  width: 100%;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 8px;
+  outline: 2px solid var(--accent-2);
+  background: white;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.gallery-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 0 8px 8px;
+}
+
+.gallery-empty {
+  margin: 18px 0 0;
+  text-align: center;
+  color: var(--ink-soft);
+}

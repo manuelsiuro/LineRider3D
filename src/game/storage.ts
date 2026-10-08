@@ -27,10 +27,17 @@ export const KEYS = {
   helpSeen: 'lr3d.helpSeen',
   sfx: 'lr3d.sfx',
   music: 'lr3d.music',
+  /** The single editor track of saves before version 2 (moved into the gallery). */
   track: 'lr3d.track',
+  /** The track gallery: index of saved tracks and the one being edited. */
+  tracks: 'lr3d.tracks',
 } as const;
 
-export type StorageKey = (typeof KEYS)[keyof typeof KEYS];
+/** One saved track of the gallery. */
+export type SlotKey = `lr3d.slot.${string}`;
+export const slotKey = (id: string): SlotKey => `lr3d.slot.${id}`;
+
+export type StorageKey = (typeof KEYS)[keyof typeof KEYS] | SlotKey;
 
 /** The keys "Reset progress" wipes. */
 export const PROGRESS_KEYS: StorageKey[] = [KEYS.progress, KEYS.best, KEYS.ghosts, KEYS.outfit, KEYS.achievements, KEYS.paint, KEYS.counters, KEYS.daily, KEYS.medals, KEYS.puzzles];
@@ -91,7 +98,7 @@ export function writeFlag(key: StorageKey, on: boolean) {
 
 // ------------------------------------------------------------------ versions
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** MIGRATIONS[n] upgrades saves from version n to n + 1. */
 const MIGRATIONS: Array<() => void> = [
@@ -106,6 +113,25 @@ const MIGRATIONS: Array<() => void> = [
       }
     }
     if (changed) writeJSON(KEYS.best, bests);
+  },
+  // 1 → 2: the single editor track becomes the first track of the gallery.
+  () => {
+    const raw = readText(KEYS.track);
+    if (raw === null) return;
+    let strokes = 0;
+    let world = '';
+    try {
+      const data = JSON.parse(raw) as { strokes?: unknown[]; world?: { biome?: string } };
+      strokes = Array.isArray(data.strokes) ? data.strokes.length : 0;
+      world = data.world?.biome ?? '';
+    } catch {
+      return;
+    }
+    if (strokes === 0) return removeKey(KEYS.track);
+    // Copy first, and only drop the old key once the copy is in place.
+    if (!writeText(slotKey('t1'), raw)) return;
+    if (!writeJSON(KEYS.tracks, { current: 't1', slots: [{ id: 't1', name: 'My track', savedAt: Date.now(), strokes, world }] })) return;
+    removeKey(KEYS.track);
   },
 ];
 

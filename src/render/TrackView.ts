@@ -102,7 +102,7 @@ export class TrackView {
     if (!mesh) return;
     mesh.geometry.dispose();
     // Highlight clones belong to this ribbon only.
-    if (mesh.userData.highlighted) for (const m of mesh.material as THREE.Material[]) m.dispose();
+    if (mesh.userData.originalMaterials) for (const m of mesh.material as THREE.Material[]) m.dispose();
     this.ribbons.remove(mesh);
     this.ribbonById.delete(id);
   }
@@ -118,7 +118,7 @@ export class TrackView {
       if (!stroke) continue;
       const mats = (mesh.userData.originalMaterials ?? mesh.material) as THREE.Material[];
       mats[0] = topMaterial(stroke.type);
-      if (mesh.userData.highlighted) this.highlightRefresh(mesh);
+      if (mesh.userData.originalMaterials) this.highlightRefresh(mesh);
       else mesh.material = [...mats];
     }
     for (const id of [...this.decorById.keys()]) {
@@ -208,33 +208,43 @@ export class TrackView {
     });
   }
 
+  /** Re-applies a ribbon's highlight on top of its (restyled) materials. */
   private highlightRefresh(mesh: THREE.Mesh) {
-    mesh.userData.highlighted = false;
+    const color = mesh.userData.highlighted as number;
     for (const m of mesh.material as THREE.Material[]) m.dispose();
-    mesh.material = mesh.userData.originalMaterials;
-    this.highlight(mesh.userData.strokeId);
+    mesh.material = [...(mesh.userData.originalMaterials as THREE.Material[])];
+    mesh.userData.originalMaterials = null;
+    mesh.userData.highlighted = null;
+    this.applyHighlight(mesh, color);
   }
 
   /** Highlights a ribbon (eraser / bank hover). */
   highlight(strokeId: number | null) {
-    for (const [id, mesh] of this.ribbonById) {
-      const on = id === strokeId;
-      if (mesh.userData.highlighted === on) continue;
-      mesh.userData.highlighted = on;
-      const mats = mesh.material as THREE.MeshStandardMaterial[];
-      if (on) {
-        mesh.material = mats.map((m) => {
-          const c = m.clone();
-          c.emissive = new THREE.Color(0xffffff);
-          c.emissiveIntensity = 0.35;
-          return c;
-        });
-        mesh.userData.originalMaterials = mats;
-      } else if (mesh.userData.originalMaterials) {
-        for (const m of mats) m.dispose();
-        mesh.material = mesh.userData.originalMaterials;
-      }
+    this.highlightSet(strokeId === null ? new Set() : new Set([strokeId]));
+  }
+
+  /** Highlights several ribbons (the editor selection uses a warm color). */
+  highlightSet(ids: Set<number>, color = 0xffffff) {
+    for (const [id, mesh] of this.ribbonById) this.applyHighlight(mesh, ids.has(id) ? color : null);
+  }
+
+  private applyHighlight(mesh: THREE.Mesh, want: number | null) {
+    if ((mesh.userData.highlighted ?? null) === want) return;
+    if (mesh.userData.originalMaterials) {
+      for (const m of mesh.material as THREE.Material[]) m.dispose();
+      mesh.material = mesh.userData.originalMaterials;
+      mesh.userData.originalMaterials = null;
     }
+    mesh.userData.highlighted = want;
+    if (want === null) return;
+    const base = mesh.material as THREE.MeshStandardMaterial[];
+    mesh.material = base.map((m) => {
+      const c = m.clone();
+      c.emissive = new THREE.Color(want);
+      c.emissiveIntensity = 0.35;
+      return c;
+    });
+    mesh.userData.originalMaterials = base;
   }
 
   private buildStartMarker() {

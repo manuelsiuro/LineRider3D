@@ -51,3 +51,34 @@ check(Object.keys(readJSON(KEYS.progress, {})).length === 0, 'blocked reads fall
 migrateStorage();
 blocked = false;
 console.log('corrupt and blocked storage handled');
+
+// 1 → 2: the single editor track moves into the gallery, as "My track".
+{
+  mem.clear();
+  const track = JSON.stringify({ version: 1, start: [0, 12, 0], strokes: [{ type: 'normal', mode: 'profile', points: [0, 10, 0, 5, 9, 0], planeNormal: [0, 0, 1], bank: 0, width: 2.4 }], decor: [], world: { biome: 'forest' } });
+  mem.set(KEYS.track, track);
+  mem.set(KEYS.version, '1');
+  migrateStorage();
+  const gallery = await import('../src/game/gallery');
+  const slots = gallery.listSlots();
+  check(slots.length === 1 && slots[0].name === 'My track' && slots[0].strokes === 1 && slots[0].world === 'forest', `gallery after migration: ${JSON.stringify(slots)}`);
+  check(gallery.currentSlot() === slots[0].id, 'the migrated track is current');
+  check(gallery.loadSlot(slots[0].id)?.strokes.length === 1, 'the migrated track loads');
+  check(!mem.has(KEYS.track), 'the old key is gone');
+  // Gallery basics: create, save, duplicate, rename, delete.
+  const id = gallery.createSlot();
+  check(gallery.saveSlot(id, gallery.loadSlot(slots[0].id)!), 'save into a new slot');
+  const copy = gallery.duplicateSlot(id)!;
+  gallery.renameSlot(copy, '  Big jump  ');
+  check(gallery.listSlots().some((s) => s.id === copy && s.name === 'Big jump'), 'rename trims');
+  gallery.deleteSlot(copy);
+  check(!gallery.listSlots().some((s) => s.id === copy) && !mem.has(`lr3d.slot.${copy}`), 'delete removes the slot and its data');
+  check(gallery.freshName() === 'Track 3', `fresh name: ${gallery.freshName()}`);
+  // An empty old track is simply dropped.
+  mem.clear();
+  mem.set(KEYS.track, JSON.stringify({ strokes: [] }));
+  mem.set(KEYS.version, '1');
+  migrateStorage();
+  check(!mem.has(KEYS.track) && gallery.listSlots().length === 0, 'an empty old track is not kept');
+  console.log('gallery migration ok');
+}

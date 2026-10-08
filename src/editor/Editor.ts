@@ -6,8 +6,9 @@ import type { DecorKind, DrawMode, LineType, Stroke } from '../track/types';
 import type { TrackView } from '../render/TrackView';
 import { buildRibbonMesh } from '../render/ribbon';
 import { History } from './History';
+import { Selection } from './Selection';
 
-export type Tool = 'pencil' | 'line' | 'eraser' | 'bank' | 'decor' | 'item' | 'start' | 'hand';
+export type Tool = 'pencil' | 'line' | 'select' | 'eraser' | 'bank' | 'decor' | 'item' | 'start' | 'hand';
 export type ItemKind = 'ring' | 'star' | 'finish';
 
 export interface EditorSettings {
@@ -67,6 +68,10 @@ export class Editor {
     item: 'star',
   };
   readonly history = new History();
+  /** The Select tool's strokes and clipboard. */
+  readonly selection: Selection;
+  /** Last pointer position over the canvas (for "test from here"). */
+  private lastPointer: PointerEvent | null = null;
 
   /** Goal score of the track (third star). */
   get targetScore() {
@@ -98,6 +103,7 @@ export class Editor {
     private view: TrackView,
     private ground: THREE.Object3D,
   ) {
+    this.selection = new Selection(dom, camera, track, view, this.history);
     this.grid = this.buildGrid();
     scene.add(this.grid);
     this.snapRing = new THREE.Mesh(
@@ -152,6 +158,7 @@ export class Editor {
   setTool(tool: Tool) {
     if (!this.allows(tool)) return;
     this.cancelDraw();
+    if (tool !== 'select') this.selection.clear();
     this.tool = tool;
     const c = this.controls;
     if (tool === 'hand') {
@@ -161,8 +168,8 @@ export class Editor {
       c.mouseButtons = { LEFT: null as unknown as MOUSE, MIDDLE: MOUSE.PAN, RIGHT: MOUSE.ROTATE };
       c.touches = { ONE: null as unknown as TOUCH, TWO: TOUCH.DOLLY_ROTATE };
     }
-    this.dom.style.cursor = tool === 'hand' ? 'grab' : tool === 'eraser' || tool === 'bank' ? 'pointer' : 'crosshair';
-    this.view.highlight(null);
+    this.dom.style.cursor = tool === 'hand' ? 'grab' : tool === 'eraser' || tool === 'bank' ? 'pointer' : tool === 'select' ? 'default' : 'crosshair';
+    if (tool !== 'select') this.view.highlight(null);
   }
 
   // ---------------------------------------------------------------- plane
@@ -322,6 +329,11 @@ export class Editor {
       case 'line':
         this.beginStroke(e);
         break;
+      case 'select': {
+        const hit = this.pickStroke(e);
+        if (this.selection.down(e, hit && !hit.stroke.locked ? hit : null)) this.controls.enabled = false;
+        break;
+      }
       case 'eraser':
         this.erasing = true;
         this.eraseAt(e);
@@ -351,6 +363,11 @@ export class Editor {
   private onMove = (e: PointerEvent) => {
     if (e.pointerType === 'touch' && this.touches.size > 1) return;
     const active = this.dragPointer === e.pointerId;
+    if (e.target === this.dom) this.lastPointer = e;
+    if (active && this.selection.active) {
+      this.selection.move(e);
+      return;
+    }
 
     if (this.draw && active) {
       this.extendStroke(e);
@@ -387,6 +404,10 @@ export class Editor {
     if (e.pointerType === 'touch') this.touches.delete(e.pointerId);
     if (this.dragPointer !== e.pointerId) return;
     this.dragPointer = null;
+    if (this.selection.active) {
+      this.selection.up(e);
+      this.controls.enabled = true;
+    }
     if (this.draw) this.finishStroke(e);
     if (this.bankDrag) {
       const { stroke, bank0 } = this.bankDrag;
@@ -686,14 +707,21 @@ export class Editor {
     this.history.push({ undo: () => this.track.setFinish(before), redo: () => this.track.setFinish(after) });
   }
 
-  private placeStart(e: PointerEvent) {
+  /** Where a start flag would go under the pointer: on a track, or on the drawing plane. */
+  private startPoint(e: PointerEvent): THREE.Vector3 | null {
     const hit = this.pickStroke(e);
-    let p: THREE.Vector3 | null = null;
-    if (hit) p = hit.point.clone().addScaledVector(hit.normal, 0.9);
-    else {
-      this.setRay(e);
-      p = this.raycaster.ray.intersectPlane(this.planeThrough(this.controls.target).plane, new THREE.Vector3());
-    }
+    if (hit) return hit.point.clone().addScaledVector(hit.normal, 0.9);
+    this.setRay(e);
+    return this.raycaster.ray.intersectPlane(this.planeThrough(this.controls.target).plane, new THREE.Vector3());
+  }
+
+  /** The start point under the last pointer position (for "test from here"). */
+  cursorPoint(): THREE.Vector3 | null {
+    return this.lastPointer ? this.startPoint(this.lastPointer) : null;
+  }
+
+  private placeStart(e: PointerEvent) {
+    const p = this.startPoint(e);
     if (!p) return;
     const before = this.track.start.clone();
     const after = p.clone();
