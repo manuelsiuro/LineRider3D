@@ -121,8 +121,10 @@ export interface TrophyCard {
 export interface RidePicker {
   options: { id: string; name: string }[];
   selected: string;
-  /** Level made for one ride: no choice. */
+  /** Level made for one ride (or a challenge): no choice. */
   locked: boolean;
+  /** Why, shown under the chip ("This level's ride"). */
+  lockNote?: string;
   /** Picks a ride; returns its controls. */
   onPick(id: string): Controls;
 }
@@ -1047,7 +1049,7 @@ export class UI {
     const render = (sel: string) => {
       if (ride.locked) {
         const o = ride.options.find((x) => x.id === sel)!;
-        slot.innerHTML = `<span class="ride-chip active locked">${icon(o.id, 20)}<span>${o.name}</span></span><span class="ride-note">${icon('lock', 13)} This level's ride</span>`;
+        slot.innerHTML = `<span class="ride-chip active locked">${icon(o.id, 20)}<span>${o.name}</span></span><span class="ride-note">${icon('lock', 13)} ${ride.lockNote ?? "This level's ride"}</span>`;
         return;
       }
       slot.innerHTML = ride.options
