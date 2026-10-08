@@ -85,6 +85,8 @@ const failed = results.filter((r) => !r.ok);
 for (const r of verbose ? results : failed) {
   const body = r.note ?? r.out.trimEnd().split('\n').slice(-60).join('\n');
   console.log(`\n\x1b[1m── ${r.name} ${r.ok ? 'output' : 'FAILED'} ──\x1b[0m\n${body}`);
+  // On GitHub Actions, failures also show as annotations on the run page.
+  if (!r.ok && process.env.GITHUB_ACTIONS) console.log(`::error title=${r.name} failed::${body.split('\n').slice(0, 12).join('%0A')}`);
 }
 console.log(`\n${results.length - failed.length}/${results.length} passed${update ? ' (snapshots updated)' : ''}`);
 process.exit(failed.length ? 1 : 0);
