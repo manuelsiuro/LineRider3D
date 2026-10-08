@@ -1,0 +1,77 @@
+/* ------------------------------------------------------------ responsive */
+@media (max-width: 720px) {
+  .actions .big-btn {
+    padding: 0 14px;
+    font-size: 15px;
+  }
+  .score-big {
+    font-size: 38px;
+  }
+  .brand span {
+    display: none;
+  }
+  .text-btn span {
+    display: none;
+  }
+  .text-btn {
+    padding: 0;
+    width: 44px;
+  }
+  .top-right {
+    gap: 6px;
+  }
+  .btn-group .btn {
+    min-width: 40px;
+  }
+  .tool {
+    min-width: 46px;
+    padding: 9px 4px;
+  }
+  .tool .label,
+  .tool kbd {
+    display: none;
+  }
+  .slider {
+    min-width: 96px;
+  }
+  .seg button {
+    padding: 7px 9px;
+  }
+  .gauge {
+    width: 104px;
+    height: 96px;
+    border-radius: 22px;
+  }
+  .gauge-text b {
+    font-size: 30px;
+  }
+  .stats b {
+    font-size: 24px;
+  }
+}
+
+/* Phones: trim the top bar and give the timeline room. */
+@media (max-width: 480px) {
+  .focus-btn,
+  .top-right .btn-group:last-child .icon-btn:last-child,
+  .text-btn span {
+    display: none;
+  }
+  .player .slow-btn,
+  body.level-mode .player .rider-btn {
+    display: none;
+  }
+  .player .time {
+    min-width: 0;
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

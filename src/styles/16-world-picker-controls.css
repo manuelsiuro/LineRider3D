@@ -1,0 +1,330 @@
+/* World picker on intro cards. */
+.world-pick:empty {
+  display: none;
+}
+
+.world-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.world-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.world-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 8px;
+  border-radius: 999px;
+  font: 600 12.5px var(--font-ui);
+  color: var(--ink-soft);
+  background: #eef3f8;
+  border: 2px solid transparent;
+  transition: transform 0.15s var(--spring), background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.world-chip:hover {
+  transform: translateY(-2px);
+}
+
+.world-chip.active {
+  color: white;
+  background: linear-gradient(150deg, var(--world), var(--world-2));
+  border-color: transparent;
+}
+
+.world-chip[data-biome='alpine'] { --world: #3f8ae6; --world-2: #2a5fb8; }
+.world-chip[data-biome='forest'] { --world: #3aa65e; --world-2: #1d7340; }
+.world-chip[data-biome='beach'] { --world: #18b6c9; --world-2: #0b7fa3; }
+.world-chip[data-biome='desert'] { --world: #f08a3c; --world-2: #c4532a; }
+.world-chip[data-biome='city'] { --world: #7466f0; --world-2: #3c2fb4; }
+
+.home-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffc23d;
+  box-shadow: 0 0 0 2px white;
+}
+
+.mini-seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: #eef3f8;
+}
+
+.mini-seg button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  transition: background 0.2s, color 0.2s;
+}
+
+.mini-seg button.active {
+  color: var(--accent);
+  background: white;
+  box-shadow: 0 2px 6px rgba(18, 35, 58, 0.15);
+}
+
+.world-label {
+  font: 600 12px var(--font-ui);
+  color: var(--ink-soft);
+}
+
+.world-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font: 600 12px var(--font-ui);
+  color: var(--accent);
+  background: rgba(47, 127, 216, 0.1);
+}
+
+@media (max-width: 480px) {
+  .world-chip:not(.active) span {
+    display: none;
+  }
+}
+
+/* Quick dip to the world's fog color while the landscape is rebuilt. */
+.world-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: #0d1424;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.world-fade.on {
+  opacity: 0.85;
+  transition: opacity 0.12s ease;
+}
+
+.panel .seg .ic {
+  vertical-align: -3px;
+}
+
+/* Controls panel on intro cards: key caps grouped by ground / air. */
+.intro .keys.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  gap: 8px;
+  margin: 4px 0 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #f2f6fb;
+  box-shadow: inset 0 0 0 1px rgba(18, 35, 58, 0.06);
+  color: var(--ink);
+}
+
+.ctl-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.ctl-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  width: 124px;
+  white-space: nowrap;
+  font: 700 11px var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.ctl-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: 600 13.5px var(--font-ui);
+}
+
+.ctl em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font: 700 16px var(--font-ui);
+  color: var(--ink);
+  background: linear-gradient(180deg, #ffffff, #e9eef5);
+  box-shadow: 0 3px 0 #c5cfdc, 0 4px 8px -2px rgba(18, 35, 58, 0.25), inset 0 0 0 1px rgba(18, 35, 58, 0.08);
+}
+
+.key.right {
+  color: #1b8f63;
+}
+
+.key.left {
+  color: #c4532a;
+}
+
+.key.up {
+  color: #4f3fd1;
+}
+
+.ctl-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+/* Section labels on intro cards. */
+.intro .ride-pick::before,
+.intro .world-pick::before,
+.intro .keys.controls::before {
+  flex-basis: 100%;
+  font: 700 11px var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: left;
+}
+.intro .ride-pick::before { content: 'Ride'; }
+.intro .world-pick::before { content: 'World'; }
+.intro .keys.controls::before { content: 'Controls'; margin-bottom: 2px; }
+
+/* Enter hint on the button Enter will press: the main one, or the one picked with the arrows. */
+.modal .big-btn.primary::after,
+.summary .big-btn.primary::after,
+.modal .big-btn.kb-sel:not(.icon-only)::after,
+.summary .big-btn.kb-sel:not(.icon-only)::after {
+  content: '↵';
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 6px;
+  font: 700 12px var(--font-ui);
+  color: currentColor;
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.big-btn.kb-sel:not(.primary)::after {
+  background: rgba(18, 35, 58, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(18, 35, 58, 0.15);
+}
+
+/* Once another button is picked, the main one loses its hint. */
+.modal:has(.big-btn.kb-sel) .big-btn.primary:not(.kb-sel)::after,
+.summary:has(.big-btn.kb-sel) .big-btn.primary:not(.kb-sel)::after {
+  display: none;
+}
+
+.big-btn.kb-sel {
+  outline: 3px solid var(--accent-2);
+  outline-offset: 3px;
+  transform: translateY(-2px);
+}
+
+@media (pointer: coarse) {
+  .modal .big-btn.primary::after,
+  .summary .big-btn.primary::after,
+  .big-btn.kb-sel::after {
+    display: none;
+  }
+}
+
+/* The title badge and the top-bar logo follow the world on screen. */
+.logo-mark[data-world] {
+  background: linear-gradient(145deg, var(--world), var(--world-2));
+  box-shadow: 0 16px 40px -10px var(--world-2), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+  transition: background 0.6s, box-shadow 0.6s;
+}
+
+/* Only the snowflake spins; the other badges sway gently. */
+.logo-mark[data-world]:not([data-world='alpine']) .ic {
+  animation: sway 5s ease-in-out infinite;
+}
+
+@keyframes sway {
+  50% {
+    transform: rotate(-6deg) scale(1.04);
+  }
+}
+
+.logo-mark.pop {
+  animation: badge-pop 0.7s var(--spring), float 4s 0.7s ease-in-out infinite;
+}
+
+@keyframes badge-pop {
+  0% {
+    transform: scale(0.6) rotate(-20deg);
+  }
+  60% {
+    transform: scale(1.12) rotate(4deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+.title-world {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 4px 12px 4px 10px;
+  border-radius: 999px;
+  font: 600 13px var(--font-ui);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+}
+
+.brand-mark[data-world] .ic {
+  color: var(--world-2);
+}

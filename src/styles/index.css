@@ -1,0 +1,21 @@
+/*
+ * Styles, split by area. Files load in this order and later rules win, so
+ * keep the order (responsive overrides sit after the parts they adjust).
+ * Colors, fonts, shadows and easing are tokens on :root in 01-base.css.
+ */
+@import './01-base.css';
+@import './02-shared.css';
+@import './03-topbar-player.css';
+@import './04-hud.css';
+@import './05-editor.css';
+@import './06-overlays-help.css';
+@import './07-summary.css';
+@import './08-title.css';
+@import './09-responsive.css';
+@import './10-title-menu.css';
+@import './11-screens-levels.css';
+@import './12-garage-intro.css';
+@import './13-pause-settings.css';
+@import './14-achievements.css';
+@import './15-replay-photo.css';
+@import './16-world-picker-controls.css';

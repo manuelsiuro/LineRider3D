@@ -1,0 +1,210 @@
+/* ------------------------------------------------------------ garage */
+.screen.garage {
+  align-items: flex-end;
+  background: linear-gradient(to top, rgba(220, 235, 250, 0.96) 0%, rgba(220, 235, 250, 0.88) 55%, rgba(220, 235, 250, 0) 82%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.screen.garage .screen-inner {
+  width: min(1040px, 100%);
+}
+
+.ride-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: 12px;
+}
+
+.ride-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'icon name' 'icon blurb' 'stats stats';
+  column-gap: 12px;
+  row-gap: 4px;
+  padding: 14px;
+  border-radius: 20px;
+  text-align: left;
+  background: white;
+  box-shadow: var(--shadow);
+  border: 3px solid transparent;
+  animation: card-in 0.35s var(--ease) both;
+  transition: transform 0.18s var(--spring), border-color 0.2s, box-shadow 0.2s;
+}
+
+.ride-card:hover {
+  transform: translateY(-3px);
+}
+
+.ride-card.active {
+  border-color: var(--accent);
+  box-shadow: var(--shadow), 0 0 0 6px rgba(47, 127, 216, 0.12);
+}
+
+.ride-icon {
+  grid-area: icon;
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background: linear-gradient(160deg, #eaf3ff, #d6e7fb);
+}
+
+.ride-card.active .ride-icon {
+  color: white;
+  background: linear-gradient(160deg, var(--accent-2), var(--accent));
+}
+
+.ride-name {
+  grid-area: name;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.ride-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font: 600 11px var(--font-ui);
+  color: var(--accent);
+  background: rgba(47, 127, 216, 0.1);
+}
+
+.ride-blurb {
+  grid-area: blurb;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+.ride-stats {
+  grid-area: stats;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 14px;
+  margin-top: 8px;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stat-bar {
+  display: flex;
+  gap: 3px;
+}
+
+.stat-bar i {
+  width: 12px;
+  height: 6px;
+  border-radius: 3px;
+  background: #e3e9f0;
+}
+
+.stat-bar i.on {
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+}
+
+/* Ride chips on the intro cards */
+.ride-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 12px;
+}
+
+.ride-pick:empty {
+  display: none;
+}
+
+.ride-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 8px;
+  border-radius: 999px;
+  font: 600 12.5px var(--font-ui);
+  color: var(--ink-soft);
+  background: #eef3f8;
+  border: 2px solid transparent;
+  transition: transform 0.15s var(--spring), background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.ride-chip:hover {
+  transform: translateY(-2px);
+}
+
+.ride-chip.active {
+  color: var(--accent);
+  background: white;
+  border-color: var(--accent);
+}
+
+.ride-chip.locked {
+  cursor: default;
+}
+
+.ride-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Narrow intro cards: chips show icons only, the active one keeps its name. */
+@media (max-width: 480px) {
+  .ride-chip:not(.active) span {
+    display: none;
+  }
+}
+
+.vehicle-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Spin pad only for rides that spin. */
+.pad-spin {
+  display: none !important;
+  width: 76px;
+  height: 76px;
+  align-self: flex-end;
+  margin-right: auto;
+  margin-left: 12px;
+}
+
+.touch-pad.with-spin .pad-spin {
+  display: flex !important;
+}
+
+.pad-spin.down {
+  background: rgba(255, 138, 61, 0.78);
+}
+
+/* Touch riding: the HUD moves up under the player bar so the pads stay clear. */
+body.rider-mode .touch-pad:not(.hidden) ~ .hud {
+  left: 50%;
+  bottom: auto;
+  top: calc(max(12px, env(safe-area-inset-top)) + 118px);
+  transform: translateX(-50%) scale(0.82);
+  transform-origin: top center;
+  opacity: 0.92;
+}

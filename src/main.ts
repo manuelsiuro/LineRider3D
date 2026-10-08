@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import './style.css';
+import './styles/index.css';
 import { TrackFormatError, validateTrack, type SerializedTrack } from './track/Track';
 import { CAMERA_LABELS, type CameraMode } from './render/CameraRig';
 import { STEPS_PER_SECOND } from './physics/Simulation';
