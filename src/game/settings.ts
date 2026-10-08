@@ -22,7 +22,7 @@ export const DEFAULT_SETTINGS: Settings = {
   quality: 'auto',
   sfxVolume: 0.9,
   musicVolume: 0.6,
-  camera: 'cinematic',
+  camera: 'side',
   cameraDistance: 1,
   reducedMotion: matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
 };
