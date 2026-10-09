@@ -53,11 +53,27 @@ OK   Sun Temple     round trip, compressed
 OK   Rooftop Run    round trip, compressed
 OK   Downtown Drift round trip, compressed
 OK   Neon Nights    round trip, compressed
+OK   Rush Hour      round trip, compressed
+OK   Skyline Drop   round trip, compressed
+OK   Subway Dash    round trip, compressed
+OK   Rooftop Hop    round trip, compressed
+OK   Roadworks      round trip, compressed
+OK   Crosstown      round trip, compressed
+OK   Construction Site round trip, compressed
+OK   Brake Lights   round trip, compressed
+OK   Midnight Express round trip, compressed
 OK   Pumpkin Patch  round trip, compressed
 OK   Graveyard Shift round trip, compressed
 OK   Bat Cave Drop  round trip, compressed
 OK   Haunted Manor  round trip, compressed
 OK   Witching Hour  round trip, compressed
+OK   Ghost Train    round trip, compressed
+OK   Haunted Hayride round trip, compressed
+OK   Wisp Woods     round trip, compressed
+OK   Bog of Souls   round trip, compressed
+OK   Crumbling Crypt round trip, compressed
+OK   Gravedigger    round trip, compressed
+OK   Nightmare      round trip, compressed
 OK   Ember Run      round trip, compressed
 OK   Ash Chute      round trip, compressed
 OK   Moonwalk       round trip, compressed

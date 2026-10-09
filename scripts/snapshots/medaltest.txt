@@ -77,14 +77,42 @@ rooftop-run:snowboard      11.1 / 9 / 8.8 / 8.5
 rooftop-run:coffin         11 / 8.9 / 8.7 / 8.4
 neon-nights:snowboard      9.1 / 7.8 / 7.6 / 7.3
 neon-nights:coffin         9.3 / 8.2 / 8 / 7.7
-pumpkin-patch:bike         7 / 5.7 / 5.4 / 5.1
-graveyard-shift:sled       9 / 7.4 / 7.2 / 6.9
-graveyard-shift:moto       9 / 7.9 / 7.7 / 7.5
-bat-cave-drop:skis         10.1 / 8.9 / 8.7 / 8.3
-bat-cave-drop:buggy        10.4 / 9.1 / 8.9 / 8.6
-haunted-manor:snowboard    10.8 / 7.8 / 6.5 / 6.3
-haunted-manor:coffin       11.4 / 8.7 / 7.8 / 7.5
-witching-hour:bike         9.7 / 7.9 / 7.7 / 7.4
+rush-hour:bike             7.8 / 6.1 / 5.7 / 5.5
+skyline-drop:sled          9.7 / 8.5 / 8.3 / 8
+skyline-drop:moto          9.7 / 8.6 / 8.4 / 8
+subway-dash:skis           13.2 / 9.5 / 7.9 / 7.6
+subway-dash:buggy          13.2 / 8.9 / 6.8 / 6.5
+rooftop-hop:snowboard      undefined
+rooftop-hop:coffin         11.8 / 10.3 / 10.1 / 9.8
+roadworks:bike             undefined
+crosstown:sled             11.7 / 10.2 / 10 / 9.7
+crosstown:moto             undefined
+construction-site:skis     undefined
+construction-site:buggy    undefined
+brake-lights:snowboard     7.8 / 6.8 / 6.6 / 6.4
+brake-lights:coffin        7.5 / 6.4 / 6.2 / 6
+midnight-express:bike      11.3 / 9.9 / 9.7 / 9.4
+pumpkin-patch:sled         7.1 / 6.3 / 6.1 / 5.8
+pumpkin-patch:moto         7 / 6.2 / 6 / 5.8
+graveyard-shift:skis       8.9 / 7.3 / 7.1 / 6.8
+graveyard-shift:buggy      8.9 / 7.1 / 6.7 / 6.4
+bat-cave-drop:snowboard    10.3 / 8.7 / 8.5 / 8.2
+bat-cave-drop:coffin       10.4 / 9.1 / 8.9 / 8.6
+haunted-manor:bike         10.8 / 7.6 / 6.2 / 6
+witching-hour:sled         9.6 / 8.4 / 8.2 / 7.9
+witching-hour:moto         9.7 / 8.5 / 8.3 / 8
+ghost-train:skis           13.5 / 9.6 / 8 / 7.7
+ghost-train:buggy          13.4 / 9.1 / 6.9 / 6.6
+haunted-hayride:snowboard  12.8 / 10.8 / 10.6 / 10.2
+haunted-hayride:coffin     12.7 / 10.8 / 10.6 / 10.2
+wisp-woods:bike            undefined
+bog-of-souls:sled          11.5 / 10.1 / 9.9 / 9.5
+bog-of-souls:moto          undefined
+crumbling-crypt:skis       undefined
+crumbling-crypt:buggy      undefined
+gravedigger:snowboard      7.5 / 6.5 / 6.3 / 6
+gravedigger:coffin         7.2 / 6.2 / 6 / 5.8
+nightmare:bike             13.2 / 11.5 / 11.3 / 10.9
 ember-run:sled             8.7 / 7.7 / 7.5 / 7.2
 ember-run:moto             8.8 / 7.7 / 7.5 / 7.3
 ash-chute:skis             10.5 / 9.2 / 9 / 8.7

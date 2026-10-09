@@ -53,11 +53,27 @@ OK   Sun Temple     stars 6/6  finish 11.8s  score 1120/4000  ★★☆  end x=3
 OK   Rooftop Run    stars 4/4  finish 9.1s  score 0/5000  ★★☆  end x=238,y=-1.6,z=-0.0 f406
 OK   Downtown Drift stars 4/4  finish 13.9s  score 1915/12000  ★★☆  end x=282,y=4.9,z=0.2 f599
 OK   Neon Nights    stars 4/4  finish 7.7s  score 3165/12000  ★★☆  end x=322,y=5.1,z=-0.0 f350
+OK   Rush Hour      stars 4/4  finish 6.5s  score 3875/5000  ★★☆  end x=285,y=4.6,z=-0.3 f300
+OK   Skyline Drop   stars 4/4  finish 8.1s  score 0/7000  ★★☆  end x=280,y=4.2,z=-0.0 f363
+OK   Subway Dash    stars 4/4  finish 12.0s  score 1000/1500  ★★☆  end x=256,y=22.9,z=0.8 f520
+OK   Rooftop Hop    stars 4/4  finish 9.8s  score 0/2000  ★★☆  end x=233,y=5.5,z=0.0 f433  solution (6 changes)
+OK   Roadworks      stars 5/5  finish 9.6s  score 0/2500  ★★☆  end x=265,y=1.9,z=0.1 f425  solution (6 changes)
+OK   Crosstown      stars 3/3  finish 9.7s  score 0/1500  ★★☆  end x=260,y=4.4,z=0.0 f429  solution (6 changes)
+OK   Construction Site stars 5/5  finish 8.2s  score 1830/2500  ★★☆  end x=221,y=0.3,z=0.0 f368  solution (6 changes)
+OK   Brake Lights   stars 3/3  finish 6.2s  score 0/600  ★★☆  end x=148,y=0.4,z=0.0 f289  solution (2 changes)
+OK   Midnight Express stars 5/5  finish 9.5s  score 2495/4000  ★★☆  end x=403,y=17.9,z=-0.8 f420  solution (16 changes)
 OK   Pumpkin Patch  stars 4/4  finish 5.8s  score 0/3500  ★★☆  end x=139,y=0.5,z=0.0 f275
 OK   Graveyard Shift stars 4/4  finish 7.5s  score 0/5000  ★★☆  end x=198,y=0.1,z=-0.0 f339
 OK   Bat Cave Drop  stars 4/4  finish 8.6s  score 1740/9000  ★★☆  end x=303,y=5.6,z=-0.0 f385
 OK   Haunted Manor  stars 4/4  finish 9.5s  score 1125/1300  ★★☆  end x=196,y=-0.2,z=-1.2 f421
 OK   Witching Hour  stars 4/4  finish 8.0s  score 2305/12000  ★★☆  end x=282,y=4.8,z=-0.1 f359
+OK   Ghost Train    stars 4/4  finish 11.8s  score 1000/1500  ★★☆  end x=257,y=20.0,z=2.1 f515
+OK   Haunted Hayride stars 4/4  finish 10.6s  score 1000/6000  ★★☆  end x=297,y=5.6,z=0.1 f464
+OK   Wisp Woods     stars 4/4  finish 8.8s  score 0/2500  ★★☆  end x=234,y=-1.5,z=-0.0 f393  solution (6 changes)
+OK   Bog of Souls   stars 4/4  finish 9.6s  score 0/1500  ★★☆  end x=220,y=-0.8,z=-0.0 f424  solution (10 changes)
+OK   Crumbling Crypt stars 4/4  finish 9.5s  score 0/2500  ★★☆  end x=228,y=1.2,z=0.0 f420  solution (6 changes)
+OK   Gravedigger    stars 3/3  finish 6.0s  score 1200/600  ★★★  end x=150,y=0.4,z=0.0 f281  solution (2 changes)
+OK   Nightmare      stars 5/5  finish 11.0s  score 1120/4000  ★★☆  end x=307,y=9.5,z=0.0 f480  solution (12 changes)
 OK   Ember Run      stars 4/4  finish 7.3s  score 1320/6000  ★★☆  end x=188,y=0.1,z=-0.1 f331
 OK   Ash Chute      stars 4/4  finish 8.8s  score 660/8000  ★★☆  end x=248,y=-0.3,z=0.1 f392
 OK   Moonwalk       stars 3/3  finish 8.6s  score 0/4000  ★★☆  end x=142,y=1.5,z=0.0 f383

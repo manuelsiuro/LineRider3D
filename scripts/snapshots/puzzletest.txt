@@ -48,3 +48,27 @@ tumbleweeds     unsolved fails    solved 6.85s stars 2/2 erased 2/2/5
 boost-dune      unsolved fails    solved 9.13s stars 2/2 ink 18.0/18/28
 crumbling-climb unsolved fails    solved 6.55s stars 1/1 rings 2/2/4
 sun-leap        unsolved fails    solved 6.10s stars 1/1 ink 7.0/8/14 trick Perfect Big Air
+broken-overpass unsolved fails    solved 5.13s stars 1/1 ink 13.0/13/18
+ramp-rings      unsolved fails    solved 6.83s stars 1/1 rings 1/1/3
+road-closed     unsolved fails    solved 6.17s stars 1/1 erased 1/1/3
+fire-escape     unsolved fails    solved 5.90s stars 1/1 ink 33.2/34/49
+old-scaffold    unsolved fails    solved 6.30s stars 1/1 rings 1/1/3
+rooftop-launch  unsolved fails    solved 6.05s stars 1/1 ink 6.8/8/14 trick Sketchy Big Air
+street-gaps     unsolved fails    solved 5.35s stars 2/2 ink 25.0/25/34
+trampoline-park unsolved fails    solved 6.58s stars 1/1 ink 12.1/13/18
+boost-lane-city unsolved fails    solved 8.95s stars 2/2 ink 18.0/18/28
+traffic-jam     unsolved fails    solved 7.53s stars 3/3 erased 3/3/5
+condemned       unsolved fails    solved 6.20s stars 1/1 ink 18.0/18/28
+skyscraper-slide unsolved fails    solved 6.13s stars 1/1 ink 43.0/44/64
+rotten-bridge   unsolved fails    solved 4.95s stars 1/1 ink 12.0/12/17
+graveyard-brakes unsolved fails    solved 8.35s stars 1/1 ink 24.7/26/36
+witch-rings     unsolved fails    solved 6.83s stars 1/1 rings 1/1/3
+cobwebs         unsolved fails    solved 6.85s stars 2/2 erased 2/2/5
+coffin-spring   unsolved fails    solved 6.58s stars 1/1 ink 12.1/13/18
+grave-steps     unsolved fails    solved 5.75s stars 3/3 ink 32.0/32/44
+bat-flight      unsolved fails    solved 6.15s stars 1/1 ink 7.2/8/14 trick Perfect Big Air
+crypt-crossing  unsolved fails    solved 6.30s stars 1/1 rings 1/1/3
+tower-drop      unsolved fails    solved 5.95s stars 1/1 ink 35.8/36/53
+deadwood        unsolved fails    solved 7.35s stars 3/3 erased 3/3/4
+swamp-slide     unsolved fails    solved 7.72s stars 1/1 ink 25.1/27/36
+haunted-pier    unsolved fails    solved 6.15s stars 3/3 ink 30.0/30/41
