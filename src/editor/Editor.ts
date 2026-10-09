@@ -1102,6 +1102,11 @@ export class Editor {
     this.onChange?.();
   }
 
+  /** The track has lines but no finish gate (the editor offers to add one). */
+  get needsFinish() {
+    return !this.rules && !this.track.finish && this.track.strokes.size > 0;
+  }
+
   get bending() {
     return this.bend !== null;
   }

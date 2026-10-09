@@ -398,3 +398,27 @@ body.touch.edit-orbit:not(.is-playing):not(.level-mode):not(.on-title):not(.phot
   color: white;
   opacity: 0.7;
 }
+
+/* "Add finish gate": shown while the track has lines but no gate. */
+.finish-nudge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 16px 0 12px;
+  border-radius: 999px;
+  font: 700 14px var(--font-ui);
+  color: white;
+  background: linear-gradient(180deg, #2fbf71, #1b8f53);
+  box-shadow: 0 8px 18px -8px rgba(27, 143, 83, 0.9);
+  pointer-events: auto;
+  animation: fade-up 0.25s var(--ease);
+}
+
+.finish-nudge.hidden {
+  display: none;
+}
+
+.finish-nudge:active {
+  transform: scale(0.95);
+}

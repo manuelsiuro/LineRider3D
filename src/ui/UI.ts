@@ -64,6 +64,7 @@ export class UI {
   private pop!: HTMLElement;
   private dockUndo: HTMLButtonElement[] = [];
   private dockView!: HTMLButtonElement;
+  private finishBtn!: HTMLButtonElement;
   /** The draw tool the touch Draw button picks. */
   private lastDraw: Tool = 'pencil';
   /** Touch: the options panel shows every row, not just the first. */
@@ -387,7 +388,15 @@ export class UI {
     const bottom = h('div', 'bottom');
     // Puzzles: how much ink is left (the par mark is the three-star line).
     this.inkMeter = h('div', 'ink-meter hidden', `<span class="ink-label">${icon('pencil', 14)} Ink</span><div class="ink-bar"><i class="ink-fill"></i><i class="ink-par"></i></div><b class="ink-left">0 m</b>`);
-    bottom.append(this.inkMeter, dock, this.panel, this.pop, toolbar);
+    // No finish gate (never placed, or erased): one tap gets to placing it.
+    this.finishBtn = button('finish-nudge hidden', `<span>🏁</span>Add finish gate`, 'Place the finish gate');
+    this.finishBtn.onclick = () => {
+      handlers.click();
+      this.editor.settings.item = 'finish';
+      this.selectTool('item');
+      this.flash(TOUCH ? 'Tap a track to place the finish gate' : 'Click a track to place the finish gate');
+    };
+    bottom.append(this.inkMeter, this.finishBtn, dock, this.panel, this.pop, toolbar);
 
     this.hint = h('div', 'hint hidden');
     const replayTag = h('div', 'replay-tag', '<i></i>REPLAY');
@@ -474,6 +483,13 @@ export class UI {
     for (const [id, b] of this.toolButtons) b.classList.toggle('active', id === tool);
     this.renderPanel();
     this.refreshTouchTools();
+    this.refreshFinish();
+  }
+
+  /** Shows "Add finish gate" while the track has none (not once the gate is being placed). */
+  private refreshFinish() {
+    const placing = this.editor.tool === 'item' && this.editor.settings.item === 'finish';
+    this.finishBtn?.classList.toggle('hidden', !this.editor.needsFinish || placing);
   }
 
   private showView(v: EditView) {
@@ -494,6 +510,7 @@ export class UI {
     const tool = this.editor.tool;
     this.panel.innerHTML = '';
     this.panel.classList.remove('compact');
+    this.refreshFinish();
     const row = () => {
       const r = h('div', 'row');
       this.panel.append(r);
@@ -760,6 +777,7 @@ export class UI {
       this.dockUndo[0].disabled = !h.canUndo;
       this.dockUndo[1].disabled = !h.canRedo;
     }
+    this.refreshFinish();
     // A new edit (not an undo or redo) moves the tour on.
     if (h.size > this.historySize && h.size > 0 && !h.canRedo) this.tour?.event(this.editor.tool === 'build' ? 'piece' : 'stroke');
     this.historySize = h.size;
