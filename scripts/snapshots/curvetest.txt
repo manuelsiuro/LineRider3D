@@ -1,9 +1,9 @@
-alpine     gate   0★   10 levels    8 puzzles  difficulty 1 1 1 1 1 2 2 2 2 2
-forest     gate  17★    4 levels    2 puzzles  difficulty 2 2 2 2
-beach      gate  23★    3 levels    0 puzzles  difficulty 2 2 2
-desert     gate  28★    5 levels    0 puzzles  difficulty 2 2 2 2 2
-city       gate  36★    3 levels    0 puzzles  difficulty 2 2 3
-halloween  gate  41★    5 levels    0 puzzles  difficulty 2 2 3 3 3
-volcano    gate  50★    2 levels    0 puzzles  difficulty 3 3
-moon       gate  53★    2 levels    0 puzzles  difficulty 3 3*
-total 34 levels, 10 puzzles (* needs input)
+alpine     gate   0★   14 levels   12 puzzles  difficulty 1 1 1 1 1 1 2 2 2 2 2 2 2 2
+forest     gate  23★   13 levels   13 puzzles  difficulty 2 2 2 2 2 2 2 3 3* 3* 3* 3* 3*
+beach      gate  45★    3 levels    0 puzzles  difficulty 2 2 2
+desert     gate  50★    5 levels    0 puzzles  difficulty 2 2 2 2 2
+city       gate  58★    3 levels    0 puzzles  difficulty 2 2 3
+halloween  gate  63★    5 levels    0 puzzles  difficulty 2 2 3 3 3
+volcano    gate  71★    2 levels    0 puzzles  difficulty 3 3
+moon       gate  74★    2 levels    0 puzzles  difficulty 3 3*
+total 47 levels, 25 puzzles (* needs input)

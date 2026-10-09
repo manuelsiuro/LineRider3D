@@ -1,17 +1,30 @@
 OK   First Run      stars 4/4  finish 6.0s  score 625/600  ★★★  end x=124,y=0.5,z=0.0 f280
 OK   Little Hop     stars 3/3  finish 5.6s  score 0/3000  ★★☆  end x=139,y=0.5,z=0.0 f266
 OK   Boost Lane     stars 4/4  finish 5.0s  score 625/3000  ★★☆  end x=161,y=0.5,z=0.0 f239
+OK   Long Glide     stars 5/5  finish 9.0s  score 1375/600  ★★★  end x=291,y=5.5,z=-0.0 f400
 OK   Ice Age        stars 4/4  finish 6.1s  score 1500/1500  ★★★  end x=-53,y=0.0,z=-32.8 f284
 OK   Boing Boing    stars 4/4  finish 6.0s  score 0/5000  ★★☆  end x=147,y=0.5,z=0.0 f280
 OK   Flip Academy   stars 5/5  finish 6.5s  score 1475/6000  ★★☆  end x=197,y=0.2,z=0.0 f300
 OK   Ring Road      stars 5/5  finish 9.4s  score 1375/1350  ★★★  end x=186,y=0.2,z=-12.1 f419
+OK   Icicle Alley   stars 4/4  finish 8.8s  score 0/3000  ★★☆  end x=246,y=-0.5,z=-0.0 f392
 OK   Slalom         stars 4/4  finish 13.8s  score 1915/12000  ★★☆  end x=280,y=4.7,z=0.1 f593
 OK   Big Air Park   stars 4/4  finish 8.3s  score 2580/18000  ★★☆  end x=256,y=0.9,z=0.2 f371
+OK   Ski Jump       stars 4/4  finish 6.2s  score 1800/6000  ★★☆  end x=200,y=0.1,z=0.0 f290
+OK   Avalanche Run  stars 4/4  finish 8.5s  score 2405/8000  ★★☆  end x=362,y=11.1,z=-0.1 f380
 OK   Grand Finale   stars 4/4  finish 8.0s  score 2305/12000  ★★☆  end x=282,y=4.9,z=-0.1 f359
 OK   Timberline     stars 4/4  finish 9.5s  score 1125/1300  ★★☆  end x=196,y=-0.2,z=-1.2 f421
+OK   Muddy Lane     stars 4/4  finish 10.1s  score 0/600  ★★☆  end x=160,y=0.8,z=0.0 f443
 OK   Treetop Trail  stars 4/4  finish 7.5s  score 0/4500  ★★☆  end x=198,y=0.1,z=-0.0 f339
+OK   Bog Hop        stars 4/4  finish 8.3s  score 0/3000  ★★☆  end x=159,y=0.5,z=0.0 f375
 OK   Pump Track     stars 4/4  finish 9.5s  score 0/4000  ★★☆  end x=220,y=-1.7,z=0.0 f421
+OK   Woodland Trail stars 5/5  finish 10.2s  score 0/5000  ★★☆  end x=252,y=-0.3,z=-0.1 f449
 OK   Misty Hollow   stars 4/4  finish 6.5s  score 1500/1600  ★★☆  end x=-57,y=0.0,z=37.2 f301
+OK   Log Flume      stars 5/5  finish 13.5s  score 1000/1500  ★★☆  end x=302,y=24.4,z=-1.5 f581
+OK   Push Through   stars 4/4  finish 6.8s  score 0/600  ★★☆  end x=159,y=0.5,z=0.0 f312  solution (3 changes)
+OK   Thorn Gully    stars 4/4  finish 8.4s  score 0/2000  ★★☆  end x=223,y=-1.4,z=-0.0 f378  solution (6 changes)
+OK   Deep Woods     stars 5/5  finish 9.4s  score 0/4000  ★★☆  end x=258,y=1.3,z=0.0 f418  solution (21 changes)
+OK   Canopy Run     stars 4/4  finish 8.6s  score 0/2000  ★★☆  end x=235,y=4.4,z=0.0 f383  solution (6 changes)
+OK   Wildwood       stars 6/6  finish 11.8s  score 240/5000  ★★☆  end x=338,y=6.2,z=0.0 f515  solution (21 changes)
 OK   Boardwalk      stars 4/4  finish 6.3s  score 750/6000  ★★☆  end x=170,y=0.6,z=0.0 f292
 OK   Surf's Up      stars 5/5  finish 8.6s  score 2200/15000  ★★☆  end x=225,y=-1.9,z=0.0 f383
 OK   Sunset Cruise  stars 5/5  finish 11.4s  score 2600/6000  ★★☆  end x=276,y=4.4,z=0.5 f497

@@ -1,17 +1,30 @@
 OK   First Run      round trip, compressed
 OK   Little Hop     round trip, compressed
 OK   Boost Lane     round trip, compressed
+OK   Long Glide     round trip, compressed
 OK   Ice Age        round trip, compressed
 OK   Boing Boing    round trip, compressed
 OK   Flip Academy   round trip, compressed
 OK   Ring Road      round trip, compressed
+OK   Icicle Alley   round trip, compressed
 OK   Slalom         round trip, compressed
 OK   Big Air Park   round trip, compressed
+OK   Ski Jump       round trip, compressed
+OK   Avalanche Run  round trip, compressed
 OK   Grand Finale   round trip, compressed
 OK   Timberline     round trip, compressed
+OK   Muddy Lane     round trip, compressed
 OK   Treetop Trail  round trip, compressed
+OK   Bog Hop        round trip, compressed
 OK   Pump Track     round trip, compressed
+OK   Woodland Trail round trip, compressed
 OK   Misty Hollow   round trip, compressed
+OK   Log Flume      round trip, compressed
+OK   Push Through   round trip, compressed
+OK   Thorn Gully    round trip, compressed
+OK   Deep Woods     round trip, compressed
+OK   Canopy Run     round trip, compressed
+OK   Wildwood       round trip, compressed
 OK   Boardwalk      round trip, compressed
 OK   Surf's Up      round trip, compressed
 OK   Sunset Cruise  round trip, compressed

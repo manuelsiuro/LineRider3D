@@ -31,6 +31,8 @@ export interface LevelRide {
   airFrames: number;
   /** Where the run ended. */
   end: { x: number; y: number; z: number };
+  /** The inputs actually played (with the autopilot's pushes), as a plan. */
+  played: InputPlan;
 }
 
 /**
@@ -49,6 +51,7 @@ export function rideLevel(level: LevelDef, opts: { plan?: InputPlan; vehicle?: V
   const plan = opts.plan ?? [];
   const stats = new RunStats();
   let airFrames = 0;
+  const played: InputPlan = [];
   let f = 0;
   for (; f <= (opts.maxFrames ?? 2400); f++) {
     sim.seek(f);
@@ -59,9 +62,10 @@ export function rideLevel(level: LevelDef, opts: { plan?: InputPlan; vehicle?: V
     let mask = planAt(plan, f);
     if (opts.push && sim.rider.contact.some((c) => c) && !(mask & INPUT.brake)) mask |= INPUT.push;
     sim.setInput(f, mask);
+    if (mask !== (played.length ? played[played.length - 1][1] : 0)) played.push([f, mask]);
   }
   const b = sim.rider.pos[P.butt];
-  return { stats: stats.stats, track, frames: f, airFrames, end: { x: b.x, y: b.y, z: b.z } };
+  return { stats: stats.stats, track, frames: f, airFrames, end: { x: b.x, y: b.y, z: b.z }, played };
 }
 
 /** A clean run: finished with every star, no crash. */
