@@ -3,7 +3,7 @@ import { Simulation } from '../physics/Simulation';
 import { INPUT } from '../physics/Rider';
 import { VEHICLES, type VehicleDef } from '../physics/vehicles';
 import { RunStats } from '../game/RunStats';
-import { SURFACES, normalizeWorld, surfaceOf } from '../world/worlds';
+import { SURFACES, normalizeWorld, surfaceOf, gravityOf } from '../world/worlds';
 import type { LevelDef } from './levels';
 
 /** Bronze, silver, gold and dev finish times, in seconds. */
@@ -17,7 +17,9 @@ function finishTime(level: LevelDef, v: VehicleDef, push: boolean): number | nul
   const t = new Track();
   level.build(t);
   const sim = new Simulation(t, v);
-  sim.setGroundDrag(SURFACES[surfaceOf(normalizeWorld(level.world))].drag);
+  const world = normalizeWorld(level.world);
+  sim.setGroundDrag(SURFACES[surfaceOf(world)].drag);
+  sim.setGravity(gravityOf(world));
   const stats = new RunStats();
   for (let f = 0; f <= 1600; f++) {
     sim.seek(f);

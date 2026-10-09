@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import type { Track } from '../track/Track';
-import type { Decor, Ring, Star } from '../track/types';
-import { animateStar, buildFinish, buildStar } from './goalModels';
+import type { Checkpoint, Decor, Hazard, Ring, Star } from '../track/types';
+import { animateCheckpoint, animateStar, buildCheckpoint, buildFinish, buildStar } from './goalModels';
+import { animateHazard, buildHazard } from './hazardModels';
+import { CRUMBLE_HOLD } from '../physics/Rider';
 import { animateRing, buildRing } from './ringModel';
 import { buildDecor, decorFor, M } from '../world/models';
 import { DEFAULT_WORLD, biomeById, isSnowy, type WorldConfig } from '../world/worlds';
@@ -11,6 +13,15 @@ import { buildSupports, setSupportStyle, supportMaterial } from './supports';
 /** Lines off the drawing plane, in the Draw view. */
 const FADED = new THREE.MeshBasicMaterial({ color: 0xc8d4e3, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
 
+/** What the props need from the rider at the frame on screen. */
+export interface RiderProps {
+  /** Collected stars (bit mask). */
+  stars: number;
+  /** Checkpoints passed (place of the last one). */
+  checkpoint: number;
+  crumbleAge(strokeId: number): number;
+}
+
 /** Keeps Three.js objects in sync with the track data. */
 export class TrackView {
   readonly ribbons = new THREE.Group();
@@ -18,6 +29,10 @@ export class TrackView {
   readonly rings = new THREE.Group();
   readonly stars = new THREE.Group();
   readonly goals = new THREE.Group();
+  readonly checkpoints = new THREE.Group();
+  readonly hazards = new THREE.Group();
+  private checkpointById = new Map<number, THREE.Object3D>();
+  private hazardById = new Map<number, THREE.Object3D>();
   private starById = new Map<number, THREE.Object3D>();
   /** Decorative wooden scaffolding under tracks. */
   readonly supports = new THREE.Group();
@@ -32,7 +47,7 @@ export class TrackView {
   private focusKey = '';
 
   constructor(scene: THREE.Scene, private track: Track) {
-    scene.add(this.ribbons, this.decor, this.supports, this.rings, this.stars, this.goals);
+    scene.add(this.ribbons, this.decor, this.supports, this.rings, this.stars, this.goals, this.checkpoints, this.hazards);
     this.startMarker = this.buildStartMarker();
     scene.add(this.startMarker);
 
@@ -67,6 +82,18 @@ export class TrackView {
         case 'finishChanged':
           this.rebuildFinish();
           break;
+        case 'checkpointAdded':
+          this.addCheckpoint(e.checkpoint);
+          break;
+        case 'checkpointRemoved':
+          this.removeProp(this.checkpoints, this.checkpointById, e.checkpoint.id, true);
+          break;
+        case 'hazardAdded':
+          this.addHazard(e.hazard);
+          break;
+        case 'hazardRemoved':
+          this.removeProp(this.hazards, this.hazardById, e.hazard.id, false);
+          break;
         case 'startChanged':
           this.startMarker.position.copy(track.start);
           break;
@@ -75,6 +102,8 @@ export class TrackView {
           for (const id of [...this.decorById.keys()]) this.removeDecor(id);
           for (const id of [...this.ringById.keys()]) this.removeRing(id);
           for (const id of [...this.starById.keys()]) this.removeStar(id);
+          for (const id of [...this.checkpointById.keys()]) this.removeProp(this.checkpoints, this.checkpointById, id, true);
+          for (const id of [...this.hazardById.keys()]) this.removeProp(this.hazards, this.hazardById, id, false);
           this.rebuildFinish();
           break;
       }
@@ -192,6 +221,31 @@ export class TrackView {
     });
   }
 
+  private addCheckpoint(c: Checkpoint) {
+    const obj = buildCheckpoint(c);
+    this.checkpointById.set(c.id, obj);
+    this.checkpoints.add(obj);
+  }
+
+  private addHazard(h: Hazard) {
+    const obj = buildHazard(h);
+    this.hazardById.set(h.id, obj);
+    this.hazards.add(obj);
+  }
+
+  /** Removes a checkpoint or hazard model (checkpoint materials are its own; hazard ones are shared). */
+  private removeProp(group: THREE.Group, byId: Map<number, THREE.Object3D>, id: number, ownMaterials: boolean) {
+    const obj = byId.get(id);
+    if (!obj) return;
+    group.remove(obj);
+    byId.delete(id);
+    obj.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      o.geometry.dispose();
+      if (ownMaterials) for (const m of [o.material].flat()) m.dispose();
+    });
+  }
+
   private rebuildFinish() {
     for (const c of [...this.goals.children]) {
       this.goals.remove(c);
@@ -208,13 +262,44 @@ export class TrackView {
     if (this.track.finish) this.goals.add(buildFinish(this.track.finish));
   }
 
-  /** Per-frame animation of interactive props; `collected` is the star bit mask. */
-  update(time: number, rider: THREE.Vector3, collected = 0) {
+  /** Per-frame animation of interactive props, as the rider left them at this frame. */
+  update(time: number, rider: THREE.Vector3, props?: RiderProps) {
+    const collected = props?.stars ?? 0;
     for (const obj of this.ringById.values()) animateRing(obj, time, obj.position.distanceTo(rider));
     this.track.starList().forEach((st, k) => {
       const obj = this.starById.get(st.id);
       if (obj) animateStar(obj, time, k * 1.3, Math.floor(collected / 2 ** k) % 2 === 1);
     });
+    if (this.checkpointById.size) {
+      this.track.checkpointList().forEach((c, k) => {
+        const obj = this.checkpointById.get(c.id);
+        if (obj) animateCheckpoint(obj, time, k < (props?.checkpoint ?? 0));
+      });
+    }
+    for (const obj of this.hazardById.values()) animateHazard(obj, time);
+    this.crumble(time, props);
+  }
+
+  /** Crumbling lines shake once touched, then drop away and vanish. */
+  private crumble(time: number, props?: RiderProps) {
+    for (const [id, mesh] of this.ribbonById) {
+      const stroke = this.track.strokes.get(id);
+      if (stroke?.type !== 'crumble') continue;
+      const age = props?.crumbleAge(id) ?? 0;
+      if (age <= 0) {
+        mesh.position.set(0, 0, 0);
+        mesh.visible = true;
+      } else if (age <= CRUMBLE_HOLD) {
+        // Trembles harder as it is about to go.
+        const k = (age / CRUMBLE_HOLD) * 0.06;
+        mesh.position.set(Math.sin(time * 61) * k, Math.sin(time * 47) * k, Math.cos(time * 53) * k);
+        mesh.visible = true;
+      } else {
+        const t = (age - CRUMBLE_HOLD) / 40;
+        mesh.position.set(0, -t * t * 14, 0);
+        mesh.visible = t < 1.6;
+      }
+    }
   }
 
   /** Re-applies a ribbon's highlight on top of its (restyled) materials. */

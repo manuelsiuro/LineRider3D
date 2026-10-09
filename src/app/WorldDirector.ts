@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { fxStyle } from '../render/fxStyles';
 import { LEVELS } from '../levels/levels';
-import { SURFACES, normalizeWorld, sameWorld, surfaceOf, type WorldConfig } from '../world/worlds';
+import { SURFACES, normalizeWorld, sameWorld, surfaceOf, gravityOf, type WorldConfig } from '../world/worlds';
 import type { WorldPicker } from '../ui/UI';
 import type { Core } from './core';
 
@@ -65,6 +65,7 @@ export class WorldDirector {
     if (!this.look(w, force)) return false;
     const { env, sim } = this.c;
     sim.setGroundDrag(SURFACES[surfaceOf(env.config)].drag);
+    sim.setGravity(gravityOf(env.config));
     this.hooks.applied();
     this.hooks.shown(env.config);
     return true;

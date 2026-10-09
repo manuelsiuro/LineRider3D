@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { EVENT, META, META_SIZE, P } from '../physics/Rider';
+import { EVENT, META, P } from '../physics/Rider';
 import type { Simulation } from '../physics/Simulation';
 import type { Segment } from '../track/types';
 import { terrainHeight } from '../world/terrain';
@@ -33,6 +33,8 @@ export interface Stats {
   finished: boolean;
   /** Seconds to reach the finish (0 if not finished). */
   finishTime: number;
+  /** Comebacks at a checkpoint after a crash. */
+  respawns: number;
 }
 
 export type Grade = 'perfect' | 'good' | 'sketchy';
@@ -47,8 +49,6 @@ export interface Trick {
 }
 
 const BUTT = P.butt * 6;
-/** Offset of a recorded state's META fields (the layout depends on the vehicle). */
-const meta = (s: Float64Array) => s.length - META_SIZE;
 
 function countBits(mask: number) {
   let n = 0;
@@ -187,6 +187,7 @@ export class RunStats {
       stars: 0,
       finished: false,
       finishTime: 0,
+      respawns: 0,
     };
   }
 
@@ -308,10 +309,25 @@ export class RunStats {
     if (frame < this.frame) this.reset();
     let events = 0;
     const s = this.stats;
+    // Offset of a recorded state's META fields (the layout depends on the vehicle).
+    const m = sim.rider.count * 6;
     for (let f = this.frame + 1; f <= frame; f++) {
       const a = sim.stateAt(f - 1);
       const b = sim.stateAt(f);
       if (!a || !b) break;
+      if (b[m + META.events] & EVENT.respawn) {
+        // Back at a checkpoint: the jump there isn't distance, and no trick is in the air.
+        s.respawns++;
+        this.airFrames = 0;
+        this.airRotation = 0;
+        this.airYaw = 0;
+        this.pending = null;
+        this.stillFrames = 0;
+        s.crashed = false;
+        events |= EVENT.respawn;
+        this.frame = f;
+        continue;
+      }
       const dx = b[BUTT] - a[BUTT];
       const dy = b[BUTT + 1] - a[BUTT + 1];
       const dz = b[BUTT + 2] - a[BUTT + 2];
@@ -320,7 +336,7 @@ export class RunStats {
       s.speed = step * fps;
       if (!s.crashed) s.topSpeed = Math.max(s.topSpeed, s.speed);
 
-      const airborne = b[meta(b) + META.contact] === 0;
+      const airborne = b[m + META.contact] === 0;
       const wasCrashed = s.crashed;
       // Track pitch rotation while airborne.
       if (airborne && !wasCrashed) {
@@ -343,9 +359,9 @@ export class RunStats {
           this.pending.air += this.airFrames / fps;
           this.pending.frame = f;
           this.pending.angle = this.landingAngle(sim, b);
-          this.pending.spin = Math.max(Math.abs(a[meta(a) + META.spin]), Math.abs(a[meta(a) + META.yaw]));
+          this.pending.spin = Math.max(Math.abs(a[m + META.spin]), Math.abs(a[m + META.yaw]));
         } else if (this.airFrames >= MIN_AIR_FRAMES) {
-          this.pending = { rotation: this.airRotation, yaw: this.airYaw, air: this.airFrames / fps, frame: f, angle: this.landingAngle(sim, b), spin: Math.max(Math.abs(a[meta(a) + META.spin]), Math.abs(a[meta(a) + META.yaw])) };
+          this.pending = { rotation: this.airRotation, yaw: this.airYaw, air: this.airFrames / fps, frame: f, angle: this.landingAngle(sim, b), spin: Math.max(Math.abs(a[m + META.spin]), Math.abs(a[m + META.yaw])) };
           this.touchdowns.push({ rotation: this.airRotation, yaw: this.airYaw, air: this.airFrames / fps });
         }
       }
@@ -359,7 +375,7 @@ export class RunStats {
       this.stillFrames = s.speed < 0.6 ? this.stillFrames + 1 : 0;
       s.still = this.stillFrames / fps;
 
-      const ev = b[meta(b) + META.events];
+      const ev = b[m + META.events];
       if (ev & EVENT.ring) {
         s.rings++;
         if (!s.crashed) {
@@ -369,7 +385,7 @@ export class RunStats {
       }
       if (ev & EVENT.bounce) s.bounces++;
       if (ev & EVENT.star) {
-        s.stars = countBits(b[meta(b) + META.stars]);
+        s.stars = countBits(b[m + META.stars]);
         if (!s.crashed) this.bump(f);
       }
       if (ev & EVENT.finish && !s.finished) {
@@ -384,7 +400,7 @@ export class RunStats {
       }
       events |= ev;
       // A crash after crossing the finish doesn't spoil the run.
-      s.crashed = b[meta(b) + META.crashed] === 1 && !s.finished;
+      s.crashed = b[m + META.crashed] === 1 && !s.finished;
 
       if (s.crashed && !wasCrashed) {
         // Crashing mid-air or right after touchdown voids the trick and the combo.

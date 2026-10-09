@@ -38,7 +38,8 @@ function beam(a: THREE.Vector3, b: THREE.Vector3, thickness: number): THREE.Buff
  * crossbeam, plus X-bracing on tall spans. Purely decorative.
  */
 export function buildSupports(stroke: Stroke): THREE.BufferGeometry | null {
-  if (stroke.type === 'scenery' || stroke.points.length < 2) return null;
+  // Crumbling lines hang in the air: scaffolding would make them look safe.
+  if (stroke.type === 'scenery' || stroke.type === 'crumble' || stroke.points.length < 2) return null;
   const frames = pointFrames(stroke);
   const pts = stroke.points;
   const parts: THREE.BufferGeometry[] = [];

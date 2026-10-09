@@ -3,7 +3,7 @@ import { pointFrames, segmentFrame } from './frames';
 
 /** Height of bobsled side walls. */
 export const WALL_HEIGHT = 0.7;
-import type { Decor, DecorKind, DrawMode, Finish, LineType, Ring, Segment, Star, Stroke } from './types';
+import type { Checkpoint, Decor, DecorKind, DrawMode, Finish, Hazard, HazardKind, LineType, Ring, Segment, Star, Stroke } from './types';
 
 const CELL = 4;
 
@@ -17,6 +17,10 @@ export type TrackEvent =
   | { kind: 'ringRemoved'; ring: Ring }
   | { kind: 'starAdded'; star: Star }
   | { kind: 'starRemoved'; star: Star }
+  | { kind: 'checkpointAdded'; checkpoint: Checkpoint }
+  | { kind: 'checkpointRemoved'; checkpoint: Checkpoint }
+  | { kind: 'hazardAdded'; hazard: Hazard }
+  | { kind: 'hazardRemoved'; hazard: Hazard }
   | { kind: 'finishChanged' }
   | { kind: 'goalsChanged' }
   | { kind: 'startChanged' }
@@ -46,6 +50,8 @@ interface SerializedTrack {
   rings?: { position: number[]; axis: number[]; radius: number }[];
   stars?: number[][];
   finish?: { position: number[]; axis: number[]; halfWidth: number } | null;
+  checkpoints?: { position: number[]; axis: number[]; halfWidth: number }[];
+  hazards?: { kind: HazardKind; position: number[]; rotation: number; scale: number }[];
   targetScore?: number;
   name?: string;
   /** Landscape, time of day and weather (Alpine by day when missing). */
@@ -57,6 +63,8 @@ export class Track {
   decor = new Map<number, Decor>();
   rings = new Map<number, Ring>();
   stars = new Map<number, Star>();
+  checkpoints = new Map<number, Checkpoint>();
+  hazards = new Map<number, Hazard>();
   finish: Finish | null = null;
   /** Score needed for the third star. */
   targetScore = 2000;
@@ -154,6 +162,37 @@ export class Track {
     this.emit({ kind: 'starRemoved', star });
   }
 
+  addCheckpoint(c: Omit<Checkpoint, 'id'> & { id?: number }): Checkpoint {
+    const checkpoint: Checkpoint = { ...c, id: c.id ?? this.nextId++ };
+    this.nextId = Math.max(this.nextId, checkpoint.id + 1);
+    this.checkpoints.set(checkpoint.id, checkpoint);
+    this.emit({ kind: 'checkpointAdded', checkpoint });
+    return checkpoint;
+  }
+
+  removeCheckpoint(checkpoint: Checkpoint) {
+    if (!this.checkpoints.delete(checkpoint.id)) return;
+    this.emit({ kind: 'checkpointRemoved', checkpoint });
+  }
+
+  /** Checkpoints in a stable order (the recorded state keeps the last one's place + 1). */
+  checkpointList(): Checkpoint[] {
+    return [...this.checkpoints.values()].sort((a, b) => a.id - b.id);
+  }
+
+  addHazard(h: Omit<Hazard, 'id'> & { id?: number }): Hazard {
+    const hazard: Hazard = { ...h, id: h.id ?? this.nextId++ };
+    this.nextId = Math.max(this.nextId, hazard.id + 1);
+    this.hazards.set(hazard.id, hazard);
+    this.emit({ kind: 'hazardAdded', hazard });
+    return hazard;
+  }
+
+  removeHazard(hazard: Hazard) {
+    if (!this.hazards.delete(hazard.id)) return;
+    this.emit({ kind: 'hazardRemoved', hazard });
+  }
+
   /** Stars in a stable order (their bit in the collected mask). */
   starList(): Star[] {
     return [...this.stars.values()].sort((a, b) => a.id - b.id);
@@ -192,6 +231,8 @@ export class Track {
     this.decor.clear();
     this.rings.clear();
     this.stars.clear();
+    this.checkpoints.clear();
+    this.hazards.clear();
     this.finish = null;
     this.targetScore = 2000;
     this.grid.clear();
@@ -336,6 +377,12 @@ export class Track {
       finish: this.finish
         ? { position: this.finish.position.toArray().map(r), axis: this.finish.axis.toArray().map(r), halfWidth: this.finish.halfWidth }
         : null,
+      ...(this.checkpoints.size
+        ? { checkpoints: this.checkpointList().map((c) => ({ position: c.position.toArray().map(r), axis: c.axis.toArray().map(r), halfWidth: r(c.halfWidth) })) }
+        : {}),
+      ...(this.hazards.size
+        ? { hazards: [...this.hazards.values()].map((h) => ({ kind: h.kind, position: h.position.toArray().map(r), rotation: r(h.rotation), scale: r(h.scale) })) }
+        : {}),
       targetScore: this.targetScore,
       ...(this.world ? { world: { ...this.world } } : {}),
     };
@@ -381,6 +428,16 @@ export class Track {
         halfWidth: data.finish.halfWidth,
       });
     }
+    for (const c of data.checkpoints ?? []) {
+      this.addCheckpoint({
+        position: new THREE.Vector3().fromArray(c.position),
+        axis: new THREE.Vector3().fromArray(c.axis).normalize(),
+        halfWidth: c.halfWidth,
+      });
+    }
+    for (const h of data.hazards ?? []) {
+      this.addHazard({ kind: h.kind, position: new THREE.Vector3().fromArray(h.position), rotation: h.rotation, scale: h.scale });
+    }
     this.targetScore = data.targetScore ?? 2000;
     const w = data.world;
     this.world = w && typeof w === 'object' ? { biome: String(w.biome ?? ''), time: String(w.time ?? ''), weather: String(w.weather ?? '') } : null;
@@ -390,7 +447,11 @@ export class Track {
 
 export type { SerializedTrack };
 
-const LINE_TYPES = new Set<string>(['normal', 'accel', 'ice', 'bouncy', 'scenery']);
+const LINE_TYPES = new Set<string>(['normal', 'accel', 'ice', 'bouncy', 'scenery', 'mud', 'crumble']);
+const HAZARD_KINDS = new Set<string>(['icicles', 'thorns', 'urchin', 'cactus', 'barrier', 'spikes', 'wisp', 'lava', 'crystal']);
+/** Most checkpoints and hazards a track may hold. */
+export const MAX_CHECKPOINTS = 24;
+export const MAX_HAZARDS = 200;
 /** Generous caps that keep a hostile or corrupt link from freezing the game. */
 const MAX_STROKES = 4000;
 const MAX_NUMBERS = 600_000;
@@ -439,6 +500,14 @@ export function validateTrack(raw: unknown): SerializedTrack {
   const stars = (Array.isArray(d.stars) ? d.stars : []).filter((p) => isVec(p)) as number[][];
   const f = d.finish as Record<string, unknown> | null | undefined;
   const finish = f && typeof f === 'object' && isVec(f.position) && isVec(f.axis) && isNum(f.halfWidth) ? { position: f.position as number[], axis: f.axis as number[], halfWidth: f.halfWidth as number } : null;
+  const checkpoints = list(d.checkpoints)
+    .filter((x) => isVec(x.position) && isVec(x.axis) && isNum(x.halfWidth) && x.halfWidth > 0)
+    .slice(0, MAX_CHECKPOINTS)
+    .map((x) => ({ position: x.position as number[], axis: x.axis as number[], halfWidth: x.halfWidth as number }));
+  const hazards = list(d.hazards)
+    .filter((x) => HAZARD_KINDS.has(x.kind as string) && isVec(x.position))
+    .slice(0, MAX_HAZARDS)
+    .map((x) => ({ kind: x.kind as HazardKind, position: x.position as number[], rotation: isNum(x.rotation) ? x.rotation : 0, scale: isNum(x.scale) && x.scale > 0 && x.scale < 10 ? x.scale : 1 }));
   const w = d.world as Record<string, unknown> | undefined;
   return {
     version: TRACK_VERSION,
@@ -448,6 +517,8 @@ export function validateTrack(raw: unknown): SerializedTrack {
     rings,
     stars,
     finish,
+    ...(checkpoints.length ? { checkpoints } : {}),
+    ...(hazards.length ? { hazards } : {}),
     targetScore: isNum(d.targetScore) ? d.targetScore : undefined,
     name: typeof d.name === 'string' ? d.name.slice(0, 80) : undefined,
     world: w && typeof w === 'object' ? { biome: String(w.biome ?? ''), time: String(w.time ?? ''), weather: String(w.weather ?? '') } : undefined,

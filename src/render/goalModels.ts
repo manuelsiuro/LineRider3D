@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Finish, Star } from '../track/types';
+import type { Checkpoint, Finish, Star } from '../track/types';
 
 const starMat = new THREE.MeshStandardMaterial({
   color: 0xffd34d,
@@ -123,4 +123,62 @@ export function buildFinish(fin: Finish): THREE.Group {
   g.userData.finish = true;
   g.traverse((o) => (o.userData.finish = true));
   return g;
+}
+
+const cpPost = new THREE.MeshStandardMaterial({ color: 0x2f7fd8, roughness: 0.5 });
+const cpWhite = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+
+/** Checkpoint arch: blue posts and a flag banner that lights up green once passed. */
+export function buildCheckpoint(cp: Checkpoint): THREE.Group {
+  const g = new THREE.Group();
+  const w = cp.halfWidth;
+  const H = 3.6;
+  for (const s of [-1, 1]) {
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, H + 3, 8), cpPost);
+    p.position.set(0, H / 2 - 1.5, s * w);
+    p.castShadow = true;
+    g.add(p);
+    const stripe = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.3, 8), cpWhite);
+    stripe.position.set(0, H - 0.9, s * w);
+    g.add(stripe);
+  }
+  const banner = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.6, w * 2),
+    new THREE.MeshStandardMaterial({ color: 0x9fb3c8, emissive: 0x000000, roughness: 0.55 }),
+  );
+  banner.name = 'banner';
+  banner.position.set(0, H - 0.35, 0);
+  banner.castShadow = true;
+  g.add(banner);
+  const flag = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.7, 0.45),
+    new THREE.MeshStandardMaterial({ color: 0x9fb3c8, side: THREE.DoubleSide, roughness: 0.6 }),
+  );
+  flag.name = 'flag';
+  flag.position.set(-0.36, H + 1.15, w);
+  g.add(flag);
+  const axis = cp.axis.clone();
+  axis.y = 0;
+  if (axis.lengthSq() < 1e-6) axis.set(1, 0, 0);
+  g.position.copy(cp.position);
+  g.rotation.y = Math.atan2(-axis.z, axis.normalize().x);
+  g.userData.checkpointId = cp.id;
+  g.traverse((o) => (o.userData.checkpointId = cp.id));
+  return g;
+}
+
+const CP_OFF = new THREE.Color(0x9fb3c8);
+const CP_ON = new THREE.Color(0x2fbf71);
+
+/** Flutters the flag; the banner and flag turn green once the rider has passed. */
+export function animateCheckpoint(obj: THREE.Object3D, time: number, passed: boolean) {
+  const banner = obj.getObjectByName('banner') as THREE.Mesh | undefined;
+  const flag = obj.getObjectByName('flag') as THREE.Mesh | undefined;
+  for (const m of [banner, flag]) {
+    if (!m) continue;
+    const mat = m.material as THREE.MeshStandardMaterial;
+    mat.color.copy(passed ? CP_ON : CP_OFF);
+    mat.emissive.copy(passed ? CP_ON : CP_OFF).multiplyScalar(passed ? 0.45 : 0);
+  }
+  if (flag) flag.rotation.y = Math.sin(time * 5 + obj.id) * 0.35;
 }

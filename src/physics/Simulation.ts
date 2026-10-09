@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { META, Rider } from './Rider';
+import { EVENT, META, Rider } from './Rider';
 import { SLED, type VehicleDef } from './vehicles';
 import type { Track } from '../track/Track';
 
@@ -17,6 +17,8 @@ export class Simulation {
   /** Recorded player input per frame (input[f] drives the step f → f+1). */
   private inputs: number[] = [];
   private revision = -1;
+  /** Comebacks after a crash: frame where the rider respawned → frame it was copied from. */
+  private respawns = new Map<number, number>();
 
   constructor(
     readonly track: Track,
@@ -32,9 +34,10 @@ export class Simulation {
   /** Switches the ride; the recording starts over (inputs are kept). */
   setVehicle(vehicle: VehicleDef) {
     if (vehicle === this.rider.def) return;
-    const drag = this.rider.groundDrag;
+    const { groundDrag, gravityScale } = this.rider;
     this.rider = new Rider(vehicle);
-    this.rider.groundDrag = drag;
+    this.rider.groundDrag = groundDrag;
+    this.rider.gravityScale = gravityScale;
     this.history = [];
     this.revision = -1;
   }
@@ -43,6 +46,14 @@ export class Simulation {
   setGroundDrag(drag: number) {
     if (drag === this.rider.groundDrag) return;
     this.rider.groundDrag = drag;
+    this.history = [];
+    this.revision = -1;
+  }
+
+  /** Gravity of the world (1 on Earth); the recording starts over. */
+  setGravity(scale: number) {
+    if (scale === this.rider.gravityScale) return;
+    this.rider.gravityScale = scale;
     this.history = [];
     this.revision = -1;
   }
@@ -71,6 +82,8 @@ export class Simulation {
   private ensureFresh() {
     if (this.revision === this.track.revision && this.history.length > 0) return;
     this.revision = this.track.revision;
+    this.respawns.clear();
+    this.rider.bindTrack(this.track);
     this.rider.reset(this.track.start, this.startYaw());
     const s = new Float64Array(this.rider.stateSize);
     this.rider.writeState(s);
@@ -89,7 +102,14 @@ export class Simulation {
     if (frame >= this.history.length) {
       this.rider.readState(this.history[this.history.length - 1]);
       while (this.history.length <= frame) {
-        this.rider.step(this.track, this.inputs[this.history.length - 1] ?? 0);
+        const last = this.history.length - 1;
+        const from = this.respawns.get(last);
+        if (from !== undefined) {
+          this.history.push(this.comeback(this.history[last], this.history[from]));
+          this.rider.readState(this.history[last + 1]);
+          continue;
+        }
+        this.rider.step(this.track, this.inputs[last] ?? 0);
         const s = new Float64Array(this.rider.stateSize);
         this.rider.writeState(s);
         this.history.push(s);
@@ -118,12 +138,54 @@ export class Simulation {
     if ((this.inputs[frame] ?? 0) === mask) return;
     this.inputs[frame] = mask;
     if (this.history.length > frame + 1) this.history.length = frame + 1;
+    for (const f of this.respawns.keys()) if (f > frame) this.respawns.delete(f);
   }
 
   /** Forgets all recorded input (classic runs and fresh attempts). */
   clearInputs() {
-    if (this.inputs.some((m) => m)) this.history.length = Math.min(this.history.length, 1);
+    if (this.inputs.some((m) => m) || this.respawns.size) this.history.length = Math.min(this.history.length, 1);
     this.inputs = [];
+    this.respawns.clear();
+  }
+
+  /** The rider crashed at `frame` after passing a checkpoint (so can come back to it). */
+  canRespawn(frame: number) {
+    const s = this.history[frame];
+    if (!s) return false;
+    const m = this.rider.count * 6;
+    return s[m + META.crashed] === 1 && s[m + META.finished] === 0 && s[m + META.checkpoint] > 0;
+  }
+
+  /**
+   * Back to the last checkpoint after a crash: the next frame is the rider as he crossed
+   * it (same speed), keeping the stars collected since. The clock keeps running.
+   */
+  respawn(frame: number) {
+    if (!this.canRespawn(frame)) return false;
+    const m = this.rider.count * 6;
+    const k = this.history[frame][m + META.checkpoint];
+    let from = frame;
+    while (from > 0 && this.history[from - 1][m + META.checkpoint] === k) from--;
+    this.respawns.set(frame, from);
+    this.history.length = frame + 1;
+    for (const f of this.respawns.keys()) if (f > frame) this.respawns.delete(f);
+    return true;
+  }
+
+  /** Number of comebacks up to `frame`. */
+  respawnsUpTo(frame: number) {
+    let n = 0;
+    for (const f of this.respawns.keys()) if (f < frame) n++;
+    return n;
+  }
+
+  private comeback(now: Float64Array, at: Float64Array) {
+    const m = this.rider.count * 6;
+    const s = at.slice();
+    s[m + META.crashed] = 0;
+    s[m + META.events] = EVENT.respawn;
+    s[m + META.stars] = unionBits(at[m + META.stars], now[m + META.stars]);
+    return s;
   }
 
   /** Recorded inputs up to `frames` (for saving a run). */
@@ -140,6 +202,7 @@ export class Simulation {
   /** Replaces all inputs (e.g. to replay a saved ghost run). */
   loadInputs(inputs: number[]) {
     this.inputs = inputs.slice();
+    this.respawns.clear();
     this.history.length = Math.min(this.history.length, 1);
   }
 
@@ -152,4 +215,15 @@ export class Simulation {
     const s = this.history[frame];
     return s ? s[this.rider.count * 6 + META.crashed] === 1 : false;
   }
+}
+
+/** Bitwise OR of two star masks (they go past 32 bits, so no `|`). */
+function unionBits(a: number, b: number) {
+  let out = 0;
+  for (let bit = 1; a > 0 || b > 0; bit *= 2) {
+    if (a % 2 === 1 || b % 2 === 1) out += bit;
+    a = Math.floor(a / 2);
+    b = Math.floor(b / 2);
+  }
+  return out;
 }

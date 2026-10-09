@@ -55,6 +55,20 @@ export function showHelp(ctx: ScreenCtx) {
         : 'Turn on <b>rider mode</b> to steer Bosh. <b>Let go before landing</b> and touch down flat for a Perfect.',
     },
     {
+      title: 'Watch out',
+      art: `<div class="help-chips help-chips-big">${(
+        [
+          ['#7a5232', 'Mud: slows you down'],
+          ['#c9a46a', 'Crumble: falls away once touched'],
+          ['#d8342c', 'Hazards: one touch is a wipeout'],
+          ['#2fbf71', 'Checkpoints: come back after a wipeout'],
+        ] as const
+      )
+        .map(([c, n]) => `<span><i style="background:${c}"></i>${n}</span>`)
+        .join('')}</div>`,
+      text: 'Later levels get tricky. <b>Crumbling</b> lines only hold for a moment, so keep your speed. Steer clear of <b>hazards</b>. Passed a <b>checkpoint</b>? A wipeout only costs you time (but no medal).',
+    },
+    {
       title: 'Rides and worlds',
       art: `<div class="help-explore">
           <div class="row">${VEHICLES.map((v) => v.id).map((v) => `<span class="ride">${icon(v, 24)}</span>`).join('')}</div>

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Segment } from '../track/types';
 import type { Track } from '../track/Track';
 import { terrainHeight } from '../world/terrain';
+import { HAZARDS, hazardHits } from './hazards';
 import { P, SLED, type Bone, type VehicleDef } from './vehicles';
 
 /**
@@ -24,12 +25,18 @@ const RESTITUTION = 0.9;
 const MIN_BOUNCE = 0.06;
 /** Velocity added (per step) when passing through a boost ring. */
 const RING_BOOST = 0.22;
+/** Share of the rider's speed that mud takes each step it is touched. */
+const MUD_DRAG = 0.025;
+/** Steps a crumbling line holds after it is first touched. */
+export const CRUMBLE_HOLD = 24;
+/** Steps it keeps counting after that (the falling pieces are animated). */
+const CRUMBLE_END = CRUMBLE_HOLD + 80;
 
 /** Player input bits for one step (rider mode). */
 export const INPUT = { push: 1, brake: 2, spin: 4 } as const;
 
 /** One-off events of a step, for sound and effects. */
-export const EVENT = { ring: 1, bounce: 2, star: 4, finish: 8 } as const;
+export const EVENT = { ring: 1, bounce: 2, star: 4, finish: 8, checkpoint: 16, respawn: 32 } as const;
 
 /** Max number of stars per track (one bit each in the recorded state). */
 export const MAX_STARS = 48;
@@ -39,11 +46,11 @@ export { P };
 
 /**
  * Recorded state layout: 6 numbers per point (position, previous position),
- * then these fields at `points * 6 + offset`.
+ * then these fields at `points * 6 + offset`, then one number per crumbling
+ * line of the track (steps since it was first touched, 0 = not yet).
  */
-export const META = { crashed: 0, contact: 1, events: 2, spin: 3, stars: 4, finished: 5, yaw: 6 } as const;
-export const META_SIZE = 7;
-export const stateSize = (def: VehicleDef) => def.points.length * 6 + META_SIZE;
+export const META = { crashed: 0, contact: 1, events: 2, spin: 3, stars: 4, finished: 5, yaw: 6, checkpoint: 7 } as const;
+export const META_SIZE = 8;
 
 /**
  * The same bones with left/right swapped. Gauss-Seidel relaxation is order
@@ -97,6 +104,16 @@ export class Rider {
 
   /** Ground drag multiplier of the world's surface (snow = 1). */
   groundDrag = 1;
+  /** Gravity multiplier of the world (the Moon is lighter). */
+  gravityScale = 1;
+  /** Crumbling lines of the bound track: stroke id → slot in `crumble`. */
+  private crumbleSlot = new Map<number, number>();
+  /** Steps since each crumbling line was first touched (0 = not yet). */
+  crumble: number[] = [];
+  /** Checkpoints passed: the place (1-based, in Track.checkpointList order) of the last one. */
+  checkpoint = 0;
+  /** Touched mud this step. */
+  private inMud = false;
 
   constructor(readonly def: VehicleDef = SLED) {
     this.count = def.points.length;
@@ -110,7 +127,20 @@ export class Rider {
   }
 
   get stateSize() {
-    return this.count * 6 + META_SIZE;
+    return this.count * 6 + META_SIZE + this.crumble.length;
+  }
+
+  /** Takes note of the track's crumbling lines (call before reset when the track changes). */
+  bindTrack(track: Track) {
+    this.crumbleSlot.clear();
+    for (const s of track.strokes.values()) if (s.type === 'crumble') this.crumbleSlot.set(s.id, this.crumbleSlot.size);
+    this.crumble = new Array(this.crumbleSlot.size).fill(0);
+  }
+
+  /** Steps since a crumbling line was first touched (0: untouched or not crumbling). */
+  crumbleAge(strokeId: number) {
+    const k = this.crumbleSlot.get(strokeId);
+    return k === undefined ? 0 : this.crumble[k];
   }
 
   reset(start: THREE.Vector3, yaw: number, speed = 0.04) {
@@ -125,6 +155,8 @@ export class Rider {
     this.yawSpin = 0;
     this.stars = 0;
     this.finished = false;
+    this.checkpoint = 0;
+    this.crumble.fill(0);
   }
 
   private ringRef = new THREE.Vector3();
@@ -147,12 +179,15 @@ export class Rider {
     this.ringRef.copy(this.pos[P.butt]);
     this.bounce = null;
     this.events = 0;
+    this.inMud = false;
+    // Touched crumbling lines count down to falling away.
+    for (let k = 0; k < this.crumble.length; k++) if (this.crumble[k] > 0 && this.crumble[k] < CRUMBLE_END) this.crumble[k]++;
     // Integrate.
     for (let i = 0; i < this.count; i++) {
       const p = this.pos[i];
       vel.subVectors(p, this.prev[i]);
       this.prev[i].copy(p);
-      p.add(vel).add(GRAVITY);
+      p.add(vel).addScaledVector(GRAVITY, this.gravityScale);
       this.contact[i] = false;
     }
 
@@ -168,9 +203,56 @@ export class Rider {
     }
     this.assist(input);
     this.applyBounce();
+    this.applyMud();
     this.passRings(track, this.ringRef, this.pos[P.butt]);
+    this.touchHazards(track);
     this.collectStars(track);
+    this.passCheckpoints(track, this.ringRef, this.pos[P.butt]);
     this.checkFinish(track, this.ringRef, this.pos[P.butt]);
+  }
+
+  /** Mud slows the whole rider at once (per point it would tear Bosh off his ride). */
+  private applyMud() {
+    if (!this.inMud) return;
+    for (let i = 0; i < this.count; i++) {
+      vel.subVectors(this.pos[i], this.prev[i]).multiplyScalar(1 - MUD_DRAG);
+      this.prev[i].copy(this.pos[i]).sub(vel);
+    }
+  }
+
+  /** Any part of Bosh or his ride touching a hazard is a crash. */
+  private touchHazards(track: Track) {
+    if (track.hazards.size === 0 || this.crashed) return;
+    for (const h of track.hazards.values()) {
+      for (let i = 0; i < this.count; i++) {
+        if (!hazardHits(h, this.pos[i])) continue;
+        this.crashed = true;
+        this.crashReason = `hazard ${HAZARDS[h.kind].name}`;
+        return;
+      }
+    }
+  }
+
+  /** Crossing a checkpoint gate (in order or not) makes it the place to come back to. */
+  private passCheckpoints(track: Track, from: THREE.Vector3, to: THREE.Vector3) {
+    if (track.checkpoints.size === 0 || this.crashed || this.finished) return;
+    const list = track.checkpointList();
+    for (let k = this.checkpoint; k < list.length; k++) {
+      if (!this.crossesGate(list[k], from, to)) continue;
+      this.checkpoint = k + 1;
+      this.events |= EVENT.checkpoint;
+    }
+  }
+
+  /** The body's path this step crosses a gate's plane, inside the gate. */
+  private crossesGate(gate: { position: THREE.Vector3; axis: THREE.Vector3; halfWidth: number }, from: THREE.Vector3, to: THREE.Vector3) {
+    const d0 = tmp.subVectors(from, gate.position).dot(gate.axis);
+    const d1 = tmp.subVectors(to, gate.position).dot(gate.axis);
+    if (!(d0 < 0 && d1 >= 0)) return false;
+    const t = d0 / (d0 - d1);
+    const hit = tmp.lerpVectors(from, to, t).sub(gate.position);
+    hit.addScaledVector(gate.axis, -hit.dot(gate.axis));
+    return Math.abs(hit.y) <= 5 && hit.length() <= gate.halfWidth + 2;
   }
 
   /** Picks up stars near the body or the vehicle. */
@@ -192,13 +274,7 @@ export class Rider {
   private checkFinish(track: Track, from: THREE.Vector3, to: THREE.Vector3) {
     const fin = track.finish;
     if (!fin || this.finished || this.crashed) return;
-    const d0 = tmp.subVectors(from, fin.position).dot(fin.axis);
-    const d1 = tmp.subVectors(to, fin.position).dot(fin.axis);
-    if (!(d0 < 0 && d1 >= 0)) return;
-    const t = d0 / (d0 - d1);
-    const hit = tmp.lerpVectors(from, to, t).sub(fin.position);
-    hit.addScaledVector(fin.axis, -hit.dot(fin.axis));
-    if (Math.abs(hit.y) > 5 || hit.length() > fin.halfWidth + 2) return;
+    if (!this.crossesGate(fin, from, to)) return;
     this.finished = true;
     this.events |= EVENT.finish;
   }
@@ -472,6 +548,9 @@ export class Rider {
       const body = tallWalls && i >= P.butt && i <= P.rFoot;
       for (const seg of this.nearby) {
         if (body && seg.wall) continue;
+        // A crumbling line that has fallen away is gone (walls and all).
+        const slot = seg.stroke.type === 'crumble' ? this.crumbleSlot.get(seg.stroke.id) : undefined;
+        if (slot !== undefined && this.crumble[slot] > CRUMBLE_HOLD) continue;
         tmp.subVectors(p, seg.a);
         const d = tmp.dot(seg.up);
         if (d >= 0 || d < -HIT_DEPTH) continue;
@@ -501,6 +580,8 @@ export class Rider {
           this.offCount++;
         }
         this.contact[i] = true;
+        if (slot !== undefined && this.crumble[slot] === 0) this.crumble[slot] = 1;
+        if (type === 'mud') this.inMud = true;
         if (def.fatal && !this.crashed && !seg.wall) {
           this.crashed = true;
           this.crashReason = `fatal ${i} track`;
@@ -576,6 +657,8 @@ export class Rider {
     buf[m + META.stars] = this.stars;
     buf[m + META.finished] = this.finished ? 1 : 0;
     buf[m + META.yaw] = this.yawSpin;
+    buf[m + META.checkpoint] = this.checkpoint;
+    for (let k = 0; k < this.crumble.length; k++) buf[m + META_SIZE + k] = this.crumble[k];
   }
 
   readState(buf: Float64Array) {
@@ -593,5 +676,7 @@ export class Rider {
     this.stars = buf[m + META.stars];
     this.finished = buf[m + META.finished] === 1;
     this.yawSpin = buf[m + META.yaw];
+    this.checkpoint = buf[m + META.checkpoint];
+    for (let k = 0; k < this.crumble.length; k++) this.crumble[k] = buf[m + META_SIZE + k] ?? 0;
   }
 }

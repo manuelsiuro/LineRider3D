@@ -1,5 +1,6 @@
 import type { EditView, Editor, ItemKind, Tool } from '../editor/Editor';
 import { DECOR_LABELS } from '../world/models';
+import { HAZARDS, HAZARD_KINDS } from '../physics/hazards';
 import type { DecorKind, LineType } from '../track/types';
 import { LINE_COLORS } from '../track/types';
 import type { Stats, Trick } from '../game/RunStats';
@@ -53,6 +54,8 @@ const LINE_TYPES: { id: LineType; label: string }[] = [
   { id: 'accel', label: 'Boost' },
   { id: 'ice', label: 'Ice' },
   { id: 'bouncy', label: 'Bouncy' },
+  { id: 'mud', label: 'Mud' },
+  { id: 'crumble', label: 'Crumble' },
   { id: 'scenery', label: 'Scenery' },
 ];
 
@@ -103,6 +106,7 @@ export class UI {
   private worldOpen = false;
   /** Decor palette shows every kind, not only the world's. */
   private allDecor = false;
+  private allHazards = false;
   private inkMeter!: HTMLElement;
   private toastQueue: { title: string; desc: string; ride?: string }[] = [];
   private toasting = false;
@@ -693,13 +697,36 @@ export class UI {
           { id: 'star' as ItemKind, label: '★ Star' },
           { id: 'ring' as ItemKind, label: '◎ Boost ring' },
           { id: 'finish' as ItemKind, label: '🏁 Finish gate' },
+          { id: 'checkpoint' as ItemKind, label: '⚑ Checkpoint' },
+          { id: 'hazard' as ItemKind, label: '⚠ Hazard' },
         ],
         s.item,
         (v) => (s.item = v),
       );
+      if (s.item === 'hazard') {
+        // The world's own hazards first; the rest on request.
+        const native = biomeById(this.handlers.world().biome).hazards;
+        const kinds = this.allHazards ? HAZARD_KINDS : native;
+        if (!kinds.includes(s.hazard)) s.hazard = kinds[0];
+        const r = row();
+        seg(
+          r,
+          kinds.map((k) => ({ id: k, label: HAZARDS[k].name })),
+          s.hazard,
+          (v) => (s.hazard = v),
+        );
+        toggle(r, this.allHazards, 'All worlds', (v) => (this.allHazards = v));
+      }
       const r2 = row();
       slider(r2, '3rd star target', 500, 30000, 500, this.editor.targetScore, ' pts', (v) => (this.editor.targetScore = v));
-      r2.append(h('span', 'tip', s.item === 'star' ? 'Tap a track to float a star over it.' : s.item === 'ring' ? 'Tap a track to hang a ring over it.' : 'Tap a track to place the finish gate.'));
+      const tips: Record<ItemKind, string> = {
+        star: 'Tap a track to float a star over it.',
+        ring: 'Tap a track to hang a ring over it.',
+        finish: 'Tap a track to place the finish gate.',
+        checkpoint: 'Tap a track to put up a checkpoint: after a wipeout the rider comes back to it.',
+        hazard: 'Tap a track to set a hazard on it: touching one is a wipeout.',
+      };
+      r2.append(h('span', 'tip', tips[s.item]));
     } else if (tool === 'decor') {
       // The world's own decor first; everything else on request.
       const native = biomeById(this.handlers.world().biome).decor;

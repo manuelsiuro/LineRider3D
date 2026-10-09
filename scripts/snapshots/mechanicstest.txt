@@ -1,0 +1,7 @@
+mud      plain x77.8 v36.3 | muddy x54.9 v12.1
+crumble  touched at 69, gone at 93, past the bridge x40.0 y10.5
+crumble  slow rider y0.0 age 104
+hazard   crash at 106 x38.5 (hazard Cactus)
+checkpt  passed 83 crash 140 respawn → x24.3 y10.8 respawns 1
+gravity  airtime earth 41 steps, moon 61 steps
+format   mud,crumble checkpoints 1 hazards lava

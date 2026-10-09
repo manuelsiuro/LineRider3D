@@ -11,6 +11,8 @@ import type { Core } from './core';
 const STEP = 1 / STEPS_PER_SECOND;
 /** Ten minutes of simulation at most. */
 export const MAX_FRAME = STEPS_PER_SECOND * 60 * 10 - 2;
+/** Seconds of wipeout (real time) before coming back to the last checkpoint. */
+const RESPAWN_DELAY = 1.2;
 
 export interface RunHooks {
   /** Riding a track (not the title's demo loop). */
@@ -103,7 +105,7 @@ export class Run {
     if (this.frame === 0 && !this.replaying) sim.clearInputs();
     if (this.frame === 0) {
       const record = this.h.inGame() ? this.h.ghostRecord() : null;
-      this.ghost = record ? new GhostRun(track, record, this.h.vehicle(), sim.rider.groundDrag) : null;
+      this.ghost = record ? new GhostRun(track, record, this.h.vehicle(), sim.rider.groundDrag, sim.rider.gravityScale) : null;
       ghostView.setVehicle(this.h.vehicle());
       this.h.focus();
     } else rig.snapTo(sim.rider.center(riderCenter));
@@ -245,6 +247,18 @@ export class Run {
       ui.popup('BOOST!', 'boost', true);
       this.flash = 0.35;
     }
+    if (events & EVENT.checkpoint) {
+      sound.ring();
+      ui.popup('CHECKPOINT', 'boost', true);
+    }
+    if (events & EVENT.respawn) {
+      // Back at the last checkpoint: no streak across the screen, no lingering wipeout.
+      this.c.trail.reset();
+      this.impact = 0;
+      this.slowTimer = 0;
+      rig.snapTo(sim.rider.center(this.c.riderCenter));
+      ui.popup('BACK TO CHECKPOINT', 'boost', true);
+    }
     if (events & EVENT.bounce) {
       sound.bounce();
       if (Math.random() < 0.5) ui.popup('BOING!', 'bounce', true);
@@ -318,6 +332,12 @@ export class Run {
     }
     const s = this.c.runStats.stats;
     this.crashClock = s.crashed ? this.crashClock + dt : 0;
+    // Past a checkpoint, a wipeout only costs time: the rider comes back to it (with the
+    // player steering: an untouched run would only crash the same way again).
+    if (this.crashClock > RESPAWN_DELAY && !this.replaying && this.h.riderOn() && this.c.sim.respawn(this.frame)) {
+      this.crashClock = 0;
+      return;
+    }
     this.finishClock = s.finished ? this.finishClock + dt : 0;
     const ended = this.crashClock > 2.4 || this.finishClock > 1.6 || (s.still > 1.2 && s.time > 1.5) || this.frame >= MAX_FRAME;
     if (!ended) return;

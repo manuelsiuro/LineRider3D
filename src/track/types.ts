@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export type LineType = 'normal' | 'accel' | 'ice' | 'bouncy' | 'scenery';
+export type LineType = 'normal' | 'accel' | 'ice' | 'bouncy' | 'scenery' | 'mud' | 'crumble';
 
 /**
  * How a stroke was drawn:
@@ -65,6 +65,27 @@ export interface Finish {
   halfWidth: number;
 }
 
+/** Checkpoint gate: after a crash the rider comes back here (crossed like the finish). */
+export interface Checkpoint {
+  id: number;
+  position: THREE.Vector3;
+  /** Unit vector: the riding direction through the gate. */
+  axis: THREE.Vector3;
+  halfWidth: number;
+}
+
+/** Deadly obstacles: touching one throws Bosh off his ride. One or two per biome. */
+export type HazardKind = 'icicles' | 'thorns' | 'urchin' | 'cactus' | 'barrier' | 'spikes' | 'wisp' | 'lava' | 'crystal';
+
+export interface Hazard {
+  id: number;
+  kind: HazardKind;
+  position: THREE.Vector3;
+  /** Turn around the vertical axis, radians. */
+  rotation: number;
+  scale: number;
+}
+
 export interface Decor {
   id: number;
   kind: DecorKind;
@@ -93,4 +114,6 @@ export const LINE_COLORS: Record<LineType, number> = {
   ice: 0x9fe3f5,
   bouncy: 0xf0529c,
   scenery: 0x3aa15a,
+  mud: 0x7a5232,
+  crumble: 0xc9a46a,
 };

@@ -24,7 +24,7 @@ function makeTexture(type: LineType, skin: Skin): THREE.CanvasTexture {
   const ctx = c.getContext('2d')!;
   const line = new THREE.Color(LINE_COLORS[type]);
   // Ice lanes always look like ice; other lines take on the world's material.
-  const sk = type === 'ice' || type === 'scenery' ? 'ice' : skin;
+  const sk = type === 'ice' || type === 'scenery' || type === 'mud' ? 'ice' : skin;
   const base = sk === 'ice' ? line.clone() : line.clone().lerp(new THREE.Color(SKIN_BASE[sk].color), SKIN_BASE[sk].mix);
   // Subtle vertical gradient across the width gives the ribbon a rounded look.
   const grad = ctx.createLinearGradient(0, 0, TEX, 0);
@@ -36,7 +36,21 @@ function makeTexture(type: LineType, skin: Skin): THREE.CanvasTexture {
   ctx.fillRect(0, 0, TEX, TEX);
   let seed = 11;
   const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
-  if (sk === 'ice') {
+  if (type === 'mud') {
+    // Wet clods and puddles.
+    for (let i = 0; i < 70; i++) {
+      ctx.fillStyle = rand() < 0.5 ? `rgba(40,22,10,${0.2 + rand() * 0.25})` : `rgba(170,120,80,${0.12 + rand() * 0.15})`;
+      ctx.beginPath();
+      ctx.ellipse(12 + rand() * (TEX - 24), rand() * TEX, 2 + rand() * 7, 1.5 + rand() * 4, rand() * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = 'rgba(210,190,170,0.22)';
+      ctx.beginPath();
+      ctx.ellipse(26 + rand() * 76, rand() * TEX, 8 + rand() * 10, 3 + rand() * 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (sk === 'ice') {
     // Frosty speckles.
     for (let i = 0; i < 260; i++) {
       ctx.fillStyle = `rgba(255,255,255,${0.04 + rand() * 0.1})`;
@@ -105,7 +119,7 @@ function makeTexture(type: LineType, skin: Skin): THREE.CanvasTexture {
   }
   // Bright edges so the ribbon reads well from far away.
   // Haunted tracks get a pumpkin-orange glow along the edges.
-  ctx.fillStyle = sk === 'ice' ? 'rgba(255,255,255,0.75)' : sk === 'haunted' && type === 'normal' ? '#ff8a20' : line.clone().lerp(new THREE.Color(0xffffff), 0.35).getStyle();
+  ctx.fillStyle = type === 'mud' ? '#4a2e1a' : sk === 'ice' ? 'rgba(255,255,255,0.75)' : sk === 'haunted' && type === 'normal' ? '#ff8a20' : line.clone().lerp(new THREE.Color(0xffffff), 0.35).getStyle();
   ctx.fillRect(0, 0, 8, TEX);
   ctx.fillRect(TEX - 8, 0, 8, TEX);
   ctx.fillStyle = 'rgba(0,0,0,0.12)';
@@ -143,6 +157,35 @@ function makeTexture(type: LineType, skin: Skin): THREE.CanvasTexture {
       }
       ctx.stroke();
     }
+  } else if (type === 'crumble') {
+    // Deep cracks across the slab: it won't hold for long.
+    ctx.strokeStyle = 'rgba(40,20,10,0.8)';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    for (const y0 of [18, 62, 104]) {
+      ctx.beginPath();
+      let x = 8;
+      let y = y0 + rand() * 8;
+      ctx.moveTo(x, y);
+      while (x < TEX - 8) {
+        x += 10 + rand() * 14;
+        y += (rand() - 0.5) * 14;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255,235,200,0.35)';
+    ctx.lineWidth = 1;
+    for (let k = 0; k < 8; k++) {
+      const x = 14 + rand() * 100;
+      const y = rand() * TEX;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + (rand() - 0.5) * 20, y + (rand() - 0.5) * 20);
+      ctx.stroke();
+    }
+  } else if (type === 'mud') {
+    // (Clods drawn with the base.)
   } else if (type === 'bouncy') {
     // Springy zigzag.
     ctx.strokeStyle = 'rgba(255,240,250,0.9)';
@@ -195,7 +238,7 @@ export function topMaterial(type: LineType) {
     const f = FINISH[type === 'ice' || type === 'scenery' ? 'ice' : skin];
     m = new THREE.MeshPhysicalMaterial({
       map: tex,
-      roughness: type === 'ice' ? 0.05 : type === 'bouncy' ? 0.6 : f.roughness,
+      roughness: type === 'ice' ? 0.05 : type === 'bouncy' ? 0.6 : type === 'mud' ? 0.5 : f.roughness,
       metalness: 0,
       clearcoat: type === 'scenery' || type === 'bouncy' ? 0 : f.clearcoat,
       clearcoatRoughness: type === 'ice' ? 0.02 : 0.25,

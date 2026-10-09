@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { MOUSE, TOUCH } from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Track } from '../track/Track';
-import type { DecorKind, DrawMode, Finish, LineType, Stroke } from '../track/types';
+import type { DecorKind, DrawMode, Finish, HazardKind, LineType, Stroke } from '../track/types';
+import { HAZARDS } from '../physics/hazards';
 import type { TrackView } from '../render/TrackView';
 import { buildRibbonMesh } from '../render/ribbon';
 import { History } from './History';
@@ -17,7 +18,7 @@ type ScreenPoint = { clientX: number; clientY: number };
 export type Tool = 'pencil' | 'line' | 'curve' | 'build' | 'select' | 'eraser' | 'bank' | 'decor' | 'item' | 'start';
 /** Draw: the camera squares up to the drawing plane (pan and zoom only). 3D: free orbit. */
 export type EditView = 'draw' | 'orbit';
-export type ItemKind = 'ring' | 'star' | 'finish';
+export type ItemKind = 'ring' | 'star' | 'finish' | 'checkpoint' | 'hazard';
 
 export interface EditorSettings {
   lineType: LineType;
@@ -30,6 +31,8 @@ export interface EditorSettings {
   autoBank: boolean;
   decor: DecorKind;
   item: ItemKind;
+  /** The hazard the Items tool places. */
+  hazard: HazardKind;
   /** Line and Curve: 15° steps (Shift draws freely). */
   angleSnap: boolean;
   /** Line, Curve and placed points land on the 1-unit grid. */
@@ -106,6 +109,7 @@ export class Editor {
     autoBank: true,
     decor: 'pine',
     item: 'star',
+    hazard: 'icicles',
     angleSnap: true,
     gridSnap: false,
     smooth: TOUCH_DEVICE ? 60 : 40,
@@ -583,6 +587,18 @@ export class Editor {
     return this.track.stars.get(hit.object.userData.starId) ?? null;
   }
 
+  private pickCheckpoint(e: PointerEvent) {
+    this.setRay(e);
+    const hit = this.raycaster.intersectObjects(this.view.checkpoints.children, true)[0];
+    return hit ? (this.track.checkpoints.get(hit.object.userData.checkpointId) ?? null) : null;
+  }
+
+  private pickHazard(e: PointerEvent) {
+    this.setRay(e);
+    const hit = this.raycaster.intersectObjects(this.view.hazards.children, true)[0];
+    return hit ? (this.track.hazards.get(hit.object.userData.hazardId) ?? null) : null;
+  }
+
   private pickFinish(e: PointerEvent) {
     this.setRay(e);
     return this.raycaster.intersectObjects(this.view.goals.children, true).length > 0;
@@ -690,6 +706,8 @@ export class Editor {
       case 'item':
         if (this.settings.item === 'ring') this.placeRing(e);
         else if (this.settings.item === 'star') this.placeStar(e);
+        else if (this.settings.item === 'checkpoint') this.placeCheckpoint(e);
+        else if (this.settings.item === 'hazard') this.placeHazard(e);
         else this.placeFinish(e);
         break;
       case 'start':
@@ -1284,6 +1302,20 @@ export class Editor {
       this.history.push({ undo: () => (r = this.track.addRing(r)), redo: () => this.track.removeRing(r) });
       return;
     }
+    const cp = this.pickCheckpoint(e);
+    if (cp) {
+      let c = cp;
+      this.track.removeCheckpoint(c);
+      this.history.push({ undo: () => (c = this.track.addCheckpoint(c)), redo: () => this.track.removeCheckpoint(c) });
+      return;
+    }
+    const hz = this.pickHazard(e);
+    if (hz) {
+      let h = hz;
+      this.track.removeHazard(h);
+      this.history.push({ undo: () => (h = this.track.addHazard(h)), redo: () => this.track.removeHazard(h) });
+      return;
+    }
     const hit = this.pickStroke(e);
     const decor = hit ? null : this.pickDecor(e);
     if (hit) {
@@ -1381,6 +1413,26 @@ export class Editor {
     const position = onTrack ? hit.point.addScaledVector(hit.normal, 1.1) : hit.point;
     let star = this.track.addStar({ position });
     this.history.push({ undo: () => this.track.removeStar(star), redo: () => (star = this.track.addStar(star)) });
+  }
+
+  /** A checkpoint gate across the track (as wide as the finish gate). */
+  private placeCheckpoint(e: PointerEvent) {
+    const hit = this.placementHit(e);
+    if (!hit) return;
+    let cp = this.track.addCheckpoint({ position: hit.point, axis: hit.dir, halfWidth: Math.max(hit.width / 2 + 0.9, 2) });
+    this.history.push({ undo: () => this.track.removeCheckpoint(cp), redo: () => (cp = this.track.addCheckpoint(cp)) });
+  }
+
+  /** A hazard on the track, facing along it (icicles hang over it, out of reach of a rider on the surface). */
+  private placeHazard(e: PointerEvent) {
+    const hit = this.placementHit(e);
+    if (!hit) return;
+    const kind = this.settings.hazard;
+    const position = hit.point.clone();
+    if (HAZARDS[kind].hangs) position.addScaledVector(hit.normal, 3.6);
+    const rotation = Math.atan2(-hit.dir.z, hit.dir.x);
+    let h = this.track.addHazard({ kind, position, rotation, scale: 1 });
+    this.history.push({ undo: () => this.track.removeHazard(h), redo: () => (h = this.track.addHazard(h)) });
   }
 
   /** One finish gate per track: placing it again moves it. */

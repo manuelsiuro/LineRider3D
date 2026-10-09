@@ -344,7 +344,7 @@ const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('di
     // A daily needs no track in the link: everyone can build the day's ride.
     const daily = session.kind === 'daily' ? dailyInfo(session.day) : null;
     // A score comes from the run just ended: its inputs become the friend's ghost.
-    const ghost = score > 0 && run.summaryShown && riderOn() ? encodeInputs(sim.inputsUpTo(run.frame)) : undefined;
+    const ghost = score > 0 && run.summaryShown && riderOn() && runStats.stats.respawns === 0 ? encodeInputs(sim.inputsUpTo(run.frame)) : undefined;
     const url = daily ? dailyLink(daily.day, score, ghost) : await shareLink(track.serialize(), score, rides.current.id, ghost);
     const text = daily
       ? `I scored ${score.toLocaleString()} on Line Rider 3D Daily #${daily.number} (${daily.name}). Can you beat it?`
@@ -786,19 +786,20 @@ function showSummary(wasReplay: boolean) {
   if (index !== null && !wasReplay) saveLevelResult(LEVELS[index].id, rating.stars, s.score);
   const levelInfo =
     index !== null ? { number: index + 1, name: LEVELS[index].name, hasNext: index + 1 < LEVELS.length, nextUnlocked: isUnlocked(index + 1) } : undefined;
-  // Save this run as the ghost to beat if it's the best so far.
+  // Save this run as the ghost to beat if it's the best so far (a ghost is only inputs:
+  // it can't replay comebacks at a checkpoint).
   let ghostSaved = false;
-  if (!wasReplay && riderOn()) {
+  if (!wasReplay && riderOn() && s.respawns === 0) {
     const key = ghostKey();
     if (beats(s.score, s.finishTime, loadGhost(key))) {
       saveGhost(key, { rle: encodeInputs(sim.inputsUpTo(run.frame)), frames: run.frame, score: s.score, finishTime: s.finishTime });
       ghostSaved = true;
     }
   }
-  // Finish-time medals: clean finishes on the level's home world.
+  // Finish-time medals: clean finishes (no comebacks) on the level's home world.
   let medal: SummaryInfo['medal'];
   const times = index !== null ? medalTimes(LEVELS[index].id, rides.current.id) : null;
-  if (index !== null && times && s.finished && !s.crashed && sameWorld(env.config, worlds.levelWorld(index))) {
+  if (index !== null && times && s.finished && !s.crashed && s.respawns === 0 && sameWorld(env.config, worlds.levelWorld(index))) {
     const r = wasReplay ? { best: bestTime(LEVELS[index].id, rides.current.id), newBest: false, medal: null, newMedal: false } : recordTime(LEVELS[index].id, rides.current.id, s.finishTime);
     // The medal this run earned, and the next one up.
     const won = medalFor(times, s.finishTime);
@@ -1069,7 +1070,7 @@ function loop(time: number) {
   const game = playingGame();
   editor.update(!run.playing && editing(session), dt);
   if (session.kind === 'puzzle' && editor.rules) ui.setInk(editor.inkLeft(), editor.rules.ink, PUZZLES[session.index].par);
-  core.trackView.update(t, riderCenter, rider.stars);
+  core.trackView.update(t, riderCenter, rider);
   env.update(dt, controls.target, t, camera.position);
   worlds.updateHeadlight(game && core.riderView.root.visible);
   ui.setTime(run.frame, sim.recorded, STEPS_PER_SECOND);

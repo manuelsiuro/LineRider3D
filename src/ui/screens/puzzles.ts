@@ -3,7 +3,7 @@ import { closeOverlay, h, hex } from '../dom';
 import { icon } from '../icons';
 import type { PuzzleCard, ScreenCtx } from '../types';
 
-const TYPE_NAME: Partial<Record<LineType, string>> = { normal: 'Track', accel: 'Boost', bouncy: 'Bouncy', ice: 'Ice' };
+const TYPE_NAME: Partial<Record<LineType, string>> = { normal: 'Track', accel: 'Boost', bouncy: 'Bouncy', ice: 'Ice', mud: 'Mud', crumble: 'Crumble' };
 
 /** Puzzle select; resolves with a puzzle index, or null to go back. */
 export function showPuzzles(ctx: ScreenCtx, puzzles: PuzzleCard[]): Promise<number | null> {

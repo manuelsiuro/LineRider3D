@@ -1,4 +1,4 @@
-import type { DecorKind } from '../track/types';
+import type { DecorKind, HazardKind } from '../track/types';
 
 export type BiomeId = 'alpine' | 'forest' | 'beach' | 'desert' | 'city' | 'halloween';
 export type TimeId = 'dawn' | 'day' | 'sunset' | 'night';
@@ -22,8 +22,12 @@ export interface BiomeDef {
   weathers: WeatherId[];
   /** Decor that belongs here (editor palette and level scatter). */
   decor: DecorKind[];
+  /** Hazards that belong here (editor palette). */
+  hazards: HazardKind[];
   /** Time of day it switches to when picked (otherwise the time stays). */
   time?: TimeId;
+  /** Gravity multiplier (1 on Earth). */
+  gravity?: number;
 }
 
 export const BIOMES: BiomeDef[] = [
@@ -34,6 +38,7 @@ export const BIOMES: BiomeDef[] = [
     surface: 'snow',
     weathers: ['snow', 'clear', 'fog', 'storm'],
     decor: ['pine', 'snowman', 'cabin', 'rock', 'lamp', 'flag', 'gift'],
+    hazards: ['icicles', 'spikes'],
   },
   {
     id: 'forest',
@@ -42,6 +47,7 @@ export const BIOMES: BiomeDef[] = [
     surface: 'grass',
     weathers: ['clear', 'rain', 'fog', 'snow', 'storm'],
     decor: ['oak', 'birch', 'pine', 'bush', 'log', 'mushroom', 'sign', 'rock', 'cabin', 'lamp'],
+    hazards: ['thorns', 'spikes'],
   },
   {
     id: 'beach',
@@ -50,6 +56,7 @@ export const BIOMES: BiomeDef[] = [
     surface: 'sand',
     weathers: ['clear', 'rain', 'fog', 'storm'],
     decor: ['palm', 'umbrella', 'surfboard', 'hut', 'lifeguard', 'deckchair', 'rock', 'flag'],
+    hazards: ['urchin', 'spikes'],
   },
   {
     id: 'desert',
@@ -58,6 +65,7 @@ export const BIOMES: BiomeDef[] = [
     surface: 'sand',
     weathers: ['clear', 'sandstorm', 'storm'],
     decor: ['cactus', 'barrel', 'mesa', 'tumbleweed', 'skull', 'windmill', 'rock', 'flag'],
+    hazards: ['cactus', 'spikes'],
   },
   {
     id: 'city',
@@ -66,6 +74,7 @@ export const BIOMES: BiomeDef[] = [
     surface: 'asphalt',
     weathers: ['clear', 'rain', 'fog', 'snow', 'storm'],
     decor: ['tower', 'streetlight', 'cone', 'billboard', 'car', 'planter', 'lamp', 'flag'],
+    hazards: ['barrier', 'spikes'],
   },
   {
     id: 'halloween',
@@ -74,6 +83,7 @@ export const BIOMES: BiomeDef[] = [
     surface: 'grass',
     weathers: ['fog', 'clear', 'rain', 'storm'],
     decor: ['pumpkin', 'tombstone', 'deadtree', 'ghost', 'cauldron', 'scarecrow', 'crypt', 'candles', 'rock'],
+    hazards: ['wisp', 'spikes'],
     time: 'night',
   },
 ];
@@ -123,6 +133,11 @@ export function sameWorld(a: WorldConfig, b: WorldConfig) {
 /** The ground under the rider: snowfall covers every biome in snow. */
 export function surfaceOf(w: WorldConfig): SurfaceId {
   return w.weather === 'snow' ? 'snow' : biomeById(w.biome).surface;
+}
+
+/** Gravity of a world (1 on Earth). */
+export function gravityOf(w: WorldConfig) {
+  return biomeById(w.biome).gravity ?? 1;
 }
 
 /** Snow caps on trees, roofs and rocks. */

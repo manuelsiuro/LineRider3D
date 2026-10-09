@@ -61,9 +61,11 @@ export class GhostRun {
     readonly record: GhostRecord,
     vehicle: VehicleDef = SLED,
     groundDrag = 1,
+    gravity = 1,
   ) {
     this.sim = new Simulation(track, vehicle);
     this.sim.setGroundDrag(groundDrag);
+    this.sim.setGravity(gravity);
     this.sim.loadInputs(decodeInputs(record.rle));
   }
 
