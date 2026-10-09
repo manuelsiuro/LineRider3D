@@ -83,8 +83,14 @@ export function showHelp(ctx: ScreenCtx) {
             [['G'], 'World'],
             [['Ctrl', 'Z'], 'Undo'],
           ])}
+          ${keyGroup('View', 'plane', [
+            [['Tab'], 'Draw / 3D'],
+            [['Home'], 'Fit track'],
+            [['[', ']'], 'Layer'],
+            [[',', '.'], 'Turn plane'],
+          ])}
         </div>`,
-      text: 'Right-drag to orbit, wheel to zoom. On touch: one finger draws, two fingers orbit and zoom.',
+      text: 'Right-drag pans (Draw view) or orbits (3D), wheel zooms. Hold on a line to draw on its plane.',
     },
   ];
   const overlay = h(
@@ -163,10 +169,11 @@ function gesturesPage() {
     art: `<div class="help-short">
           ${group('Build', 'pencil', [
             ['pencil', 'One finger draws'],
-            ['move', 'Two fingers orbit and zoom'],
-            ['select', '<b>Add</b> picks several lines'],
+            ['move', 'Two fingers pan and zoom'],
+            ['undo', 'Tap two fingers to undo, three to redo'],
+            ['fit', 'Quick pinch: fit the track'],
+            ['cube', '3D: twist, or drag the cube to orbit'],
             ['test', '<b>Test</b> rides from the centre'],
-            ['undo', 'Undo'],
           ])}
           ${group('Play', 'play', [
             ['play', 'Play / pause'],
@@ -175,7 +182,7 @@ function gesturesPage() {
             ['aperture', 'Photo'],
           ])}
         </div>`,
-    text: 'The <b>Camera</b> tool orbits with one finger and pans with two. Tap the active tool again to fold its options away.',
+    text: '<b>Draw</b> faces the drawing plane, <b>3D</b> looks around it. Hold on a line to draw on its plane. Tap the active tool again to fold its options away.',
   };
 }
 

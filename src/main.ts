@@ -74,6 +74,7 @@ let riderMode = readFlag(KEYS.riderMode);
 const riderOn = () => session.kind !== 'puzzle' && (fixedTrack(session) || challenge() > 0 || riderMode);
 
 const moves = new CameraMoves(camera, controls);
+editor.fly = (pos, target, duration) => moves.flyTo(pos, target, duration);
 const input = new Input(playingGame, () => freeEdit(session), cycleVehicle);
 
 const run = new Run(core, {
@@ -126,6 +127,7 @@ function stopRun() {
   run.stop();
   restoreTestStart();
   if (session.kind === 'puzzle') moves.showSide(track, 0.8);
+  else if (session.kind === 'edit') editor.reframe();
 }
 
 /** The real start while testing from another point (put back on Stop). */
@@ -438,7 +440,7 @@ function openTrack(load: () => void, world: Partial<WorldConfig> | null, fresh =
   pristine = fresh;
   editor.history.clear();
   run.stop();
-  moves.showStart(track);
+  editor.showStart();
 }
 
 function startNewTrack() {
@@ -453,7 +455,7 @@ function startNewTrack() {
   pristine = true;
   editor.history.clear();
   run.stop();
-  moves.flyTo(new THREE.Vector3(0, 14, 30), new THREE.Vector3(0, 10, 0));
+  editor.showStart();
 }
 
 function enterTitle() {
@@ -636,7 +638,7 @@ async function enterShared(data: SerializedTrack, score: number, vehicleId: stri
   worlds.change(worlds.trackWorld());
   pristine = true;
   history.replaceState(null, '', location.pathname + location.search);
-  moves.showStart(track, 1.3);
+  editor.showStart(1.3);
   // Outside levels a world pick belongs to the track (saved, shared, exported).
   const picker = score > 0 ? undefined : worlds.picker(worlds.trackWorld(), (w) => track.setWorld(w));
   await ui.showSharedIntro(score, rateRun(track, runStats.stats).goals.map((g) => g.label), rides.keys(), rides.picker(), picker, friendGhost !== null);
@@ -693,12 +695,13 @@ async function startPuzzle(index: number) {
     p.build(track);
     for (const s of track.strokes.values()) s.locked = true;
   });
-  editor.setRules({ ink: p.ink, tools: ['pencil', 'line', 'eraser', 'hand'], types: p.types });
+  editor.setRules({ ink: p.ink, tools: ['pencil', 'line', 'eraser'], types: p.types });
   ui.setPuzzle(true);
   worlds.change(normalizeWorld(p.world ?? { biome: 'alpine', time: 'day', weather: 'clear' }));
   pristine = true;
   editor.history.clear();
   run.stop();
+  editor.resetPlane();
   moves.showSide(track, 1.3);
   await ui.showPuzzleIntro({
     number: index + 1,
@@ -888,6 +891,7 @@ async function openPhoto() {
   // Dragging frames the shot: no drawing, the left button orbits.
   const editorWasOn = editor.enabled;
   editor.enabled = false;
+  editor.release();
   controls.mouseButtons = { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN };
   controls.touches = { ONE: TOUCH.ROTATE, TWO: TOUCH.DOLLY_PAN };
   // The look can change for the shot; the world itself comes back after.
@@ -947,7 +951,7 @@ async function openPhoto() {
   });
   core.riderView.root.visible = true;
   editor.enabled = editorWasOn;
-  editor.setTool(editor.tool);
+  editor.rebind();
   if (!sameWorld(env.config, original)) worlds.preview(original);
   document.body.classList.remove('photo');
   rig.mode = prevMode;
@@ -1050,7 +1054,7 @@ function loop(time: number) {
   quality.govern(rawDt);
 
   const game = playingGame();
-  editor.update(!run.playing && editing(session));
+  editor.update(!run.playing && editing(session), dt);
   if (session.kind === 'puzzle' && editor.rules) ui.setInk(editor.inkLeft(), editor.rules.ink, PUZZLES[session.index].par);
   core.trackView.update(t, riderCenter, rider.stars);
   env.update(dt, controls.target, t, camera.position);

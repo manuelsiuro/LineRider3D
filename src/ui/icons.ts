@@ -20,6 +20,13 @@ const P: Record<string, string> = {
   ring: '<ellipse cx="12" cy="12" rx="5" ry="9"/><path d="M2 12h7"/><path d="m15 12h7"/><path d="m19 9 3 3-3 3"/>',
   flag: '<path d="M5 22V3"/><path d="M5 4h13l-2.5 4.5L18 13H5"/>',
   test: '<path d="M5 22V3"/><path d="M5 4h10l-2 3.5 2 3.5H5"/><path d="m15 14.5 6 3.75-6 3.75z"/>',
+  cube: '<path d="M12 2.5 20.5 7v10L12 21.5 3.5 17V7Z"/><path d="M3.5 7 12 11.5 20.5 7"/><path d="M12 11.5v10"/>',
+  plane: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18" opacity=".45"/><path d="M5 17c4 0 5-9 14-9" stroke-width="2.4"/>',
+  fit: '<path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/><rect x="8.5" y="8.5" width="7" height="7" rx="1"/>',
+  turnl: '<path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 3v4.5h4.5"/>',
+  turnr: '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 3v4.5h-4.5"/>',
+  layerin: '<path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 13 9 5 9-5" opacity=".45"/><path d="M12 13v8M9 18l3 3 3-3"/>',
+  layerout: '<path d="m12 11 9 5-9 5-9-5Z"/><path d="m3 8 9-5 9 5" opacity=".45"/><path d="M12 11V3M9 6l3-3 3 3"/>',
   move: '<path d="m5 9-3 3 3 3"/><path d="m9 5 3-3 3 3"/><path d="m15 19-3 3-3-3"/><path d="m19 9 3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/>',
   play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.9l12-7.5a1 1 0 0 0 0-1.8l-12-7.5A1 1 0 0 0 7 4.5Z" fill="currentColor" stroke="none"/>',
   pause:

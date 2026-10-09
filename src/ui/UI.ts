@@ -1,4 +1,4 @@
-import type { Editor, ItemKind, Tool } from '../editor/Editor';
+import type { EditView, Editor, ItemKind, Tool } from '../editor/Editor';
 import { DECOR_LABELS } from '../world/models';
 import type { DecorKind, LineType } from '../track/types';
 import { LINE_COLORS } from '../track/types';
@@ -38,7 +38,6 @@ const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
   { id: 'item', icon: 'star', label: 'Items', key: 'R' },
   { id: 'decor', icon: 'tree', label: 'Decor', key: 'D' },
   { id: 'start', icon: 'flag', label: 'Start', key: 'S' },
-  { id: 'hand', icon: 'move', label: 'Camera', key: 'H' },
 ];
 
 const LINE_TYPES: { id: LineType; label: string }[] = [
@@ -52,6 +51,7 @@ const LINE_TYPES: { id: LineType; label: string }[] = [
 export class UI {
   private root: HTMLElement;
   private toolButtons = new Map<Tool, HTMLButtonElement>();
+  private viewButtons: HTMLButtonElement[] = [];
   private panel: HTMLElement;
   private playBtn: HTMLButtonElement;
   private timeline: HTMLInputElement;
@@ -284,6 +284,24 @@ export class UI {
     // ------------------------------------------------------------ tools
     this.panel = h('div', 'panel');
     const toolbar = h('div', 'toolbar');
+    // Draw (square to the drawing plane) or 3D (orbit around), and Fit.
+    const views = h('div', 'view-seg');
+    this.viewButtons = (['draw', 'orbit'] as const).map((v) => {
+      const b = button(`view-btn ${v}`, v === 'draw' ? `${icon('plane')}<span class="label">Draw</span>` : `${icon('cube')}<span class="label">3D</span>`, v === 'draw' ? 'Draw view: face the drawing plane (Tab)' : '3D view: orbit around (Tab)');
+      b.dataset.view = v;
+      b.onclick = () => {
+        handlers.click();
+        if (this.editor.editView !== v) this.editor.setView(v);
+      };
+      views.append(b);
+      return b;
+    });
+    const fitBtn = button('tool fit-tool', `${icon('fit')}<span class="label">Fit</span><kbd>⇱</kbd>`, 'Fit the whole track (Home)');
+    fitBtn.onclick = () => {
+      handlers.click();
+      this.editor.fit();
+    };
+    toolbar.append(views, fitBtn, h('i', 'tool-sep'));
     for (const t of TOOLS) {
       const b = button('tool', `${icon(t.icon)}<span class="label">${t.label}</span><kbd>${t.key}</kbd>`, `${t.label} (${t.key})`);
       // Tapping the active tool again folds its options away (handy on phones).
@@ -309,9 +327,27 @@ export class UI {
 
     this.hint = h('div', 'hint hidden');
     const replayTag = h('div', 'replay-tag', '<i></i>REPLAY');
-    root.append(h('div', 'letterbox'), top, player, floatPause, this.hud, this.popups, this.touchPad, bottom, this.hint, replayTag);
+    // Touch, 3D view: drag this to orbit (two fingers pan, pinch and twist).
+    const puck = button('orbit-puck', icon('cube', 26), 'Drag to orbit');
+    let puckAt: { x: number; y: number } | null = null;
+    puck.onpointerdown = (e) => {
+      puck.setPointerCapture(e.pointerId);
+      puckAt = { x: e.clientX, y: e.clientY };
+    };
+    puck.onpointermove = (e) => {
+      if (!puckAt) return;
+      this.editor.orbitBy(e.clientX - puckAt.x, e.clientY - puckAt.y);
+      puckAt = { x: e.clientX, y: e.clientY };
+    };
+    puck.onpointerup = puck.onpointercancel = () => (puckAt = null);
+    root.append(h('div', 'letterbox'), top, player, floatPause, this.hud, this.popups, this.touchPad, puck, bottom, this.hint, replayTag);
     this.setRiderMode(riderMode);
     editor.onHint = (t) => this.flash(t);
+    editor.onChange = () => {
+      if (!this.worldOpen) this.renderPanel();
+    };
+    editor.onView = (v) => this.showView(v);
+    this.showView(editor.editView);
     editor.selection.onChange = () => {
       if (this.editor.tool === 'select' && !this.worldOpen) this.renderPanel();
     };
@@ -361,6 +397,12 @@ export class UI {
     this.worldBtn?.classList.remove('active');
     this.panel.classList.remove('folded');
     for (const [id, b] of this.toolButtons) b.classList.toggle('active', id === tool);
+    this.renderPanel();
+  }
+
+  private showView(v: EditView) {
+    for (const b of this.viewButtons) b.classList.toggle('active', b.dataset.view === v);
+    document.body.classList.toggle('edit-orbit', v === 'orbit');
     this.renderPanel();
   }
 
@@ -462,8 +504,8 @@ export class UI {
         s.mode,
         (v) => (s.mode = v),
       );
-      if (s.mode === 'profile') toggle(r2, s.lockPlane, 'Lock plane', (v) => (s.lockPlane = v));
-      else toggle(r2, s.autoBank, 'Auto-bank', (v) => (s.autoBank = v));
+      if (s.mode === 'path') toggle(r2, s.autoBank, 'Auto-bank', (v) => (s.autoBank = v));
+      this.planeControls(r2);
       slider(r2, 'Width', 1, 6, 0.2, s.width, '', (v) => (s.width = v));
       slider(r2, 'Bank', -90, 90, 5, s.bank, '°', (v) => (s.bank = v));
       if (s.mode === 'path') slider(r2, 'Descent', 0, 60, 1, s.grade, '%', (v) => (s.grade = v));
@@ -525,10 +567,44 @@ export class UI {
         eraser: 'Tap or drag over a track, ring or decoration to remove it.',
         bank: 'Drag a track left or right to tilt it. Snaps every 15°.',
         start: 'Tap a track or the drawing plane to move the start flag.',
-        hand: TOUCH ? 'Drag to orbit · two fingers to pan and zoom.' : 'Drag to orbit · right-drag to pan · wheel to zoom.',
       };
       row().append(h('span', 'tip', tips[tool] ?? ''));
     }
+    if ((tool === 'pencil' || tool === 'line') && !rules) {
+      const camera = TOUCH
+        ? this.editor.editView === 'draw'
+          ? 'Two fingers pan and zoom · tap two fingers to undo · hold on a line to draw on its plane.'
+          : 'Two fingers pan, pinch and twist · drag the cube to orbit · hold on a line to draw on its plane.'
+        : this.editor.editView === 'draw'
+          ? 'Right-drag pans, wheel zooms · Tab: 3D view · hold on a line to draw on its plane.'
+          : 'Right-drag orbits, middle-drag pans · Tab: Draw view · hold on a line to draw on its plane.';
+      row().append(h('span', 'tip', camera));
+    }
+  }
+
+  /** Where lines go: turn the plane, step it nearer or further (path: up or down). */
+  private planeControls(r: HTMLElement) {
+    const e = this.editor;
+    if (e.planeLocked) return;
+    const g = h('div', 'plane-ctl');
+    const btn = (ic: string, title: string, fn: () => void) => {
+      const b = button('plane-btn', icon(ic, 18), title);
+      b.onclick = () => {
+        this.handlers.click();
+        fn();
+      };
+      g.append(b);
+    };
+    const profile = e.settings.mode === 'profile';
+    if (profile) {
+      btn('turnl', 'Turn the plane left 15° (,)', () => e.turnPlane(-15));
+      g.append(h('span', 'plane-read', `<small>Plane</small><b>${e.work.heading}°</b>`));
+      btn('turnr', 'Turn the plane right 15° (.)', () => e.turnPlane(15));
+    }
+    btn('layerout', profile ? 'Layer further back ([)' : 'Lower the plane ([)', () => e.shiftPlane(-1));
+    g.append(h('span', 'plane-read', `<small>${profile ? 'Layer' : 'Height'}</small><b>${Math.round(e.work.depth(e.settings.mode))}</b>`));
+    btn('layerin', profile ? 'Layer nearer (])' : 'Raise the plane (])', () => e.shiftPlane(1));
+    r.append(g);
   }
 
   private refreshHistory() {
@@ -842,6 +918,17 @@ export class UI {
       if (e.key.toLowerCase() === 'p') return this.handlers.photo();
       if (e.key.toLowerCase() === 'g' && this.editor.enabled && !this.editor.rules) return this.toggleWorldPanel();
       if (e.key.toLowerCase() === 't' && this.editor.enabled) return this.handlers.testHere();
+      if (this.editor.enabled && !this.playing) {
+        if (e.key === 'Tab' || e.key.toLowerCase() === 'h') {
+          e.preventDefault();
+          return this.editor.toggleView();
+        }
+        if (e.key === 'Home') return this.editor.fit();
+        if (e.key === '[') return this.editor.shiftPlane(-1);
+        if (e.key === ']') return this.editor.shiftPlane(1);
+        if (e.key === ',') return this.editor.turnPlane(-15);
+        if (e.key === '.') return this.editor.turnPlane(15);
+      }
       const tool = TOOLS.find((t) => t.key === e.key.toUpperCase());
       if (tool) this.selectTool(tool.id);
     });

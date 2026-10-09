@@ -8,6 +8,9 @@ import { DEFAULT_WORLD, biomeById, isSnowy, type WorldConfig } from '../world/wo
 import { buildRibbonMesh, setRibbonStyle, topMaterial, type Skin } from './ribbon';
 import { buildSupports, setSupportStyle, supportMaterial } from './supports';
 
+/** Lines off the drawing plane, in the Draw view. */
+const FADED = new THREE.MeshBasicMaterial({ color: 0xc8d4e3, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
+
 /** Keeps Three.js objects in sync with the track data. */
 export class TrackView {
   readonly ribbons = new THREE.Group();
@@ -24,6 +27,9 @@ export class TrackView {
   private decorById = new Map<number, THREE.Object3D>();
   private ringById = new Map<number, THREE.Object3D>();
   private world: WorldConfig = { ...DEFAULT_WORLD };
+  /** Draw view: lines away from the drawing plane fade back. */
+  private focus: THREE.Plane | null = null;
+  private focusKey = '';
 
   constructor(scene: THREE.Scene, private track: Track) {
     scene.add(this.ribbons, this.decor, this.supports, this.rings, this.stars, this.goals);
@@ -89,6 +95,7 @@ export class TrackView {
       this.supportById.set(id, sup);
       this.supports.add(sup);
     }
+    this.applyDim(mesh, stroke);
   }
 
   private removeRibbon(id: number) {
@@ -113,6 +120,7 @@ export class TrackView {
     const skin: Skin = ({ alpine: 'ice', forest: 'timber', beach: 'boardwalk', desert: 'sandstone', city: 'asphalt', halloween: 'haunted' } as const)[w.biome];
     setRibbonStyle(skin, night, wet);
     setSupportStyle(({ alpine: 'timber', forest: 'timber', beach: 'driftwood', desert: 'rust', city: 'steel', halloween: 'timber' } as const)[w.biome]);
+    this.undimAll();
     for (const [id, mesh] of this.ribbonById) {
       const stroke = this.track.strokes.get(id);
       if (!stroke) continue;
@@ -121,6 +129,7 @@ export class TrackView {
       if (mesh.userData.originalMaterials) this.highlightRefresh(mesh);
       else mesh.material = [...mats];
     }
+    this.redim();
     for (const id of [...this.decorById.keys()]) {
       const d = this.track.decor.get(id);
       this.removeDecor(id);
@@ -225,7 +234,47 @@ export class TrackView {
 
   /** Highlights several ribbons (the editor selection uses a warm color). */
   highlightSet(ids: Set<number>, color = 0xffffff) {
+    this.undimAll();
     for (const [id, mesh] of this.ribbonById) this.applyHighlight(mesh, ids.has(id) ? color : null);
+    this.redim();
+  }
+
+  /**
+   * Draw view: ribbons that don't touch `plane` (within 1.5) fade back so the lines being
+   * drawn on stand out. Null shows them all.
+   */
+  setFocusPlane(plane: THREE.Plane | null) {
+    const key = plane ? `${plane.normal.x.toFixed(3)},${plane.normal.z.toFixed(3)},${plane.constant.toFixed(2)}` : '';
+    if (key === this.focusKey) return;
+    this.focusKey = key;
+    this.focus = plane?.clone() ?? null;
+    this.undimAll();
+    this.redim();
+  }
+
+  private redim() {
+    for (const [id, mesh] of this.ribbonById) {
+      const stroke = this.track.strokes.get(id);
+      if (stroke) this.applyDim(mesh, stroke);
+    }
+  }
+
+  private applyDim(mesh: THREE.Mesh, stroke: { id: number; points: THREE.Vector3[] }) {
+    const near = !this.focus || stroke.points.some((p) => Math.abs(this.focus!.distanceToPoint(p)) < 1.5);
+    if (near || mesh.userData.highlighted != null || mesh.userData.solid) return;
+    const sup = this.supportById.get(stroke.id);
+    if (sup) sup.visible = false;
+    mesh.userData.solid = mesh.material;
+    mesh.material = (mesh.material as THREE.Material[]).map(() => FADED);
+  }
+
+  private undimAll() {
+    for (const sup of this.supportById.values()) sup.visible = true;
+    for (const mesh of this.ribbonById.values()) {
+      if (!mesh.userData.solid) continue;
+      mesh.material = mesh.userData.solid;
+      mesh.userData.solid = null;
+    }
   }
 
   private applyHighlight(mesh: THREE.Mesh, want: number | null) {

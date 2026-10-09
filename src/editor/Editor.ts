@@ -7,11 +7,15 @@ import type { TrackView } from '../render/TrackView';
 import { buildRibbonMesh } from '../render/ribbon';
 import { History } from './History';
 import { Selection } from './Selection';
+import { WorkPlane } from './WorkPlane';
+import { Gestures } from './Gestures';
 import { TOUCH as TOUCH_DEVICE } from '../ui/dom';
 
 type ScreenPoint = { clientX: number; clientY: number };
 
-export type Tool = 'pencil' | 'line' | 'select' | 'eraser' | 'bank' | 'decor' | 'item' | 'start' | 'hand';
+export type Tool = 'pencil' | 'line' | 'select' | 'eraser' | 'bank' | 'decor' | 'item' | 'start';
+/** Draw: the camera squares up to the drawing plane (pan and zoom only). 3D: free orbit. */
+export type EditView = 'draw' | 'orbit';
 export type ItemKind = 'ring' | 'star' | 'finish';
 
 export interface EditorSettings {
@@ -22,7 +26,6 @@ export interface EditorSettings {
   bank: number;
   /** Descent of path strokes, percent. */
   grade: number;
-  lockPlane: boolean;
   autoBank: boolean;
   decor: DecorKind;
   item: ItemKind;
@@ -31,7 +34,13 @@ export interface EditorSettings {
 const SNAP_PX = 26;
 const MIN_SEG = 0.35;
 const LINE_STEP = 0.5;
-const ANGLE_SNAP = THREE.MathUtils.degToRad(5);
+/** Holding still on a line this long makes its plane the drawing plane. */
+const LONG_PRESS_MS = 450;
+/** Drawing near this fraction of the screen edge pans the Draw view along. */
+const EDGE = 0.1;
+/** The Draw view looks at the plane from slightly above. */
+const PITCH = THREE.MathUtils.degToRad(6);
+const UP = new THREE.Vector3(0, 1, 0);
 
 interface DrawState {
   points: THREE.Vector3[];
@@ -65,7 +74,6 @@ export class Editor {
     width: 2.4,
     bank: 0,
     grade: 15,
-    lockPlane: false,
     autoBank: true,
     decor: 'pine',
     item: 'star',
@@ -86,12 +94,30 @@ export class Editor {
   /** Fired with a short status message (e.g. bank angle). */
   onHint?: (text: string) => void;
 
+  /** Settings changed from the editor itself (the panel redraws). */
+  onChange?: () => void;
+  /** The Draw / 3D view changed. */
+  onView?: (view: EditView) => void;
+  /** Flies the camera (the app's scripted camera moves). */
+  fly?: (pos: THREE.Vector3, target: THREE.Vector3, duration: number) => void;
+  editView: EditView = 'draw';
+  /** Where new lines go. */
+  readonly work: WorkPlane;
+
   private raycaster = new THREE.Raycaster();
   private ndc = new THREE.Vector2();
   private draw: DrawState | null = null;
-  private touches = new Set<number>();
-  private lockedNormal = new THREE.Vector3(0, 0, 1);
-  private grid: THREE.Group;
+  private drawT0 = 0;
+  /** Last move of the drawing pointer (the Draw view pans along near the edges). */
+  private dragEvent: PointerEvent | null = null;
+  private gestures: Gestures;
+  /** Extra fingers that landed while a stroke was well under way (a resting palm). */
+  private ignored = new Set<number>();
+  /** A press on a line that may become a long-press ("draw on this line's plane"). */
+  private press: { x: number; y: number; timer: number } | null = null;
+  /** Camera bindings applied last ('off' when the editor isn't in use). */
+  private bound = '';
+  private time = 0;
   private snapRing: THREE.Mesh;
   private bankDrag: { stroke: Stroke; x: number; bank0: number } | null = null;
   private erasing = false;
@@ -112,8 +138,21 @@ export class Editor {
     private ground: THREE.Object3D,
   ) {
     this.selection = new Selection(dom, camera, track, view, this.history);
-    this.grid = this.buildGrid();
-    scene.add(this.grid);
+    this.work = new WorkPlane(scene);
+    this.gestures = new Gestures(dom, camera, controls, {
+      canOrbit: () => this.editView === 'orbit',
+      undo: () => {
+        if (!this.history.canUndo) return;
+        this.history.undo();
+        this.onHint?.('↶ Undo');
+      },
+      redo: () => {
+        if (!this.history.canRedo) return;
+        this.history.redo();
+        this.onHint?.('↷ Redo');
+      },
+      fit: () => this.fit(),
+    });
     this.snapRing = new THREE.Mesh(
       new THREE.TorusGeometry(0.45, 0.07, 8, 24),
       new THREE.MeshBasicMaterial({ color: 0xffb02e, depthTest: false, transparent: true }),
@@ -145,10 +184,11 @@ export class Editor {
     this.inkSpent = this.track.inkUsed();
     if (!rules) return;
     this.settings.mode = 'profile';
-    this.settings.lockPlane = true;
     this.settings.bank = 0;
     this.settings.width = 2.4;
-    this.lockedNormal.set(0, 0, 1);
+    this.work.setNormal(new THREE.Vector3(0, 0, 1));
+    this.editView = 'draw';
+    this.onView?.('draw');
     if (!rules.types.includes(this.settings.lineType)) this.settings.lineType = rules.types[0];
     if (!rules.tools.includes(this.tool)) this.setTool(rules.tools[0]);
   }
@@ -168,87 +208,227 @@ export class Editor {
     this.cancelDraw();
     if (tool !== 'select') this.selection.clear();
     this.tool = tool;
-    const c = this.controls;
-    if (tool === 'hand') {
-      c.mouseButtons = { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN };
-      c.touches = { ONE: TOUCH.ROTATE, TWO: TOUCH.DOLLY_PAN };
-    } else {
-      c.mouseButtons = { LEFT: null as unknown as MOUSE, MIDDLE: MOUSE.PAN, RIGHT: MOUSE.ROTATE };
-      c.touches = { ONE: null as unknown as TOUCH, TWO: TOUCH.DOLLY_ROTATE };
-    }
-    this.dom.style.cursor = tool === 'hand' ? 'grab' : tool === 'eraser' || tool === 'bank' ? 'pointer' : tool === 'select' ? 'default' : 'crosshair';
+    this.dom.style.cursor = tool === 'eraser' || tool === 'bank' ? 'pointer' : tool === 'select' ? 'default' : 'crosshair';
     if (tool !== 'select') this.view.highlight(null);
+  }
+
+  // ---------------------------------------------------------------- camera
+
+  /**
+   * Mouse: the left button is the tool's, the right one orbits (3D) or pans (Draw),
+   * the middle one pans and the wheel zooms toward the pointer. Touch is handled by
+   * the gestures while editing; elsewhere two fingers orbit and zoom the ride camera.
+   */
+  private bindCamera(active: boolean) {
+    const key = active ? this.editView : 'off';
+    if (key === this.bound) return;
+    this.bound = key;
+    const c = this.controls;
+    c.enableRotate = key !== 'draw';
+    c.zoomToCursor = active;
+    c.mouseButtons = { LEFT: null as unknown as MOUSE, MIDDLE: MOUSE.PAN, RIGHT: key === 'draw' ? MOUSE.PAN : MOUSE.ROTATE };
+    c.touches = { ONE: null as unknown as TOUCH, TWO: active ? (null as unknown as TOUCH) : TOUCH.DOLLY_ROTATE };
+    if (!active) this.gestures.reset();
+  }
+
+  /** Hands the camera to someone else (photo mode sets its own bindings right after). */
+  release() {
+    this.bindCamera(false);
+  }
+
+  /** The editor's bindings come back on the next frame. */
+  rebind() {
+    this.bound = '';
+  }
+
+  setView(view: EditView, duration = 0.7) {
+    this.cancelDraw();
+    this.editView = view;
+    if (view === 'draw') {
+      const c = this.drawCamera();
+      this.fly?.(c.pos, c.target, duration);
+    } else {
+      // A gentle turn and tilt so the depth shows.
+      const target = this.controls.target.clone();
+      const sph = new THREE.Spherical().setFromVector3(this.camera.position.clone().sub(target));
+      sph.theta += 0.55;
+      sph.phi = THREE.MathUtils.clamp(sph.phi - 0.3, 0.5, 1.25);
+      this.fly?.(target.clone().add(new THREE.Vector3().setFromSpherical(sph)), target, duration);
+    }
+    this.onView?.(view);
+  }
+
+  toggleView() {
+    this.setView(this.editView === 'draw' ? 'orbit' : 'draw');
+  }
+
+  /** Draw-view camera square to the plane, around `target` (moved onto the plane). */
+  private drawCamera(target: THREE.Vector3 = this.controls.target, dist?: number) {
+    const mode = this.settings.mode;
+    const t = this.work.plane(mode).plane.projectPoint(target, new THREE.Vector3());
+    if (t.distanceTo(this.work.point) > 80) t.copy(this.work.point);
+    const d = THREE.MathUtils.clamp(dist ?? this.camera.position.distanceTo(this.controls.target), 10, 120);
+    const pos =
+      mode === 'profile'
+        ? t.clone().addScaledVector(this.work.normal, d * Math.cos(PITCH)).addScaledVector(UP, d * Math.sin(PITCH))
+        : t.clone().addScaledVector(UP, d).addScaledVector(this.work.normal, d * 0.02);
+    return { pos, target: t };
+  }
+
+  /** Back to the Draw view framing after something else moved the camera (a run). */
+  reframe(duration = 0.6) {
+    if (this.editView !== 'draw') return;
+    const c = this.drawCamera();
+    this.fly?.(c.pos, c.target, duration);
+  }
+
+  /** Opening a track: the plane goes to the start flag, the camera to a view of it. */
+  showStart(duration = 1.4) {
+    this.resetPlane();
+    const portrait = innerWidth < innerHeight;
+    if (this.editView === 'draw') {
+      const { u } = this.work.axes(this.settings.mode);
+      const target = this.work.point.clone().addScaledVector(u, portrait ? 4 : 8).add(new THREE.Vector3(0, -4, 0));
+      const c = this.drawCamera(target, portrait ? 46 : 30);
+      this.fly?.(c.pos, c.target, duration);
+      return;
+    }
+    const target = this.track.start.clone().add(new THREE.Vector3(8, -4, 0));
+    const pos = target.clone().add(new THREE.Vector3(-8, 8, 28));
+    if (portrait) pos.add(new THREE.Vector3(-6, 6, 18));
+    this.fly?.(pos, target, duration);
+  }
+
+  /** Whole track in view (the Draw view keeps facing the plane). */
+  fit(duration = 0.8) {
+    const box = new THREE.Box3().expandByPoint(this.track.start);
+    for (const s of this.track.strokes.values()) for (const p of s.points) box.expandByPoint(p);
+    for (const st of this.track.stars.values()) box.expandByPoint(st.position);
+    if (this.track.finish) box.expandByPoint(this.track.finish.position);
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+    const half = THREE.MathUtils.degToRad(this.camera.fov) / 2;
+    const fit = (sphere.radius + 4) / Math.sin(half) / Math.min(1, this.camera.aspect);
+    const dist = THREE.MathUtils.clamp(fit, 14, 220);
+    if (this.editView === 'draw') {
+      const c = this.drawCamera(sphere.center, dist);
+      this.fly?.(c.pos, c.target, duration);
+      return;
+    }
+    const dir = this.camera.position.clone().sub(this.controls.target).normalize();
+    this.fly?.(sphere.center.clone().addScaledVector(dir, dist), sphere.center.clone(), duration);
+  }
+
+  /** One-finger orbit (the on-screen orbit puck), in pixels. */
+  orbitBy(dx: number, dy: number) {
+    if (this.editView !== 'orbit') return;
+    this.gestures.orbit(-dx * 0.008, -dy * 0.008);
   }
 
   // ---------------------------------------------------------------- plane
 
-  /** Normal of the vertical drawing plane: faces the camera. */
-  private profileNormal(): THREE.Vector3 {
-    if (this.settings.lockPlane) return this.lockedNormal.clone();
-    const n = new THREE.Vector3().subVectors(this.camera.position, this.controls.target);
-    n.y = 0;
-    if (n.lengthSq() < 1e-6) n.set(0, 0, 1);
-    n.normalize();
-    // Snap to multiples of 15° when close, so straight runs are easy.
-    const a = Math.atan2(n.x, n.z);
-    const step = Math.PI / 12;
-    const snapped = Math.round(a / step) * step;
-    const angle = Math.abs(a - snapped) < ANGLE_SNAP ? snapped : a;
-    n.set(Math.sin(angle), 0, Math.cos(angle));
-    this.lockedNormal.copy(n);
-    return n;
+  /** Puzzles keep their plane: lines go where the puzzle is. */
+  get planeLocked() {
+    return !!this.rules;
   }
 
-  private planeThrough(point: THREE.Vector3): { plane: THREE.Plane; normal: THREE.Vector3 } {
-    const normal = this.settings.mode === 'profile' ? this.profileNormal() : new THREE.Vector3(0, 1, 0);
-    return { plane: new THREE.Plane().setFromNormalAndCoplanarPoint(normal, point), normal };
+  private planeThrough(point: THREE.Vector3) {
+    return this.work.plane(this.settings.mode, point);
   }
 
-  /** Drawing-plane grid that fades out radially. */
-  private buildGrid() {
-    const g = new THREE.Group();
-    const geo = new THREE.PlaneGeometry(70, 70).rotateX(-Math.PI / 2);
-    const mat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      extensions: { derivatives: true } as never,
-      vertexShader: `varying vec2 vUv; void main(){ vUv = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `varying vec2 vUv;
-        float line(vec2 p, float step) {
-          vec2 g = abs(fract(p / step - 0.5) - 0.5) / fwidth(p / step);
-          return 1.0 - min(min(g.x, g.y), 1.0);
+  /** The plane goes back to the start flag, facing like the nearest line there. */
+  resetPlane() {
+    const start = this.track.start;
+    let best: Stroke | null = null;
+    let bestD = Infinity;
+    for (const s of this.track.strokes.values()) {
+      if (s.mode !== 'profile') continue;
+      for (const p of s.points) {
+        const d = p.distanceToSquared(start);
+        if (d < bestD) {
+          bestD = d;
+          best = s;
         }
-        void main(){
-          float fade = 1.0 - smoothstep(8.0, 34.0, length(vUv));
-          float minor = line(vUv, 1.0) * 0.35;
-          float major = line(vUv, 5.0);
-          float a = max(minor, major) * fade * 0.55;
-          float axis = (1.0 - min(abs(vUv.x) / fwidth(vUv.x), 1.0)) * fade;
-          vec3 col = mix(vec3(0.24, 0.45, 0.7), vec3(1.0, 0.55, 0.15), axis);
-          a = max(a, axis * 0.8);
-          if (a < 0.01) discard;
-          gl_FragColor = vec4(col, a);
-        }`,
-    });
-    const plane = new THREE.Mesh(geo, mat);
-    plane.renderOrder = 2;
-    g.add(plane);
-    return g;
+      }
+    }
+    this.work.setNormal(this.rules || !best ? new THREE.Vector3(0, 0, 1) : best.planeNormal);
+    this.work.moveTo(start);
+    this.onChange?.();
   }
 
-  /** Called every frame to place the grid and hover feedback. */
-  update(visible: boolean) {
-    const drawing = this.tool === 'pencil' || this.tool === 'line' || this.tool === 'start' || this.tool === 'item';
-    this.grid.visible = visible && drawing;
-    if (!this.grid.visible) {
-      this.snapRing.visible = this.snapRing.visible && visible;
-      return;
+  /** Turns the plane by `deg` around the anchor (the Draw view turns with it). */
+  turnPlane(deg: number) {
+    if (this.planeLocked || this.settings.mode !== 'profile') return;
+    this.cancelDraw();
+    this.work.turn(deg);
+    if (this.editView === 'draw') {
+      const c = this.drawCamera(this.work.point);
+      this.fly?.(c.pos, c.target, 0.5);
     }
-    const origin = this.draw ? this.draw.start : this.controls.target;
-    const normal = this.draw ? this.draw.normal : this.settings.mode === 'profile' ? this.profileNormal() : new THREE.Vector3(0, 1, 0);
-    this.grid.position.copy(origin);
-    this.grid.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+    this.onHint?.(`Plane turned to ${this.work.heading}°`);
+    this.onChange?.();
+  }
+
+  /** Moves the plane one layer nearer (+1) or further (-1); path planes go up or down. */
+  shiftPlane(dir: 1 | -1) {
+    if (this.planeLocked) return;
+    this.cancelDraw();
+    const before = this.work.point.clone();
+    this.work.shift(dir, this.settings.mode, this.track.strokes.values());
+    const moved = this.work.point.clone().sub(before);
+    if (this.editView === 'draw') {
+      const c = this.drawCamera(this.controls.target.clone().add(moved));
+      this.fly?.(c.pos, c.target, 0.35);
+    }
+    this.onChange?.();
+  }
+
+  /** Long-press on a line: draw on its plane, from the end nearest the press. */
+  private planeFromStroke(stroke: Stroke, at: THREE.Vector3) {
+    if (this.planeLocked) return;
+    const pts = stroke.points;
+    const atEnd = pts[pts.length - 1].distanceToSquared(at) <= pts[0].distanceToSquared(at);
+    const end = atEnd ? pts[pts.length - 1] : pts[0];
+    const tangent = atEnd ? end.clone().sub(pts[pts.length - 2]) : null;
+    this.settings.mode = stroke.mode;
+    if (stroke.mode === 'profile') this.work.setNormal(stroke.planeNormal);
+    this.work.moveTo(end, tangent);
+    if (this.editView === 'draw') {
+      const c = this.drawCamera(end);
+      this.fly?.(c.pos, c.target, 0.6);
+    }
+    navigator.vibrate?.(15);
+    this.onHint?.("Drawing on this line's plane");
+    this.onChange?.();
+  }
+
+  /** Called every frame: camera bindings, the plane, the pen tip and hover feedback. */
+  update(visible: boolean, dt = 0) {
+    this.time += dt;
+    const active = visible && this.enabled;
+    this.bindCamera(active);
+    const drawing = active && (this.tool === 'pencil' || this.tool === 'line' || this.tool === 'start' || this.tool === 'item');
+    this.work.update(drawing, this.settings.mode, this.time, this.draw, this.camera, false);
+    this.view.setFocusPlane(active && this.editView === 'draw' && this.settings.mode === 'profile' ? this.work.plane('profile').plane : null);
+    if (!active) this.snapRing.visible = false;
+    if (this.draw && this.dragEvent && this.editView === 'draw' && dt > 0) this.followPen(dt);
+  }
+
+  /** Drawing near a screen edge in the Draw view pans that way, so long lines fit. */
+  private followPen(dt: number) {
+    const e = this.dragEvent!;
+    const r = this.dom.getBoundingClientRect();
+    const push = (f: number) => (f < EDGE ? -(EDGE - f) / EDGE : f > 1 - EDGE ? (f - 1 + EDGE) / EDGE : 0);
+    const px = push((e.clientX - r.left) / r.width);
+    const py = -push((e.clientY - r.top) / r.height);
+    if (!px && !py) return;
+    const speed = this.camera.position.distanceTo(this.controls.target) * 0.7 * dt;
+    const d = new THREE.Vector3()
+      .addScaledVector(new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0), px * speed)
+      .addScaledVector(new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1), py * speed);
+    this.camera.position.add(d);
+    this.controls.target.add(d);
+    this.camera.updateMatrixWorld();
+    this.extendStroke(e);
   }
 
   // ---------------------------------------------------------------- input
@@ -320,19 +500,26 @@ export class Editor {
   private onDown = (e: PointerEvent) => {
     if (!this.enabled) return;
     if (e.pointerType === 'touch') {
-      this.touches.add(e.pointerId);
-      if (this.touches.size > 1) {
+      // A finger landing while a stroke is well under way is a resting palm: ignore it.
+      if (this.draw && this.gestures.count === 1 && performance.now() - this.drawT0 > 250 && this.draw.points.length > 3) {
+        this.ignored.add(e.pointerId);
+        return;
+      }
+      this.gestures.down(e);
+      if (this.gestures.count > 1) {
         // Second finger: this is a camera gesture, not a stroke.
         this.cancelDraw();
+        this.cancelPress();
         this.bankDrag = null;
         this.erasing = false;
         this.pendingTap = null;
+        this.dragPointer = null;
         if (this.selection.active) this.selection.cancel();
         this.controls.enabled = true;
         return;
       }
     }
-    if (e.button !== 0 || this.tool === 'hand') return;
+    if (e.button !== 0) return;
     this.dragPointer = e.pointerId;
     if (e.pointerType === 'touch' && (this.tool === 'eraser' || this.tool === 'decor' || this.tool === 'item' || this.tool === 'start')) {
       this.pendingTap = e;
@@ -343,12 +530,26 @@ export class Editor {
 
   /** What a press does with the current tool. */
   private act(e: PointerEvent) {
-
     switch (this.tool) {
       case 'pencil':
-      case 'line':
+      case 'line': {
+        // Holding still on a line takes its plane instead of drawing.
+        const hit = this.planeLocked ? null : this.pickStroke(e);
         this.beginStroke(e);
+        if (hit) {
+          this.press = {
+            x: e.clientX,
+            y: e.clientY,
+            timer: window.setTimeout(() => {
+              this.press = null;
+              this.cancelDraw();
+              this.dragPointer = null;
+              this.planeFromStroke(hit.stroke, hit.point);
+            }, LONG_PRESS_MS),
+          };
+        }
         break;
+      }
       case 'select': {
         const hit = this.pickStroke(e);
         if (this.selection.down(e, hit && !hit.stroke.locked ? hit : null)) this.controls.enabled = false;
@@ -380,10 +581,20 @@ export class Editor {
     }
   }
 
+  private cancelPress() {
+    if (this.press) clearTimeout(this.press.timer);
+    this.press = null;
+  }
+
   private onMove = (e: PointerEvent) => {
-    if (e.pointerType === 'touch' && this.touches.size > 1) return;
+    if (e.pointerType === 'touch') {
+      if (this.ignored.has(e.pointerId)) return;
+      this.gestures.move(e);
+      if (this.gestures.active) return;
+    }
     const active = this.dragPointer === e.pointerId;
     if (e.target === this.dom) this.lastPointer = e;
+    if (this.press && active && Math.hypot(e.clientX - this.press.x, e.clientY - this.press.y) > 8) this.cancelPress();
     const tap = this.pendingTap;
     if (tap && active && Math.hypot(e.clientX - tap.clientX, e.clientY - tap.clientY) > 8) {
       // A drag: the eraser starts sweeping, a placing tool lets it go.
@@ -396,6 +607,7 @@ export class Editor {
     }
 
     if (this.draw && active) {
+      this.dragEvent = e;
       this.extendStroke(e);
       return;
     }
@@ -427,9 +639,14 @@ export class Editor {
   };
 
   private onUp = (e: PointerEvent) => {
-    if (e.pointerType === 'touch') this.touches.delete(e.pointerId);
+    if (e.pointerType === 'touch') {
+      if (this.ignored.delete(e.pointerId)) return;
+      this.gestures.up(e);
+    }
     if (this.dragPointer !== e.pointerId) return;
     this.dragPointer = null;
+    this.dragEvent = null;
+    this.cancelPress();
     if (this.pendingTap) {
       const tap = this.pendingTap;
       this.pendingTap = null;
@@ -471,13 +688,14 @@ export class Editor {
 
   private beginStroke(e: PointerEvent) {
     const snap = this.findSnap(e);
-    const origin = snap ?? this.controls.target;
+    const origin = snap ?? this.work.point;
     const { plane, normal } = this.planeThrough(origin);
     this.setRay(e);
     let start: THREE.Vector3 | null = snap ? snap.clone() : this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
     if (!start) return;
     if (snap) start = snap; // share the exact point for a seamless joint
     this.draw = { points: [start], plane, normal, start: start.clone(), preview: null };
+    this.drawT0 = performance.now();
     this.controls.enabled = false;
     this.showSnap(snap);
   }
@@ -572,6 +790,7 @@ export class Editor {
       this.draw.preview.geometry.dispose();
     }
     this.draw = null;
+    this.dragEvent = null;
     this.controls.enabled = true;
     this.showSnap(null);
   }
@@ -598,6 +817,9 @@ export class Editor {
       undo: () => this.track.removeStroke(stroke),
       redo: () => (stroke = this.track.addStroke(stroke)),
     });
+    // The next line carries on from this one's end.
+    const end = pts[pts.length - 1];
+    this.work.moveTo(end, end.clone().sub(pts[pts.length - 2]));
   }
 
   // ---------------------------------------------------------------- other tools
@@ -683,10 +905,10 @@ export class Editor {
       position = hit.point.clone().addScaledVector(hit.normal, radius * 0.75);
     } else {
       this.setRay(e);
-      const { plane, normal } = this.planeThrough(this.controls.target);
+      const { plane, normal } = this.planeThrough(this.work.point);
       position = this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
       if (this.settings.mode === 'profile') axis.crossVectors(new THREE.Vector3(0, 1, 0), normal).normalize();
-      else axis.set(this.camera.position.x - this.controls.target.x, 0, this.camera.position.z - this.controls.target.z).normalize().negate();
+      else axis.set(this.controls.target.x - this.camera.position.x, 0, this.controls.target.z - this.camera.position.z).normalize();
       if (axis.lengthSq() < 0.5) axis.set(1, 0, 0);
     }
     if (!position) return;
@@ -712,7 +934,7 @@ export class Editor {
       return { point: hit.point.clone(), normal: hit.normal, dir, width: hit.stroke.width };
     }
     this.setRay(e);
-    const { plane, normal } = this.planeThrough(this.controls.target);
+    const { plane, normal } = this.planeThrough(this.work.point);
     const point = this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
     if (!point) return null;
     const dir =
@@ -746,7 +968,7 @@ export class Editor {
     const hit = this.pickStroke(e);
     if (hit) return hit.point.clone().addScaledVector(hit.normal, 0.9);
     this.setRay(e);
-    return this.raycaster.ray.intersectPlane(this.planeThrough(this.controls.target).plane, new THREE.Vector3());
+    return this.raycaster.ray.intersectPlane(this.planeThrough(this.work.point).plane, new THREE.Vector3());
   }
 
   /** The start point under the last pointer position (for "test from here"); on touch, under the screen centre. */
