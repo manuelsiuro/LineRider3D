@@ -8,7 +8,7 @@ import type { DailyCard, ScreenCtx, TitleChoice } from '../types';
 export const BADGE: Record<BiomeId, string> = { alpine: 'snowflake', forest: 'forest', beach: 'beach', desert: 'desert', city: 'city', halloween: 'pumpkin', volcano: 'volcano', moon: 'moon' };
 
 /** Title screen; resolves with the player's choice. */
-export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxStars: number, daily: DailyCard, season: { stars: number; max: number } | null = null): Promise<TitleChoice> {
+export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxStars: number, daily: DailyCard, season: { stars: number; max: number } | null = null, next: { name: string; world: BiomeId; number: number; fresh: boolean } | null = null): Promise<TitleChoice> {
   document.body.classList.add('on-title');
   return new Promise((resolve) => {
     const overlay = h(
@@ -22,7 +22,11 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
           <p class="title-world">${worldCaption(ctx.world)}</p>
         </div>
         <div class="title-actions">
-          <button class="big-btn primary" data-c="levels">${icon('play', 20)} Play <span class="pill">${icon('star', 14)} ${stars}/${maxStars}</span></button>
+          <button class="big-btn daily-btn play-card" data-c="levels" style="--done:${((stars / Math.max(1, maxStars)) * 100).toFixed(1)}%">
+            <span class="daily-ic">${icon('play', 22)}</span>
+            <span class="daily-text"><b>${next && !next.fresh ? 'Continue' : 'Play'}</b><small>${next ? `${next.fresh ? 'Start with' : 'Next'}: ${next.number}. ${next.name} · ${biomeById(next.world).name}` : 'Every level won · go for 3 stars'}</small></span>
+            <span class="pill">${icon('star', 14)} ${stars}/${maxStars}</span>
+          </button>
           <button class="big-btn daily-btn" data-c="daily">
             <span class="daily-ic">${icon('calendar', 20)}</span>
             <span class="daily-text"><b>Daily ride #${daily.number}</b><small>${daily.best > 0 ? `Today's best ${daily.best.toLocaleString()}` : `${daily.name} · new every day`}</small></span>
@@ -32,7 +36,7 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
             season
               ? `<button class="big-btn daily-btn season-btn" data-c="season">
             <span class="daily-ic">${icon('pumpkin', 22)}</span>
-            <span class="daily-text"><b>Haunted Hollow</b><small>Halloween is here · 5 spooky levels</small></span>
+            <span class="daily-text"><b>Haunted Hollow</b><small>Halloween is here · ${season.max / 3} spooky levels</small></span>
             <span class="pill">${icon('star', 14)} ${season.stars}/${season.max}</span>
           </button>`
               : ''

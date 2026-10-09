@@ -43,6 +43,78 @@
   opacity: 0.85;
 }
 
+/* Title Play: the main entry, in the game's blue, a little bigger, with a light sweep and
+   the campaign's star progress along the bottom edge. */
+.big-btn.daily-btn.play-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 68px;
+  background: linear-gradient(rgba(10, 30, 70, 0.25), rgba(10, 30, 70, 0.25)) bottom / 100% 4px no-repeat, linear-gradient(180deg, #5aa6f5, #2f6fd0);
+  box-shadow: 0 12px 28px -8px rgba(47, 111, 208, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.play-card .daily-ic {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.play-card .daily-ic .ic {
+  margin-left: 3px;
+  fill: currentColor;
+  animation: play-nudge 2.4s var(--ease) infinite;
+}
+
+.play-card .daily-text b {
+  font-size: 21px;
+}
+
+.play-card .pill {
+  flex: none;
+}
+
+.play-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: play-sheen 4.5s var(--ease) 1s infinite;
+  pointer-events: none;
+}
+
+.play-card::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--done, 0%);
+  height: 4px;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(90deg, #ffe17a, #ffc23d);
+  box-shadow: 0 0 8px rgba(255, 210, 80, 0.8);
+}
+
+@keyframes play-sheen {
+  0%, 60% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes play-nudge {
+  0%, 70%, 100% { transform: translateX(0); }
+  80% { transform: translateX(3px); }
+  90% { transform: translateX(-1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-card::before,
+  .play-card .daily-ic .ic {
+    animation: none;
+  }
+}
+
 .pill.streak {
   color: #7a2e00;
   background: linear-gradient(180deg, #ffd34d, #ff9f55);

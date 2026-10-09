@@ -497,7 +497,7 @@ async function closeUp<T>(show: () => Promise<T>): Promise<T> {
 async function titleFlow() {
   for (;;) {
     const progress = loadProgress();
-    const choice = await ui.showTitle(savedTrack() !== null, totalStars(progress), LEVELS.length * 3, dailyCard(), seasonCard(progress));
+    const choice = await ui.showTitle(savedTrack() !== null, totalStars(progress), LEVELS.length * 3, dailyCard(), seasonCard(progress), nextLevel(progress));
     if (choice === 'wardrobe') {
       const stars = totalStars(progress);
       await closeUp(() =>
@@ -592,6 +592,13 @@ async function titleFlow() {
 }
 
 /** The Haunted Hollow button on the title, during the season. */
+/** The level Play leads to: the first open one not yet won, for the title's Play card. */
+function nextLevel(progress: ReturnType<typeof loadProgress>) {
+  const i = LEVELS.findIndex((l, k) => isUnlocked(k, progress) && !(progress[l.id]?.stars ?? 0));
+  if (i < 0) return null;
+  return { name: LEVELS[i].name, world: chapterOf(LEVELS[i]), number: i + 1, fresh: Object.keys(progress).length === 0 };
+}
+
 function seasonCard(progress: ReturnType<typeof loadProgress>) {
   if (!seasonOn(core.settings.seasonal)) return null;
   const hollow = LEVELS.filter((l) => chapterOf(l) === 'halloween');
