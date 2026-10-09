@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Track } from '../track/Track';
-import type { DecorKind } from '../track/types';
+import type { DecorKind, HazardKind } from '../track/types';
 import type { PuzzleDef } from './puzzles';
 import { cosine, finish, forest, hazard, landing, line, profile, star, start } from './builders';
 
@@ -9,7 +9,12 @@ import { cosine, finish, forest, hazard, landing, line, profile, star, start } f
  * that is known to work (the tests ride it). The worlds' puzzle lists are made of these.
  */
 
-type Common = Pick<PuzzleDef, 'id' | 'name' | 'tip' | 'world'> & { decor?: DecorKind[]; seed?: number };
+type Common = Pick<PuzzleDef, 'id' | 'name' | 'tip' | 'world'> & {
+  decor?: DecorKind[];
+  seed?: number;
+  /** Hazards on the ground below the gaps (dressing: a fall is already lost). */
+  danger?: HazardKind;
+};
 
 const DECOR: DecorKind[] = ['pine', 'pine', 'rock', 'cabin', 'snowman'];
 const scenery = (t: Track, c: Common, x1: number) => forest(t, -6, x1, c.seed ?? 50, c.decor ?? DECOR, 5, 8);
@@ -43,6 +48,7 @@ export function bridge(c: Common & { kind?: 'draw' | 'oneline'; y: number; top: 
       for (const [a, b] of c.gaps) {
         profile(t, () => c.y, x, a);
         star(t, (a + b) / 2, c.y + 1.3);
+        if (c.danger) hazard(t, c.danger, (a + b) / 2, 0);
         x = b;
       }
       profile(t, () => c.y, x, c.end);
@@ -174,6 +180,7 @@ export function cliffAir(c: Common & { top: number; y: number; edge: number; flo
       profile(t, () => l.flat, l.end, l.end + 30);
       star(t, l.top, l.arc(l.top) + 0.3);
       finish(t, l.end + 22, l.flat);
+      if (c.danger) for (const k of [0.3, 0.7]) hazard(t, c.danger, c.edge + 2 + (l.top - c.edge) * k, 0);
       scenery(t, c, l.end + 36);
     },
     solution(t) {
@@ -210,6 +217,71 @@ export function mudBrakes(c: Common & { top: number; y: number; slope: number; b
     solution(t) {
       const run = (x: number) => c.y - (x - 30) * c.slope;
       profile(t, (x) => run(x) + 0.05, c.bumpAt - 26, c.bumpAt - 2, 'mud');
+    },
+  };
+}
+
+/**
+ * A ledge out of reach above a pit: a bouncy pad drawn in the pit springs Bosh up there.
+ * (The proven Bounce Back layout, raised by `dy`: height alone doesn't change the physics.)
+ */
+export function bounce(c: Common & { dy: number }): PuzzleDef {
+  const y = (v: number) => v + c.dy;
+  return {
+    ...c,
+    kind: 'draw',
+    ink: 18,
+    par: 13,
+    types: ['normal', 'bouncy'],
+    build(t) {
+      const h = cosine(y(20), y(12), -2, 24);
+      profile(t, h, -2, 24);
+      profile(t, () => y(12), 24, 32);
+      profile(t, () => y(14), 56, 100);
+      start(t, 0, h(0));
+      star(t, 55, y(11.5));
+      finish(t, 88, y(14));
+      if (c.danger) for (const x of [34, 50]) hazard(t, c.danger, x, 0);
+      scenery(t, c, 110);
+    },
+    solution(t) {
+      line(t, [36, y(2)], [48, y(3.2)], 'bouncy');
+    },
+  };
+}
+
+/**
+ * A cracked bridge (slabs that fall a moment after Bosh touches them), climbing a little:
+ * he's too slow to get across. Speed him up before it, with rings ('rings') or a drawn
+ * boost strip ('draw').
+ */
+export function crumbleRush(c: Common & { kind: 'rings' | 'draw'; top: number; y: number; slabs: number; rise: number; boosts: number }): PuzzleDef {
+  const len = c.slabs * 8;
+  return {
+    ...c,
+    ink: c.kind === 'rings' ? c.boosts + 2 : c.boosts * 14,
+    par: c.kind === 'rings' ? c.boosts : c.boosts * 9,
+    types: c.kind === 'rings' ? ['normal'] : ['accel'],
+    build(t) {
+      runIn(t, c.top, c.y);
+      profile(t, () => c.y, 30, 30 + c.boosts * 14);
+      const a = 30 + c.boosts * 14;
+      const up = (x: number) => c.y + ((x - a) / len) * c.rise;
+      for (let k = 0; k < c.slabs; k++) profile(t, up, a + k * 8, a + (k + 1) * 8, 'crumble');
+      const b = a + len;
+      const top = c.y + c.rise;
+      profile(t, () => top, b, b + 30);
+      star(t, a + len / 2, up(a + len / 2) + 1.3);
+      finish(t, b + 20, top);
+      if (c.danger) for (let k = 0; k < c.slabs; k += 2) hazard(t, c.danger, a + k * 8 + 4, 0);
+      scenery(t, c, b + 36);
+    },
+    solution(t) {
+      for (let k = 0; k < c.boosts; k++) {
+        const x = 30 + k * 14;
+        if (c.kind === 'rings') t.addRing({ position: new THREE.Vector3(x + 7, c.y + 1.2, 0), axis: new THREE.Vector3(1, 0, 0), radius: 1.6 });
+        else line(t, [x + 1, c.y + 0.02], [x + 10, c.y + 0.02], 'accel');
+      }
     },
   };
 }

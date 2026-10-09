@@ -26,13 +26,30 @@ OK   Deep Woods     stars 5/5  finish 9.4s  score 0/4000  ★★☆  end x=258,y
 OK   Canopy Run     stars 4/4  finish 8.6s  score 0/2000  ★★☆  end x=235,y=4.4,z=0.0 f383  solution (6 changes)
 OK   Wildwood       stars 6/6  finish 11.8s  score 240/5000  ★★☆  end x=338,y=6.2,z=0.0 f515  solution (21 changes)
 OK   Boardwalk      stars 4/4  finish 6.3s  score 750/6000  ★★☆  end x=170,y=0.6,z=0.0 f292
+OK   Shell Beach    stars 3/3  finish 7.5s  score 0/4000  ★★☆  end x=199,y=0.1,z=-0.0 f339
 OK   Surf's Up      stars 5/5  finish 8.6s  score 2200/15000  ★★☆  end x=225,y=-1.9,z=0.0 f383
+OK   Tide Pools     stars 4/4  finish 6.5s  score 0/6000  ★★☆  end x=172,y=0.6,z=0.0 f302
 OK   Sunset Cruise  stars 5/5  finish 11.4s  score 2600/6000  ★★☆  end x=276,y=4.4,z=0.5 f497
+OK   Pier Run       stars 4/4  finish 10.6s  score 1000/6000  ★★☆  end x=292,y=5.5,z=0.0 f464
+OK   Spike Strip    stars 4/4  finish 7.9s  score 0/1500  ★★☆  end x=202,y=-0.0,z=-0.0 f358  solution (4 changes)
+OK   Crab Cove      stars 5/5  finish 9.4s  score 0/2500  ★★☆  end x=265,y=2.3,z=-0.1 f419  solution (4 changes)
+OK   Lighthouse Climb stars 5/5  finish 8.4s  score 0/800  ★★☆  end x=239,y=-1.7,z=0.2 f376  solution (7 changes)
+OK   High Tide      stars 3/3  finish 6.0s  score 1100/600  ★★★  end x=145,y=0.0,z=0.0 f282  solution (2 changes)
+OK   Reef Hopper    stars 4/4  finish 9.8s  score 0/2000  ★★☆  end x=220,y=9.0,z=0.0 f432  solution (6 changes)
+OK   Coral Coast    stars 5/5  finish 11.4s  score 260/4000  ★★☆  end x=376,y=14.8,z=-0.3 f498  solution (15 changes)
 OK   Mesa Drop      stars 4/4  finish 8.6s  score 1740/9000  ★★☆  end x=300,y=5.6,z=-0.0 f385
 OK   Canyon Jump    stars 4/4  finish 6.5s  score 2250/6000  ★★☆  end x=226,y=-2.0,z=-0.6 f303
 OK   Dune Bash      stars 3/3  finish 8.1s  score 1040/3500  ★★☆  end x=199,y=0.0,z=-0.0 f365
 OK   Quarry Run     stars 4/4  finish 8.0s  score 1000/3500  ★★☆  end x=180,y=0.6,z=-0.0 f362
 OK   Sandstorm Rally stars 4/4  finish 8.6s  score 1920/6500  ★★☆  end x=295,y=5.9,z=0.0 f386
+OK   Cracked Mesa   stars 4/4  finish 7.6s  score 1100/3000  ★★☆  end x=213,y=-0.7,z=0.0 f344
+OK   Dune Surf      stars 5/5  finish 8.3s  score 1540/5000  ★★☆  end x=237,y=-1.8,z=0.0 f374
+OK   Mirage         stars 4/4  finish 9.5s  score 800/5000  ★★☆  end x=278,y=4.4,z=0.0 f422
+OK   Cactus Row     stars 4/4  finish 8.3s  score 0/2500  ★★☆  end x=225,y=-1.4,z=-0.0 f375  solution (6 changes)
+OK   Sinking Bridge stars 4/4  finish 7.7s  score 0/800  ★★☆  end x=201,y=-0.5,z=-0.0 f347  solution (7 changes)
+OK   Canyon Crumble stars 5/5  finish 8.3s  score 0/2500  ★★☆  end x=223,y=3.7,z=0.0 f374  solution (8 changes)
+OK   Rattlesnake Pass stars 5/5  finish 8.4s  score 0/3000  ★★☆  end x=282,y=4.3,z=-0.0 f378  solution (6 changes)
+OK   Sun Temple     stars 6/6  finish 11.8s  score 1120/4000  ★★☆  end x=389,y=17.2,z=-0.3 f515  solution (17 changes)
 OK   Rooftop Run    stars 4/4  finish 9.1s  score 0/5000  ★★☆  end x=238,y=-1.6,z=-0.0 f406
 OK   Downtown Drift stars 4/4  finish 13.9s  score 1915/12000  ★★☆  end x=282,y=4.9,z=0.2 f599
 OK   Neon Nights    stars 4/4  finish 7.7s  score 3165/12000  ★★☆  end x=322,y=5.1,z=-0.0 f350

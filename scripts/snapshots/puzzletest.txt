@@ -23,3 +23,28 @@ root-hills      unsolved fails    solved 11.35s stars 3/3 rings 3/3/5
 broken-boardwalk unsolved fails    solved 6.15s stars 3/3 ink 29.0/29/40
 deadfall        unsolved fails    solved 7.35s stars 3/3 erased 3/3/4
 slippery-slope  unsolved fails    solved 7.72s stars 1/1 ink 25.1/27/36
+washed-out      unsolved fails    solved 4.95s stars 1/1 ink 12.0/12/17
+surf-rings      unsolved fails    solved 6.83s stars 1/1 rings 1/1/3
+trampoline-tide unsolved fails    solved 6.58s stars 1/1 ink 12.1/13/18
+driftwood       unsolved fails    solved 6.17s stars 1/1 erased 1/1/3
+boardwalk-gaps  unsolved fails    solved 5.35s stars 2/2 ink 26.0/26/36
+cliff-dive      unsolved fails    solved 6.05s stars 1/1 ink 6.8/8/14 trick Sketchy Big Air
+dune-slide      unsolved fails    solved 5.85s stars 1/1 ink 33.2/34/49
+boost-wave      unsolved fails    solved 6.72s stars 1/1 ink 9.0/9/14
+seaweed-snarl   unsolved fails    solved 7.53s stars 3/3 erased 3/3/5
+sea-spring      unsolved fails    solved 6.58s stars 1/1 ink 12.1/13/18
+pier-planks     unsolved fails    solved 6.15s stars 3/3 ink 30.0/30/41
+lighthouse-line unsolved fails    solved 6.08s stars 1/1 ink 41.1/42/61
+quick-crossing  unsolved fails    solved 6.30s stars 1/1 rings 1/1/3
+canyon-gap      unsolved fails    solved 5.13s stars 1/1 ink 13.0/13/18
+mesa-leap       unsolved fails    solved 6.05s stars 1/1 ink 6.8/8/14 trick Sketchy Big Air
+rockfall        unsolved fails    solved 6.13s stars 1/1 erased 1/1/3
+boost-the-bridge unsolved fails    solved 5.80s stars 1/1 ink 9.0/9/14
+canyon-descent  unsolved fails    solved 5.95s stars 1/1 ink 35.8/36/53
+dune-rings      unsolved fails    solved 8.97s stars 2/2 rings 2/2/4
+three-canyons   unsolved fails    solved 5.67s stars 3/3 ink 32.0/32/44
+cactus-spring   unsolved fails    solved 6.58s stars 1/1 ink 12.1/13/18
+tumbleweeds     unsolved fails    solved 6.85s stars 2/2 erased 2/2/5
+boost-dune      unsolved fails    solved 9.13s stars 2/2 ink 18.0/18/28
+crumbling-climb unsolved fails    solved 6.55s stars 1/1 rings 2/2/4
+sun-leap        unsolved fails    solved 6.10s stars 1/1 ink 7.0/8/14 trick Perfect Big Air

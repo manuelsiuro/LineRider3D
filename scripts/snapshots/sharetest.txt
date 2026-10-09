@@ -26,13 +26,30 @@ OK   Deep Woods     round trip, compressed
 OK   Canopy Run     round trip, compressed
 OK   Wildwood       round trip, compressed
 OK   Boardwalk      round trip, compressed
+OK   Shell Beach    round trip, compressed
 OK   Surf's Up      round trip, compressed
+OK   Tide Pools     round trip, compressed
 OK   Sunset Cruise  round trip, compressed
+OK   Pier Run       round trip, compressed
+OK   Spike Strip    round trip, compressed
+OK   Crab Cove      round trip, compressed
+OK   Lighthouse Climb round trip, compressed
+OK   High Tide      round trip, compressed
+OK   Reef Hopper    round trip, compressed
+OK   Coral Coast    round trip, compressed
 OK   Mesa Drop      round trip, compressed
 OK   Canyon Jump    round trip, compressed
 OK   Dune Bash      round trip, compressed
 OK   Quarry Run     round trip, compressed
 OK   Sandstorm Rally round trip, compressed
+OK   Cracked Mesa   round trip, compressed
+OK   Dune Surf      round trip, compressed
+OK   Mirage         round trip, compressed
+OK   Cactus Row     round trip, compressed
+OK   Sinking Bridge round trip, compressed
+OK   Canyon Crumble round trip, compressed
+OK   Rattlesnake Pass round trip, compressed
+OK   Sun Temple     round trip, compressed
 OK   Rooftop Run    round trip, compressed
 OK   Downtown Drift round trip, compressed
 OK   Neon Nights    round trip, compressed

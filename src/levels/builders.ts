@@ -170,3 +170,13 @@ export function hazard(track: Track, kind: HazardKind, x: number, y: number, z =
 export function checkpoint(track: Track, x: number, y: number, z = 0) {
   return track.addCheckpoint({ position: new THREE.Vector3(x, y + 0.4, z), axis: new THREE.Vector3(1, 0, 0), halfWidth: 2.3 });
 }
+
+/**
+ * A pit floor under a jump, `depth` below `y`, from x0 to x1, with hazards spread along it.
+ * Add it after measuring the jump's landing (the flight passes high over it).
+ */
+export function pit(track: Track, x0: number, x1: number, y: number, kind: HazardKind, count: number, depth = 3) {
+  const floor = y - depth;
+  profile(track, () => floor, x0, x1);
+  for (let k = 0; k < count; k++) hazard(track, kind, x0 + ((k + 0.5) * (x1 - x0)) / count, floor);
+}

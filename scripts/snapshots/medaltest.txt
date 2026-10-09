@@ -41,26 +41,54 @@ canopy-run:buggy           10.3 / 9.1 / 8.9 / 8.5
 wildwood:snowboard         undefined
 wildwood:coffin            undefined
 boardwalk:bike             7.6 / 6.8 / 6.6 / 6.3
-surfs-up:snowboard         10.3 / 8.8 / 8.6 / 8.3
-mesa-drop:snowboard        10.3 / 8.7 / 8.5 / 8.2
-mesa-drop:coffin           10.4 / 9.1 / 8.9 / 8.6
-sandstorm-rally:moto       10.4 / 9.1 / 8.9 / 8.6
-rooftop-run:bike           11.1 / 8.9 / 8.7 / 8.4
-downtown-drift:skis        16.8 / 14.6 / 14.4 / 13.9
-neon-nights:bike           9.4 / 7.7 / 7.5 / 7.2
-pumpkin-patch:sled         7.1 / 6.3 / 6.1 / 5.8
-pumpkin-patch:moto         7 / 6.2 / 6 / 5.8
-graveyard-shift:skis       8.9 / 7.3 / 7.1 / 6.8
-graveyard-shift:buggy      8.9 / 7.1 / 6.7 / 6.4
-bat-cave-drop:snowboard    10.3 / 8.7 / 8.5 / 8.2
-bat-cave-drop:coffin       10.4 / 9.1 / 8.9 / 8.6
-haunted-manor:bike         10.8 / 7.6 / 6.2 / 6
-witching-hour:sled         9.6 / 8.4 / 8.2 / 7.9
-witching-hour:moto         9.7 / 8.5 / 8.3 / 8
-ember-run:skis             8.7 / 7 / 6.6 / 6.3
-ember-run:buggy            8.8 / 6.7 / 6 / 5.8
-ash-chute:snowboard        10.5 / 8.6 / 8.4 / 8.1
-ash-chute:coffin           10.6 / 9.3 / 9.1 / 8.7
-moonwalk:bike              10.3 / 9.1 / 8.9 / 8.5
-crater-hop:sled            13 / 11.4 / 11.2 / 10.7
-crater-hop:moto            undefined
+shell-beach:sled           9 / 7.4 / 7.2 / 6.9
+shell-beach:moto           9 / 7.9 / 7.7 / 7.4
+tide-pools:sled            7.9 / 7 / 6.8 / 6.5
+tide-pools:moto            7.9 / 7 / 6.8 / 6.6
+pier-run:sled              12.7 / 11.1 / 10.9 / 10.5
+pier-run:moto              12.9 / 11.3 / 11.1 / 10.7
+spike-strip:skis           undefined
+spike-strip:buggy          9.6 / 8.4 / 8.2 / 7.9
+crab-cove:snowboard        undefined
+crab-cove:coffin           11.4 / 10 / 9.8 / 9.4
+lighthouse:bike            10.5 / 9.3 / 9.1 / 8.7
+high-tide:sled             7.3 / 6.2 / 6 / 5.8
+high-tide:moto             undefined
+reef-hopper:skis           undefined
+reef-hopper:buggy          undefined
+coral-coast:snowboard      undefined
+coral-coast:coffin         undefined
+mesa-drop:bike             10.5 / 8.5 / 8.2 / 7.9
+canyon-jump:moto           7.9 / 7 / 6.8 / 6.5
+cracked-mesa:sled          9.1 / 7.4 / 7.1 / 6.8
+cracked-mesa:moto          9.2 / 8.1 / 7.9 / 7.6
+mirage:sled                11.5 / 10.1 / 9.9 / 9.5
+mirage:moto                11.5 / 10.1 / 9.9 / 9.5
+cactus-row:skis            undefined
+cactus-row:buggy           10.1 / 8.9 / 8.7 / 8.3
+sinking-bridge:snowboard   undefined
+sinking-bridge:coffin      9.3 / 8.2 / 8 / 7.7
+canyon-crumble:bike        10 / 8.8 / 8.6 / 8.3
+rattlesnake-pass:sled      10.2 / 8.9 / 8.7 / 8.4
+rattlesnake-pass:moto      undefined
+sun-temple:skis            14.1 / 12.3 / 12.1 / 11.6
+sun-temple:buggy           undefined
+rooftop-run:snowboard      11.1 / 9 / 8.8 / 8.5
+rooftop-run:coffin         11 / 8.9 / 8.7 / 8.4
+neon-nights:snowboard      9.1 / 7.8 / 7.6 / 7.3
+neon-nights:coffin         9.3 / 8.2 / 8 / 7.7
+pumpkin-patch:bike         7 / 5.7 / 5.4 / 5.1
+graveyard-shift:sled       9 / 7.4 / 7.2 / 6.9
+graveyard-shift:moto       9 / 7.9 / 7.7 / 7.5
+bat-cave-drop:skis         10.1 / 8.9 / 8.7 / 8.3
+bat-cave-drop:buggy        10.4 / 9.1 / 8.9 / 8.6
+haunted-manor:snowboard    10.8 / 7.8 / 6.5 / 6.3
+haunted-manor:coffin       11.4 / 8.7 / 7.8 / 7.5
+witching-hour:bike         9.7 / 7.9 / 7.7 / 7.4
+ember-run:sled             8.7 / 7.7 / 7.5 / 7.2
+ember-run:moto             8.8 / 7.7 / 7.5 / 7.3
+ash-chute:skis             10.5 / 9.2 / 9 / 8.7
+ash-chute:buggy            10.5 / 8.5 / 8.1 / 7.7
+moonwalk:snowboard         10.3 / 7.9 / 7.1 / 6.8
+moonwalk:coffin            10.3 / 9.1 / 8.9 / 8.5
+crater-hop:bike            13 / 11.4 / 11.2 / 10.7
