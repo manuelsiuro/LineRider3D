@@ -1,4 +1,4 @@
-import { closeOverlay, h } from '../dom';
+import { closeOverlay, h, carousel } from '../dom';
 import { icon } from '../icons';
 import type { ScreenCtx, OutfitCard } from '../types';
 
@@ -50,6 +50,8 @@ export function showWardrobe(ctx: ScreenCtx, outfits: OutfitCard[], stars: numbe
     };
     const grid = overlay.querySelector<HTMLElement>('.outfit-grid')!;
     document.body.append(overlay);
+    const arrows = carousel(grid, (d) => icon(d === 'left' ? 'chevronLeft' : 'chevronRight', 22));
     grid.querySelector('.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+    requestAnimationFrame(arrows);
   });
 }

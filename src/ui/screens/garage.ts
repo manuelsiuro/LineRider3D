@@ -1,4 +1,4 @@
-import { closeOverlay, h, hex } from '../dom';
+import { closeOverlay, h, hex, carousel } from '../dom';
 import { padWords } from '../controls';
 import { icon } from '../icons';
 import type { ScreenCtx, VehicleCard } from '../types';
@@ -75,6 +75,8 @@ export function showGarage(ctx: ScreenCtx, cards: VehicleCard[], selected: strin
       grid.scrollLeft = x;
     };
     document.body.append(overlay);
+    const arrows = carousel(grid, (d) => icon(d === 'left' ? 'chevronLeft' : 'chevronRight', 22));
     grid.querySelector('.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+    requestAnimationFrame(arrows);
   });
 }
