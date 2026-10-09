@@ -2,18 +2,19 @@ import * as THREE from 'three';
 import { MOUSE, TOUCH } from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Track } from '../track/Track';
-import type { DecorKind, DrawMode, LineType, Stroke } from '../track/types';
+import type { DecorKind, DrawMode, Finish, LineType, Stroke } from '../track/types';
 import type { TrackView } from '../render/TrackView';
 import { buildRibbonMesh } from '../render/ribbon';
 import { History } from './History';
 import { Selection } from './Selection';
 import { WorkPlane } from './WorkPlane';
 import { Gestures } from './Gestures';
-import { TOUCH as TOUCH_DEVICE } from '../ui/dom';
+import { METERS, TOUCH as TOUCH_DEVICE } from '../ui/dom';
+import { headingOn, pathPiece, profilePiece, type PathPiece, type PieceResult, type PieceSize, type ProfilePiece } from './pieces';
 
 type ScreenPoint = { clientX: number; clientY: number };
 
-export type Tool = 'pencil' | 'line' | 'select' | 'eraser' | 'bank' | 'decor' | 'item' | 'start';
+export type Tool = 'pencil' | 'line' | 'curve' | 'build' | 'select' | 'eraser' | 'bank' | 'decor' | 'item' | 'start';
 /** Draw: the camera squares up to the drawing plane (pan and zoom only). 3D: free orbit. */
 export type EditView = 'draw' | 'orbit';
 export type ItemKind = 'ring' | 'star' | 'finish';
@@ -29,9 +30,22 @@ export interface EditorSettings {
   autoBank: boolean;
   decor: DecorKind;
   item: ItemKind;
+  /** Line and Curve: 15° steps (Shift draws freely). */
+  angleSnap: boolean;
+  /** Line, Curve and placed points land on the 1-unit grid. */
+  gridSnap: boolean;
+  /** Pencil steadiness, 0–100. */
+  smooth: number;
+  piece: ProfilePiece;
+  pathPiece: PathPiece;
+  pieceSize: PieceSize;
 }
 
-const SNAP_PX = 26;
+type Endpoint = { stroke: Stroke; point: THREE.Vector3; isEnd: boolean };
+
+/** Endpoint snapping reach: a fingertip needs more than a mouse. */
+const SNAP_PX = TOUCH_DEVICE ? 44 : 26;
+const ANGLE_SNAP = THREE.MathUtils.degToRad(5);
 const MIN_SEG = 0.35;
 const LINE_STEP = 0.5;
 /** Holding still on a line this long makes its plane the drawing plane. */
@@ -49,7 +63,14 @@ interface DrawState {
   normal: THREE.Vector3;
   start: THREE.Vector3;
   preview: THREE.Mesh | null;
+  /** Carrying on from a line's end: the way it left (the start eases into it). */
+  tangent: THREE.Vector3 | null;
+  /** Pencil: the lazy pen point the line follows. */
+  lazy: THREE.Vector3;
 }
+
+/** Build tool: the next piece, see-through. */
+const GHOST = new THREE.MeshBasicMaterial({ color: 0xffb02e, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
 
 /** Puzzle limits: a fixed amount of ink, and only some tools and line types. */
 export interface EditRules {
@@ -77,6 +98,12 @@ export class Editor {
     autoBank: true,
     decor: 'pine',
     item: 'star',
+    angleSnap: true,
+    gridSnap: false,
+    smooth: TOUCH_DEVICE ? 60 : 40,
+    piece: 'slope',
+    pathPiece: 'straight',
+    pieceSize: 'M',
   };
   readonly history = new History();
   /** The Select tool's strokes and clipboard. */
@@ -93,6 +120,8 @@ export class Editor {
   }
   /** Fired with a short status message (e.g. bank angle). */
   onHint?: (text: string) => void;
+  /** Length and slope of the Line or Curve being drawn, by the pointer (null: hide). */
+  onMeasure?: (text: string | null, x: number, y: number) => void;
 
   /** Settings changed from the editor itself (the panel redraws). */
   onChange?: () => void;
@@ -118,6 +147,14 @@ export class Editor {
   /** Camera bindings applied last ('off' when the editor isn't in use). */
   private bound = '';
   private time = 0;
+  /** A Curve waiting for its bend. */
+  private bend: { a: THREE.Vector3; b: THREE.Vector3; c: THREE.Vector3; normal: THREE.Vector3; tangent: THREE.Vector3 | null; preview: THREE.Mesh | null } | null = null;
+  private bendDrag = false;
+  private handle: THREE.Mesh;
+  /** Dashed guide: the end lines up with another line's end. */
+  private guide: THREE.Line;
+  private ghost = new THREE.Group();
+  private ghostKey = '';
   private snapRing: THREE.Mesh;
   private bankDrag: { stroke: Stroke; x: number; bank0: number } | null = null;
   private erasing = false;
@@ -160,6 +197,14 @@ export class Editor {
     this.snapRing.renderOrder = 10;
     this.snapRing.visible = false;
     scene.add(this.snapRing);
+    this.handle = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 14), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true, opacity: 0.95 }));
+    this.handle.add(new THREE.Mesh(new THREE.SphereGeometry(0.62, 20, 14), new THREE.MeshBasicMaterial({ color: 0xffb02e, depthTest: false, transparent: true, opacity: 0.45 })));
+    this.handle.renderOrder = 12;
+    this.handle.visible = false;
+    this.guide = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: 0xff8a1e, dashSize: 0.5, gapSize: 0.35, depthTest: false, transparent: true }));
+    this.guide.renderOrder = 12;
+    this.guide.visible = false;
+    scene.add(this.handle, this.guide, this.ghost);
 
     track.on((e) => {
       if (this.rules && (e.kind === 'strokeAdded' || e.kind === 'strokeRemoved' || e.kind === 'cleared')) this.inkSpent = track.inkUsed();
@@ -206,6 +251,7 @@ export class Editor {
   setTool(tool: Tool) {
     if (!this.allows(tool)) return;
     this.cancelDraw();
+    this.commitBend();
     if (tool !== 'select') this.selection.clear();
     this.tool = tool;
     this.dom.style.cursor = tool === 'eraser' || tool === 'bank' ? 'pointer' : tool === 'select' ? 'default' : 'crosshair';
@@ -406,8 +452,12 @@ export class Editor {
     this.time += dt;
     const active = visible && this.enabled;
     this.bindCamera(active);
-    const drawing = active && (this.tool === 'pencil' || this.tool === 'line' || this.tool === 'start' || this.tool === 'item');
-    this.work.update(drawing, this.settings.mode, this.time, this.draw, this.camera, false);
+    const drawing = active && (this.tool === 'pencil' || this.tool === 'line' || this.tool === 'curve' || this.tool === 'build' || this.tool === 'start' || this.tool === 'item');
+    const lining = this.tool === 'pencil' || this.tool === 'line' || this.tool === 'curve';
+    this.work.update(drawing, this.settings.mode, this.time, this.draw, this.camera, lining && !!this.work.tangent);
+    this.updateGhost(active && this.tool === 'build');
+    this.ghost.visible = active;
+    if (this.bend) this.handle.visible = active;
     this.view.setFocusPlane(active && this.editView === 'draw' && this.settings.mode === 'profile' ? this.work.plane('profile').plane : null);
     if (!active) this.snapRing.visible = false;
     if (this.draw && this.dragEvent && this.editView === 'draw' && dt > 0) this.followPen(dt);
@@ -446,16 +496,22 @@ export class Editor {
   }
 
   private findSnap(e: PointerEvent): THREE.Vector3 | null {
-    let best: THREE.Vector3 | null = null;
+    return this.findEnd(e)?.point ?? null;
+  }
+
+  /** The line end under the pointer, if one is close enough to snap to. */
+  private findEnd(e: PointerEvent): Endpoint | null {
+    let best: Endpoint | null = null;
     let bestD = SNAP_PX;
     for (const ep of this.track.endpoints()) {
       if (this.draw && this.draw.points[0] === ep.point) continue;
       const s = this.toScreen(ep.point);
       if (s.behind) continue;
       const d = Math.hypot(s.x - e.clientX, s.y - e.clientY);
-      if (d < bestD) {
+      // Ends win ties with starts: lines carry on from ends.
+      if (d < bestD || (best && !best.isEnd && ep.isEnd && Math.abs(d - bestD) < 4)) {
         bestD = d;
-        best = ep.point;
+        best = ep;
       }
     }
     return best;
@@ -530,24 +586,43 @@ export class Editor {
 
   /** What a press does with the current tool. */
   private act(e: PointerEvent) {
+    // A curve waiting for its bend: grab the handle, or anything else lays it down.
+    if (this.bend) {
+      if (this.nearHandle(e)) {
+        this.bendDrag = true;
+        this.controls.enabled = false;
+        return;
+      }
+      this.commitBend();
+    }
     switch (this.tool) {
       case 'pencil':
-      case 'line': {
+      case 'line':
+      case 'curve': {
         // Holding still on a line takes its plane instead of drawing.
         const hit = this.planeLocked ? null : this.pickStroke(e);
         this.beginStroke(e);
-        if (hit) {
-          this.press = {
-            x: e.clientX,
-            y: e.clientY,
-            timer: window.setTimeout(() => {
-              this.press = null;
-              this.cancelDraw();
-              this.dragPointer = null;
-              this.planeFromStroke(hit.stroke, hit.point);
-            }, LONG_PRESS_MS),
-          };
+        if (hit) this.armLongPress(e, hit.stroke, hit.point);
+        break;
+      }
+      case 'build': {
+        this.setRay(e);
+        if (this.raycaster.intersectObjects(this.ghost.children, false).length) {
+          this.addPiece();
+          break;
         }
+        // Tap a line's end to build on from there.
+        const ep = this.findEnd(e);
+        if (ep?.isEnd) {
+          if (ep.stroke.mode === 'profile') this.work.setNormal(ep.stroke.planeNormal);
+          this.settings.mode = ep.stroke.mode;
+          this.work.moveTo(ep.point, this.endTangent(ep, this.work.normal) ?? null);
+          this.onHint?.('Building on from this end');
+          this.onChange?.();
+          break;
+        }
+        const hit = this.planeLocked ? null : this.pickStroke(e);
+        if (hit) this.armLongPress(e, hit.stroke, hit.point);
         break;
       }
       case 'select': {
@@ -581,6 +656,20 @@ export class Editor {
     }
   }
 
+  /** Holding still on a line for a moment draws on its plane from there. */
+  private armLongPress(e: PointerEvent, stroke: Stroke, at: THREE.Vector3) {
+    this.press = {
+      x: e.clientX,
+      y: e.clientY,
+      timer: window.setTimeout(() => {
+        this.press = null;
+        this.cancelDraw();
+        this.dragPointer = null;
+        this.planeFromStroke(stroke, at);
+      }, LONG_PRESS_MS),
+    };
+  }
+
   private cancelPress() {
     if (this.press) clearTimeout(this.press.timer);
     this.press = null;
@@ -605,6 +694,10 @@ export class Editor {
       this.selection.move(e);
       return;
     }
+    if (active && this.bendDrag) {
+      this.dragBend(e);
+      return;
+    }
 
     if (this.draw && active) {
       this.dragEvent = e;
@@ -627,7 +720,8 @@ export class Editor {
     }
     // Hover feedback (mouse only).
     if (e.pointerType !== 'mouse' || e.target !== this.dom) return;
-    if (this.tool === 'pencil' || this.tool === 'line') {
+    this.dom.style.cursor = this.nearHandle(e) ? 'grab' : this.tool === 'eraser' || this.tool === 'bank' ? 'pointer' : this.tool === 'select' ? 'default' : 'crosshair';
+    if (this.tool === 'pencil' || this.tool === 'line' || this.tool === 'curve' || this.tool === 'build') {
       const snap = this.findSnap(e);
       this.showSnap(snap);
     } else {
@@ -654,6 +748,10 @@ export class Editor {
     }
     if (this.selection.active) {
       this.selection.up(e);
+      this.controls.enabled = true;
+    }
+    if (this.bendDrag) {
+      this.bendDrag = false;
       this.controls.enabled = true;
     }
     if (this.draw) this.finishStroke(e);
@@ -686,43 +784,138 @@ export class Editor {
 
   // ---------------------------------------------------------------- strokes
 
+  /** The way a line leaves an endpoint, when that point ends it (lines carry on from ends). */
+  private endTangent(ep: Endpoint | null, normal: THREE.Vector3) {
+    if (!ep?.isEnd) return null;
+    const pts = ep.stroke.points;
+    const t = pts[pts.length - 1].clone().sub(pts[pts.length - 2]);
+    // Onto the plane being drawn on.
+    if (this.settings.mode === 'profile') t.addScaledVector(normal, -t.dot(normal));
+    return t.lengthSq() > 1e-8 ? t.normalize() : null;
+  }
+
   private beginStroke(e: PointerEvent) {
-    const snap = this.findSnap(e);
+    const ep = this.findEnd(e);
+    const snap = ep?.point ?? null;
     const origin = snap ?? this.work.point;
     const { plane, normal } = this.planeThrough(origin);
     this.setRay(e);
-    let start: THREE.Vector3 | null = snap ? snap.clone() : this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+    let start = snap ?? this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
     if (!start) return;
-    if (snap) start = snap; // share the exact point for a seamless joint
-    this.draw = { points: [start], plane, normal, start: start.clone(), preview: null };
+    if (!snap && this.settings.gridSnap && this.tool !== 'pencil') start = this.gridPoint(start, this.work.point);
+    this.draw = { points: [start], plane, normal, start: start.clone(), preview: null, tangent: this.endTangent(ep, normal), lazy: start.clone() };
     this.drawT0 = performance.now();
     this.controls.enabled = false;
     this.showSnap(snap);
   }
 
-  /** Ray hit on the plane, at the current height for path strokes. */
-  private planeHit(e: PointerEvent, from: THREE.Vector3): THREE.Vector3 | null {
-    const d = this.draw!;
+  /** Where the pointer meets the stroke's plane (path strokes: before the descent). */
+  private planeHit(e: ScreenPoint): THREE.Vector3 | null {
     this.setRay(e);
-    if (this.settings.mode === 'path') {
-      // Horizontal plane through the stroke's start, then apply the descent.
-      const hit = this.raycaster.ray.intersectPlane(d.plane, new THREE.Vector3());
-      if (!hit) return null;
-      const dist = Math.hypot(hit.x - from.x, hit.z - from.z);
-      hit.y = from.y - (dist * this.settings.grade) / 100;
-      return hit;
+    return this.raycaster.ray.intersectPlane(this.draw!.plane, new THREE.Vector3());
+  }
+
+  /** Path strokes keep descending: the height drops with the distance covered from `from`. */
+  private descend(p: THREE.Vector3, from: THREE.Vector3) {
+    if (this.settings.mode !== 'path') return p;
+    p.y = from.y - (Math.hypot(p.x - from.x, p.z - from.z) * this.settings.grade) / 100;
+    return p;
+  }
+
+  /** World units per screen pixel around the camera's pivot. */
+  private pxToWorld(px: number) {
+    const dist = this.camera.position.distanceTo(this.controls.target);
+    return (px * 2 * dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)) / Math.max(1, this.dom.clientHeight);
+  }
+
+  /** Plane axes for snapping: `u` along, `v` up (path: away), through the stroke's plane. */
+  private snapAxes() {
+    const { u, v } = this.work.axes(this.settings.mode);
+    return { u, v };
+  }
+
+  /** Rounds a point on the plane to the 1-unit grid around `origin`. */
+  private gridPoint(p: THREE.Vector3, origin: THREE.Vector3) {
+    const { u, v } = this.snapAxes();
+    const d = p.clone().sub(origin);
+    const du = Math.round(d.dot(u));
+    const dv = Math.round(d.dot(v));
+    const rest = d.clone().addScaledVector(u, -d.dot(u)).addScaledVector(v, -d.dot(v));
+    return origin.clone().addScaledVector(u, du).addScaledVector(v, dv).add(rest);
+  }
+
+  /**
+   * Line, Curve and Build ends: 15° angle steps (Shift: free), the 1-unit grid, or lined up
+   * level or plumb with another line's end (a dashed guide shows it).
+   */
+  private shapeEnd(from: THREE.Vector3, hit: THREE.Vector3, e: PointerEvent) {
+    this.showGuide(null);
+    if (this.settings.gridSnap) return this.gridPoint(hit, from);
+    const { u, v } = this.snapAxes();
+    const d = hit.clone().sub(from);
+    const du = d.dot(u);
+    const dv = d.dot(v);
+    const len = Math.hypot(du, dv);
+    if (this.settings.angleSnap && !e.shiftKey && len > 0.3) {
+      const a = Math.atan2(dv, du);
+      const step = Math.PI / 12;
+      const snapped = Math.round(a / step) * step;
+      if (Math.abs(a - snapped) < ANGLE_SNAP) return from.clone().addScaledVector(u, Math.cos(snapped) * len).addScaledVector(v, Math.sin(snapped) * len);
     }
-    return this.raycaster.ray.intersectPlane(d.plane, new THREE.Vector3());
+    // Level or plumb with another end on this plane.
+    const tol = this.pxToWorld(TOUCH_DEVICE ? 12 : 7);
+    const w = new THREE.Vector3().crossVectors(u, v);
+    for (const ep of this.track.endpoints()) {
+      const o = ep.point.clone().sub(from);
+      if (Math.abs(o.dot(w)) > 0.5 || o.lengthSq() < 0.01) continue;
+      if (Math.abs(o.dot(v) - dv) < tol) {
+        const p = from.clone().addScaledVector(u, du).addScaledVector(v, o.dot(v));
+        this.showGuide([ep.point, p]);
+        return p;
+      }
+      if (Math.abs(o.dot(u) - du) < tol) {
+        const p = from.clone().addScaledVector(u, o.dot(u)).addScaledVector(v, dv);
+        this.showGuide([ep.point, p]);
+        return p;
+      }
+    }
+    return hit;
+  }
+
+  private showGuide(seg: [THREE.Vector3, THREE.Vector3] | null) {
+    this.guide.visible = !!seg;
+    if (!seg) return;
+    this.guide.geometry.setFromPoints(seg);
+    this.guide.computeLineDistances();
+  }
+
+  /** Length and slope next to the pointer while a Line or Curve is drawn. */
+  private measure(from: THREE.Vector3, to: THREE.Vector3, e: ScreenPoint) {
+    const d = to.clone().sub(from);
+    const flat = this.settings.mode === 'profile' ? Math.abs(d.dot(this.work.axes('profile').u)) : Math.hypot(d.x, d.z);
+    const slope = Math.round(THREE.MathUtils.radToDeg(Math.atan2(d.y, flat)));
+    this.onMeasure?.(`${(d.length() * METERS).toFixed(1)} m · ${slope > 0 ? '+' : ''}${slope}°`, e.clientX, e.clientY);
+  }
+
+  /** Pencil steadiness: the line trails the finger by this much (0 at Smooth 0). */
+  private lazyRadius() {
+    return this.pxToWorld(this.settings.smooth * 0.4);
   }
 
   private extendStroke(e: PointerEvent) {
     const d = this.draw!;
     // Puzzles: the stroke stops where the ink runs out.
     const budget = this.rules ? this.rules.ink - this.inkSpent : Infinity;
+    const raw = this.planeHit(e);
+    if (!raw) return;
     if (this.tool === 'pencil') {
+      // A lazy pen: the line follows a point pulled along behind the finger, which irons out wobbles.
+      const off = raw.clone().sub(d.lazy);
+      const len = off.length();
+      const r = this.lazyRadius();
+      if (len > r) d.lazy.addScaledVector(off, (len - r) / len);
       const last = d.points[d.points.length - 1];
-      const hit = this.planeHit(e, last);
-      if (!hit) return;
+      const hit = this.descend(d.lazy.clone(), last);
       if (hit.distanceTo(last) < MIN_SEG) return;
       const room = budget - pathLength(d.points);
       if (room < MIN_SEG) {
@@ -732,14 +925,14 @@ export class Editor {
       if (hit.distanceTo(last) > room) hit.sub(last).setLength(room).add(last);
       d.points.push(hit);
     } else {
-      const hit = this.planeHit(e, d.start);
-      if (!hit) return;
       const from = d.points[0];
+      const hit = this.descend(this.shapeEnd(from, raw, e), from);
       if (hit.distanceTo(from) > budget) {
         hit.sub(from).setLength(Math.max(0, budget)).add(from);
         this.outOfInk();
       }
       d.points = this.lineThrough(from, hit);
+      this.measure(from, hit, e);
     }
     this.showSnap(this.findSnap(e));
     this.updatePreview();
@@ -759,12 +952,12 @@ export class Editor {
     return pts;
   }
 
-  private strokeFromDraw(points: THREE.Vector3[]): Omit<Stroke, 'id'> {
+  private strokeFromDraw(points: THREE.Vector3[], normal = this.draw!.normal): Omit<Stroke, 'id'> {
     return {
       type: this.settings.lineType,
       mode: this.settings.mode,
       points,
-      planeNormal: this.draw!.normal.clone(),
+      planeNormal: normal.clone(),
       bank: THREE.MathUtils.degToRad(this.settings.bank),
       autoBank: this.settings.mode === 'path' && this.settings.autoBank,
       bankRefY: this.track.start.y,
@@ -793,6 +986,8 @@ export class Editor {
     this.dragEvent = null;
     this.controls.enabled = true;
     this.showSnap(null);
+    this.showGuide(null);
+    this.onMeasure?.(null, 0, 0);
   }
 
   private finishStroke(e: PointerEvent) {
@@ -801,25 +996,211 @@ export class Editor {
     // Snap the end onto another stroke's endpoint.
     const endSnap = this.findSnap(e);
     if (endSnap && pts.length >= 2) {
-      let snapped = this.tool === 'line' ? this.lineThrough(pts[0], endSnap) : pts.slice();
+      let snapped = this.tool === 'pencil' ? pts.slice() : this.lineThrough(pts[0], endSnap);
       snapped[snapped.length - 1] = endSnap;
       // Puzzles: a snap can't stretch the line past the ink left.
       if (this.rules && pathLength(snapped) > this.rules.ink - this.inkSpent + 0.05) snapped = pts;
       pts = snapped;
     }
-    if (this.tool === 'pencil') pts = smooth(pts);
+    if (this.tool === 'pencil') {
+      if (d.tangent) pts = blendStart(pts, d.tangent);
+      pts = smooth(pts, Math.round(this.settings.smooth / 25));
+    }
     const valid = pts.length >= 2 && pts[0].distanceTo(pts[pts.length - 1]) > 0.2;
-    const data = valid ? this.strokeFromDraw(pts) : null;
+    const normal = d.normal;
+    const tangent = d.tangent;
     this.cancelDraw();
-    if (!data) return;
-    let stroke = this.track.addStroke(data);
+    if (!valid) return;
+    // Curve: the line waits for a bend before it's laid down.
+    if (this.tool === 'curve') {
+      this.startBend(pts[0], pts[pts.length - 1], normal, tangent);
+      return;
+    }
+    this.lay([pts], normal);
+  }
+
+  /**
+   * Adds lines as one undo step and carries the plane's anchor on to the last one's end
+   * (undo puts it back).
+   */
+  private lay(lines: THREE.Vector3[][], normal: THREE.Vector3, extra?: Partial<Omit<Stroke, 'id'>>, finish?: Finish | null) {
+    const before = { point: this.work.point.clone(), tangent: this.work.tangent?.clone() ?? null };
+    const last = lines[lines.length - 1];
+    const end = last[last.length - 1];
+    const after = { point: end.clone(), tangent: end.clone().sub(last[last.length - 2]) };
+    const finish0 = this.track.finish;
+    let strokes = lines.map((pts) => this.track.addStroke({ ...this.strokeFromDraw(pts, normal), ...extra }));
+    if (finish) this.track.setFinish(finish);
     this.history.push({
-      undo: () => this.track.removeStroke(stroke),
-      redo: () => (stroke = this.track.addStroke(stroke)),
+      undo: () => {
+        strokes.forEach((s) => this.track.removeStroke(s));
+        if (finish) this.track.setFinish(finish0);
+        this.work.moveTo(before.point, before.tangent);
+        this.onChange?.();
+      },
+      redo: () => {
+        strokes = strokes.map((s) => this.track.addStroke(s));
+        if (finish) this.track.setFinish(finish);
+        this.work.moveTo(after.point, after.tangent);
+        this.onChange?.();
+      },
     });
-    // The next line carries on from this one's end.
-    const end = pts[pts.length - 1];
-    this.work.moveTo(end, end.clone().sub(pts[pts.length - 2]));
+    this.work.moveTo(after.point, after.tangent);
+  }
+
+  // ---------------------------------------------------------------- curve
+
+  /** A drawn Curve, waiting for its bend: drag the handle, then tap elsewhere or Done. */
+  private startBend(a: THREE.Vector3, b: THREE.Vector3, normal: THREE.Vector3, tangent: THREE.Vector3 | null) {
+    const c = tangent ? a.clone().addScaledVector(tangent, a.distanceTo(b) / 2) : a.clone().lerp(b, 0.5);
+    this.bend = { a, b, c, normal, tangent, preview: null };
+    this.bendPreview();
+    this.onChange?.();
+  }
+
+  get bending() {
+    return this.bend !== null;
+  }
+
+  private bendPoints() {
+    const { a, b, c } = this.bend!;
+    const n = Math.max(2, Math.ceil((a.distanceTo(c) + c.distanceTo(b)) / LINE_STEP));
+    const pts = [a];
+    for (let i = 1; i < n; i++) {
+      const t = i / n;
+      pts.push(new THREE.Vector3().addScaledVector(a, (1 - t) * (1 - t)).addScaledVector(c, 2 * (1 - t) * t).addScaledVector(b, t * t));
+    }
+    pts.push(b);
+    return pts;
+  }
+
+  private bendPreview() {
+    const bd = this.bend!;
+    if (bd.preview) {
+      this.scene.remove(bd.preview);
+      bd.preview.geometry.dispose();
+    }
+    bd.preview = buildRibbonMesh({ ...this.strokeFromDraw(this.bendPoints(), bd.normal), id: -1 });
+    this.scene.add(bd.preview);
+    this.handle.visible = true;
+    this.handle.position.copy(bd.c);
+    this.handle.scale.setScalar(THREE.MathUtils.clamp(this.camera.position.distanceTo(bd.c) / 26, 0.5, 4));
+  }
+
+  private nearHandle(e: ScreenPoint) {
+    if (!this.bend) return false;
+    const s = this.toScreen(this.bend.c);
+    return Math.hypot(s.x - e.clientX, s.y - e.clientY) < (TOUCH_DEVICE ? 44 : 22);
+  }
+
+  private dragBend(e: PointerEvent) {
+    const bd = this.bend!;
+    this.setRay(e);
+    const plane = this.planeThrough(bd.a).plane;
+    const hit = this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+    if (!hit) return;
+    if (bd.tangent) {
+      // Keeps the joint smooth: the handle slides along the line it carries on from.
+      const t = Math.max(0.3, hit.clone().sub(bd.a).dot(bd.tangent));
+      bd.c.copy(bd.a).addScaledVector(bd.tangent, t);
+    } else bd.c.copy(hit);
+    if (this.settings.mode === 'path') bd.c.y = (bd.a.y + bd.b.y) / 2;
+    this.bendPreview();
+  }
+
+  /** Lays the bent line down. */
+  commitBend() {
+    const bd = this.bend;
+    if (!bd) return;
+    const pts = this.bendPoints();
+    this.dropBend();
+    this.lay([pts], bd.normal);
+    this.onChange?.();
+  }
+
+  cancelBend() {
+    if (!this.bend) return;
+    this.dropBend();
+    this.onChange?.();
+  }
+
+  private dropBend() {
+    const bd = this.bend;
+    if (bd?.preview) {
+      this.scene.remove(bd.preview);
+      bd.preview.geometry.dispose();
+    }
+    this.bend = null;
+    this.bendDrag = false;
+    this.handle.visible = false;
+  }
+
+  // ---------------------------------------------------------------- build
+
+  /** The selected piece, laid from the end of the track (or the start flag). */
+  private nextPiece(): PieceResult | null {
+    const s = this.settings;
+    const origin = this.work.point.clone();
+    // From the start flag the first piece drops in just under it.
+    const fromStart = !this.work.tangent && origin.distanceToSquared(this.track.start) < 1e-4;
+    if (fromStart) origin.y -= 1.2;
+    const { u } = this.work.axes('profile');
+    if (s.mode === 'profile') {
+      const heading = fromStart ? THREE.MathUtils.degToRad(-15) : headingOn(this.work.tangent, u);
+      return profilePiece(s.piece, s.pieceSize, { origin, u, normal: this.work.normal, heading, width: s.width });
+    }
+    const dir = this.work.tangent ? new THREE.Vector3(this.work.tangent.x, 0, this.work.tangent.z) : u.clone();
+    if (dir.lengthSq() < 0.01) dir.copy(u);
+    return pathPiece(s.pathPiece, s.pieceSize, origin, dir.normalize(), s.grade);
+  }
+
+  /** Path pieces are bobsled runs: walls hold every ride in (no auto-bank). */
+  private pieceExtra(): Partial<Omit<Stroke, 'id'>> {
+    if (this.settings.mode === 'profile') return { bank: 0 };
+    return { bank: 0, autoBank: false, walls: true, width: Math.max(this.settings.width, 3.5) };
+  }
+
+  /** Lays the next piece (Build tool: Add, Enter, or a tap on the ghost). */
+  addPiece() {
+    const r = this.nextPiece();
+    if (!r) return;
+    const normal = this.settings.mode === 'profile' ? this.work.normal.clone() : UP.clone();
+    const finish = r.finish ? { position: r.finish.position, axis: r.finish.axis, halfWidth: Math.max(this.settings.width / 2 + 0.9, 2) } : null;
+    this.lay(r.strokes, normal, this.pieceExtra(), finish);
+    this.work.moveTo(r.end, r.tangent);
+    if (this.settings.mode === 'profile' && this.settings.piece === 'loop') this.onHint?.('Loops need speed, and a ride that stays seated: skis, boards, bikes or the buggy');
+    // Keep the end of the track in view.
+    const s = r.end.clone().project(this.camera);
+    if (Math.abs(s.x) > 0.6 || Math.abs(s.y) > 0.6 || s.z > 1) {
+      const target = this.controls.target.clone().lerp(r.end, 0.7);
+      const pos = this.camera.position.clone().add(target.clone().sub(this.controls.target));
+      this.fly?.(pos, target, 0.5);
+    }
+    this.onChange?.();
+  }
+
+  /** Rebuilds the see-through ghost of the next piece when anything it depends on changes. */
+  private updateGhost(show: boolean) {
+    const s = this.settings;
+    const t = this.work.tangent;
+    const key = show
+      ? [s.mode, s.piece, s.pathPiece, s.pieceSize, s.width, s.grade, s.lineType, this.work.point.toArray(), t?.toArray(), this.work.normal.toArray(), this.track.start.toArray()].join('|')
+      : '';
+    if (key === this.ghostKey) return;
+    this.ghostKey = key;
+    for (const m of [...this.ghost.children] as THREE.Mesh[]) {
+      this.ghost.remove(m);
+      m.geometry.dispose();
+    }
+    if (!show) return;
+    const r = this.nextPiece();
+    if (!r) return;
+    const normal = s.mode === 'profile' ? this.work.normal : UP;
+    for (const pts of r.strokes) {
+      const mesh = buildRibbonMesh({ ...this.strokeFromDraw(pts, normal), ...this.pieceExtra(), id: -1 });
+      mesh.material = (mesh.material as THREE.Material[]).map(() => GHOST);
+      this.ghost.add(mesh);
+    }
   }
 
   // ---------------------------------------------------------------- other tools
@@ -991,9 +1372,9 @@ export class Editor {
 }
 
 /** Light Laplacian smoothing that keeps both endpoints fixed. */
-function smooth(pts: THREE.Vector3[]): THREE.Vector3[] {
+function smooth(pts: THREE.Vector3[], passes = 2): THREE.Vector3[] {
   let cur = pts;
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < passes; pass++) {
     const next = cur.map((p) => p.clone());
     for (let i = 1; i < cur.length - 1; i++) {
       next[i].copy(cur[i - 1]).add(cur[i + 1]).multiplyScalar(0.25).addScaledVector(cur[i], 0.5);
@@ -1003,6 +1384,20 @@ function smooth(pts: THREE.Vector3[]): THREE.Vector3[] {
     cur = next;
   }
   return cur;
+}
+
+/** Carrying on from a line: the first stretch eases onto the way that line left, so the joint has no kink. */
+function blendStart(pts: THREE.Vector3[], tangent: THREE.Vector3, reach = 2.5): THREE.Vector3[] {
+  const out = pts.map((p) => p.clone());
+  out[0] = pts[0];
+  let s = 0;
+  for (let i = 1; i < pts.length; i++) {
+    s += pts[i].distanceTo(pts[i - 1]);
+    if (s >= reach) break;
+    const w = 1 - s / reach;
+    out[i].lerp(pts[0].clone().addScaledVector(tangent, s), w);
+  }
+  return out;
 }
 
 function pathLength(points: THREE.Vector3[]) {

@@ -5,6 +5,7 @@ import { LINE_COLORS } from '../track/types';
 import type { Stats, Trick } from '../game/RunStats';
 import { GRADE_LABEL } from '../game/RunStats';
 import { icon } from './icons';
+import { PATH_PIECES, PROFILE_PIECES } from '../editor/pieces';
 import { BIOMES, DEFAULT_WORLD, TIMES, WEATHERS, biomeById, type WorldConfig } from '../world/worlds';
 import { KMH, METERS, TOUCH, button, h, keyless, overlayOpen, setText } from './dom';
 import type { ScreenCtx, UIHandlers } from './types';
@@ -32,6 +33,8 @@ type Rest<F> = F extends (ctx: ScreenCtx, ...a: infer A) => unknown ? A : never;
 const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
   { id: 'pencil', icon: 'pencil', label: 'Pencil', key: 'Q' },
   { id: 'line', icon: 'line', label: 'Line', key: 'W' },
+  { id: 'curve', icon: 'curve', label: 'Curve', key: 'A' },
+  { id: 'build', icon: 'build', label: 'Build', key: 'K' },
   { id: 'select', icon: 'select', label: 'Select', key: 'X' },
   { id: 'eraser', icon: 'eraser', label: 'Eraser', key: 'E' },
   { id: 'bank', icon: 'bank', label: 'Bank', key: 'B' },
@@ -347,6 +350,15 @@ export class UI {
       if (!this.worldOpen) this.renderPanel();
     };
     editor.onView = (v) => this.showView(v);
+    const measure = h('div', 'measure hidden');
+    root.append(measure);
+    editor.onMeasure = (text, x, y) => {
+      measure.classList.toggle('hidden', !text);
+      if (!text) return;
+      measure.textContent = text;
+      // Above the finger on touch, beside the cursor with a mouse.
+      measure.style.transform = `translate(${Math.round(x + (TOUCH ? -40 : 18))}px, ${Math.round(y - (TOUCH ? 84 : 34))}px)`;
+    };
     this.showView(editor.editView);
     editor.selection.onChange = () => {
       if (this.editor.tool === 'select' && !this.worldOpen) this.renderPanel();
@@ -491,7 +503,54 @@ export class UI {
       r1.append(h('span', 'tip', 'Draw from left to right: the colored side is the floor. Press Play to test.'));
     } else if (rules && tool === 'eraser') {
       row().append(h('span', 'tip', 'Erase your own lines to get the ink back. The given track stays.'));
-    } else if (tool === 'pencil' || tool === 'line') {
+    } else if (tool === 'curve' && this.editor.bending) {
+      const r = row();
+      const done = button('chip action primary', `${icon('check', 16)}<span>Done</span><kbd>↵</kbd>`, 'Lay the curve down (Enter)');
+      done.onclick = () => {
+        this.handlers.click();
+        this.editor.commitBend();
+      };
+      const cancel = button('chip action', `${icon('close', 16)}<span>Cancel</span><kbd>Esc</kbd>`, 'Drop the curve (Esc)');
+      cancel.onclick = () => {
+        this.handlers.click();
+        this.editor.cancelBend();
+      };
+      r.append(done, cancel);
+      row().append(h('span', 'tip', 'Drag the round handle to bend the curve. Tap anywhere else to lay it down.'));
+    } else if (tool === 'build') {
+      const r1 = row();
+      seg(r1, LINE_TYPES.map((t) => ({ ...t, color: LINE_COLORS[t.id] })), s.lineType, (v) => (s.lineType = v));
+      const r2 = row();
+      seg(
+        r2,
+        [
+          { id: 'profile', label: 'Profile' },
+          { id: 'path', label: 'Path' },
+        ],
+        s.mode,
+        (v) => (s.mode = v),
+      );
+      seg(r2, (['S', 'M', 'L'] as const).map((z) => ({ id: z, label: z })), s.pieceSize, (v) => (s.pieceSize = v));
+      this.planeControls(r2);
+      const r3 = row();
+      if (s.mode === 'profile') seg(r3, PROFILE_PIECES, s.piece, (v) => (s.piece = v));
+      else seg(r3, PATH_PIECES, s.pathPiece, (v) => (s.pathPiece = v));
+      const add = button('chip action primary add-piece', `${icon('plus', 16)}<span>Add</span><kbd>↵</kbd>`, 'Add the piece (Enter)');
+      add.onclick = () => {
+        this.handlers.click();
+        this.editor.addPiece();
+      };
+      r3.append(add);
+      row().append(
+        h(
+          'span',
+          'tip',
+          s.mode === 'profile'
+            ? 'Pieces join on from the glowing tip. Tap Add (or the ghost) to lay one, Undo to take it back. Tap a line’s end to build from there.'
+            : 'Path pieces are bobsled runs with walls, winding down the mountain. Set the descent with Path on the Pencil.',
+        ),
+      );
+    } else if (tool === 'pencil' || tool === 'line' || tool === 'curve') {
       const r1 = row();
       seg(r1, LINE_TYPES.map((t) => ({ ...t, color: LINE_COLORS[t.id] })), s.lineType, (v) => (s.lineType = v));
       const r2 = row();
@@ -509,6 +568,12 @@ export class UI {
       slider(r2, 'Width', 1, 6, 0.2, s.width, '', (v) => (s.width = v));
       slider(r2, 'Bank', -90, 90, 5, s.bank, '°', (v) => (s.bank = v));
       if (s.mode === 'path') slider(r2, 'Descent', 0, 60, 1, s.grade, '%', (v) => (s.grade = v));
+      const r3 = row();
+      if (tool === 'pencil') slider(r3, 'Smooth', 0, 100, 5, s.smooth, '', (v) => (s.smooth = v));
+      else {
+        toggle(r3, s.angleSnap, TOUCH ? 'Snap 15°' : 'Snap 15° (Shift: free)', (v) => (s.angleSnap = v));
+        toggle(r3, s.gridSnap, 'Grid', (v) => (s.gridSnap = v));
+      }
     } else if (tool === 'select') {
       const sel = this.editor.selection;
       const r = row();
@@ -570,7 +635,7 @@ export class UI {
       };
       row().append(h('span', 'tip', tips[tool] ?? ''));
     }
-    if ((tool === 'pencil' || tool === 'line') && !rules) {
+    if ((tool === 'pencil' || tool === 'line' || (tool === 'curve' && !this.editor.bending)) && !rules) {
       const camera = TOUCH
         ? this.editor.editView === 'draw'
           ? 'Two fingers pan and zoom · tap two fingers to undo · hold on a line to draw on its plane.'
@@ -912,7 +977,12 @@ export class UI {
         else this.handlers.play();
         return;
       }
+      if (e.key === 'Escape' && this.editor.bending) return this.editor.cancelBend();
       if (e.key === 'Escape') return this.handlers.escape();
+      if (e.key === 'Enter' && this.editor.enabled && !this.playing) {
+        if (this.editor.bending) return this.editor.commitBend();
+        if (this.editor.tool === 'build') return this.editor.addPiece();
+      }
       if (e.key.toLowerCase() === 'c') return this.cycleCamera();
       if (e.key.toLowerCase() === 'f') return this.handlers.focusRider();
       if (e.key.toLowerCase() === 'p') return this.handlers.photo();

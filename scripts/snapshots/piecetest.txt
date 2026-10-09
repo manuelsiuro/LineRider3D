@@ -1,0 +1,6 @@
+rolling  smooth sled:ok skis:ok snowboard:ok bike:ok moto:ok buggy:ok coffin:ok
+steep    smooth sled:ok skis:ok snowboard:ok bike:ok moto:ok buggy:ok coffin:ok
+jump     smooth sled:ok skis:ok snowboard:ok bike:ok moto:ok buggy:ok coffin:ok
+loop     smooth skis:ok snowboard:ok bike:ok moto:ok buggy:ok
+small    smooth sled:ok skis:ok snowboard:ok bike:ok moto:ok buggy:ok coffin:ok
+path     sled:ok skis:ok snowboard:ok bike:ok moto:ok buggy:ok coffin:ok

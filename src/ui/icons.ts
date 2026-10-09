@@ -20,6 +20,8 @@ const P: Record<string, string> = {
   ring: '<ellipse cx="12" cy="12" rx="5" ry="9"/><path d="M2 12h7"/><path d="m15 12h7"/><path d="m19 9 3 3-3 3"/>',
   flag: '<path d="M5 22V3"/><path d="M5 4h13l-2.5 4.5L18 13H5"/>',
   test: '<path d="M5 22V3"/><path d="M5 4h10l-2 3.5 2 3.5H5"/><path d="m15 14.5 6 3.75-6 3.75z"/>',
+  curve: '<path d="M4 19C6 9 14 5 20 5"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="5" r="2"/><circle cx="8" cy="7" r="1.6" fill="currentColor"/><path d="M8 7 6.2 13" stroke-dasharray="1.5 2"/>',
+  build: '<rect x="2.5" y="13" width="7" height="7" rx="1.5"/><rect x="9.5" y="8" width="7" height="7" rx="1.5"/><path d="M16.5 6.5c2-1.5 3.5-1.5 5-1"/><path d="M19 3.5l2.5 1.5-1.5 2.5"/>',
   cube: '<path d="M12 2.5 20.5 7v10L12 21.5 3.5 17V7Z"/><path d="M3.5 7 12 11.5 20.5 7"/><path d="M12 11.5v10"/>',
   plane: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18" opacity=".45"/><path d="M5 17c4 0 5-9 14-9" stroke-width="2.4"/>',
   fit: '<path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/><rect x="8.5" y="8.5" width="7" height="7" rx="1"/>',
