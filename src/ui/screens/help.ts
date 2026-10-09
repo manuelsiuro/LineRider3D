@@ -29,7 +29,7 @@ export function showHelp(ctx: ScreenCtx) {
         )
           .map(([c, n]) => `<span><i style="background:${c}"></i>${n}</span>`)
           .join('')}</div>`,
-      text: 'Drag to draw. The <b>colored side</b> is the floor, so draw <b>left to right</b>. Start on the end of a track (orange ring) to join them.',
+      text: 'Drag to draw. The <b>colored side</b> is the floor, so draw <b>left to right</b>. Start on the <b>glowing tip</b> to carry on, or use <b>Build</b> for ready-made slopes, jumps and loops.',
     },
     {
       title: 'Watch Bosh ride',

@@ -5,6 +5,7 @@ import { RunStats } from '../src/game/RunStats';
 import { VEHICLES } from '../src/physics/vehicles';
 import { P } from '../src/physics/Rider';
 import { profilePiece, pathPiece, type PathPiece, type PieceSize, type ProfilePiece } from '../src/editor/pieces';
+import { buildTemplate, TEMPLATES } from '../src/editor/templates';
 import { check } from './assert';
 
 /**
@@ -104,3 +105,12 @@ buildPath(t, ['straight', 'left45', 'right90', 'sbend', 'straight']);
 const r = ride(t);
 check(r.allOk, 'path: every ride should finish');
 console.log('path'.padEnd(8), r.line);
+
+// New-track templates are built from pieces: each must ride to the finish too.
+for (const tpl of TEMPLATES) {
+  if (tpl.id === 'blank') continue;
+  buildTemplate(t, tpl.id);
+  const r = ride(t);
+  check(r.allOk, `template ${tpl.id}: every ride should finish`);
+  console.log(tpl.id.padEnd(8), r.line);
+}

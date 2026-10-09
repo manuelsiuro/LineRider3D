@@ -41,6 +41,14 @@ export interface EditorSettings {
   pieceSize: PieceSize;
 }
 
+export interface EditorPrefs {
+  view: EditView;
+  angleSnap: boolean;
+  gridSnap: boolean;
+  smooth: number;
+  pieceSize: PieceSize;
+}
+
 type Endpoint = { stroke: Stroke; point: THREE.Vector3; isEnd: boolean };
 
 /** Endpoint snapping reach: a fingertip needs more than a mouse. */
@@ -120,6 +128,8 @@ export class Editor {
   }
   /** Fired with a short status message (e.g. bank angle). */
   onHint?: (text: string) => void;
+  /** A line is being drawn (on) or done (off): touch layouts tuck the panel away meanwhile. */
+  onStroke?: (on: boolean) => void;
   /** Length and slope of the Line or Curve being drawn, by the pointer (null: hide). */
   onMeasure?: (text: string | null, x: number, y: number) => void;
 
@@ -277,6 +287,28 @@ export class Editor {
     if (!active) this.gestures.reset();
   }
 
+  /** The player's drawing preferences, kept between visits. */
+  prefs(): EditorPrefs {
+    const s = this.settings;
+    return { view: this.editView, angleSnap: s.angleSnap, gridSnap: s.gridSnap, smooth: s.smooth, pieceSize: s.pieceSize };
+  }
+
+  applyPrefs(p: Partial<EditorPrefs>) {
+    const s = this.settings;
+    if (p.view === 'draw' || p.view === 'orbit') this.editView = p.view;
+    if (typeof p.angleSnap === 'boolean') s.angleSnap = p.angleSnap;
+    if (typeof p.gridSnap === 'boolean') s.gridSnap = p.gridSnap;
+    if (typeof p.smooth === 'number') s.smooth = THREE.MathUtils.clamp(p.smooth, 0, 100);
+    if (p.pieceSize === 'S' || p.pieceSize === 'M' || p.pieceSize === 'L') s.pieceSize = p.pieceSize;
+    this.onView?.(this.editView);
+  }
+
+  /** Where the pen tip is on screen (the editor tour points at it). */
+  tipOnScreen() {
+    const s = this.toScreen(this.work.point);
+    return s.behind ? null : { x: s.x, y: s.y };
+  }
+
   /** Hands the camera to someone else (photo mode sets its own bindings right after). */
   release() {
     this.bindCamera(false);
@@ -309,11 +341,12 @@ export class Editor {
   }
 
   /** Draw-view camera square to the plane, around `target` (moved onto the plane). */
-  private drawCamera(target: THREE.Vector3 = this.controls.target, dist?: number) {
+  private drawCamera(target: THREE.Vector3 = this.controls.target, dist?: number, whole = false) {
     const mode = this.settings.mode;
     const t = this.work.plane(mode).plane.projectPoint(target, new THREE.Vector3());
-    if (t.distanceTo(this.work.point) > 80) t.copy(this.work.point);
-    const d = THREE.MathUtils.clamp(dist ?? this.camera.position.distanceTo(this.controls.target), 10, 120);
+    // A camera that wandered off (a run) comes back to the drawing; Fit may look far and wide.
+    if (!whole && t.distanceTo(this.work.point) > 80) t.copy(this.work.point);
+    const d = THREE.MathUtils.clamp(dist ?? this.camera.position.distanceTo(this.controls.target), 10, whole ? 380 : 120);
     const pos =
       mode === 'profile'
         ? t.clone().addScaledVector(this.work.normal, d * Math.cos(PITCH)).addScaledVector(UP, d * Math.sin(PITCH))
@@ -345,6 +378,15 @@ export class Editor {
     this.fly?.(pos, target, duration);
   }
 
+  /** The glowing tip in view, a little ahead of it: where the next line goes. */
+  showTip(duration = 1.4) {
+    const portrait = innerWidth < innerHeight;
+    const { u } = this.work.axes(this.settings.mode);
+    const target = this.work.point.clone().addScaledVector(u, portrait ? 2 : 6);
+    const c = this.drawCamera(target, portrait ? 46 : 32);
+    this.fly?.(c.pos, c.target, duration);
+  }
+
   /** Whole track in view (the Draw view keeps facing the plane). */
   fit(duration = 0.8) {
     const box = new THREE.Box3().expandByPoint(this.track.start);
@@ -354,9 +396,9 @@ export class Editor {
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     const half = THREE.MathUtils.degToRad(this.camera.fov) / 2;
     const fit = (sphere.radius + 4) / Math.sin(half) / Math.min(1, this.camera.aspect);
-    const dist = THREE.MathUtils.clamp(fit, 14, 220);
+    const dist = THREE.MathUtils.clamp(fit, 14, 380);
     if (this.editView === 'draw') {
-      const c = this.drawCamera(sphere.center, dist);
+      const c = this.drawCamera(sphere.center, dist, true);
       this.fly?.(c.pos, c.target, duration);
       return;
     }
@@ -805,6 +847,7 @@ export class Editor {
     if (!snap && this.settings.gridSnap && this.tool !== 'pencil') start = this.gridPoint(start, this.work.point);
     this.draw = { points: [start], plane, normal, start: start.clone(), preview: null, tangent: this.endTangent(ep, normal), lazy: start.clone() };
     this.drawT0 = performance.now();
+    this.onStroke?.(true);
     this.controls.enabled = false;
     this.showSnap(snap);
   }
@@ -978,6 +1021,7 @@ export class Editor {
   }
 
   private cancelDraw() {
+    if (this.draw) this.onStroke?.(false);
     if (this.draw?.preview) {
       this.scene.remove(this.draw.preview);
       this.draw.preview.geometry.dispose();

@@ -18,7 +18,9 @@ import { MEDALS, MEDAL_NAME, bestTime, levelMedal, medalFor, medalTimes, recordT
 import { LEVELS, chapterOf } from './levels/levels';
 import { OUTFITS, champions, isUnlocked, outfitUnlocked, loadProgress, saveLevelResult, selectOutfit, selectedOutfit, totalStars } from './game/progress';
 import { ACHIEVEMENTS, evaluate, loadCounters, noteWorld, selectPaint, unlockedAchievements, type RunContext } from './game/achievements';
-import { KEYS, migrateStorage, readFlag, readText, writeFlag, writeText } from './game/storage';
+import { KEYS, migrateStorage, readFlag, readJSON, readText, writeFlag, writeJSON, writeText } from './game/storage';
+import { buildTemplate, TEMPLATES, type TemplateId } from './editor/templates';
+import type { EditorPrefs } from './editor/Editor';
 import { createSlot, currentSlot, deleteSlot, duplicateSlot, freshName, listSlots, loadSlot, renameSlot, saveSlot, setCurrent } from './game/gallery';
 import { createStage, fitToWindow } from './app/stage';
 import { createCore, type Core } from './app/core';
@@ -75,6 +77,7 @@ const riderOn = () => session.kind !== 'puzzle' && (fixedTrack(session) || chall
 
 const moves = new CameraMoves(camera, controls);
 editor.fly = (pos, target, duration) => moves.flyTo(pos, target, duration);
+editor.applyPrefs(readJSON<Partial<EditorPrefs>>(KEYS.editorPrefs, {}));
 const input = new Input(playingGame, () => freeEdit(session), cycleVehicle);
 
 const run = new Run(core, {
@@ -187,6 +190,7 @@ let saveTimer = 0;
 
 /** Saves now if an autosave is pending (before the track or its slot changes). */
 function flushSave() {
+  writeJSON(KEYS.editorPrefs, editor.prefs());
   if (!saveTimer) return;
   clearTimeout(saveTimer);
   saveTrack();
@@ -285,9 +289,11 @@ const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('di
     run.stop();
     enterTitle();
   },
-  newTrack() {
+  async newTrack() {
+    const tpl = await ui.pickTemplate(TEMPLATES);
+    if (!tpl) return;
     noteSaved();
-    startNewTrack();
+    startNewTrack(tpl);
   },
   loadDemo() {
     noteSaved();
@@ -443,19 +449,24 @@ function openTrack(load: () => void, world: Partial<WorldConfig> | null, fresh =
   editor.showStart();
 }
 
-function startNewTrack() {
+function startNewTrack(template: TemplateId = 'blank') {
   enter(EDIT);
   slotId = null;
   slotName = '';
-  loadInto(() => {
-    track.clear();
-    track.setStart(new THREE.Vector3(0, 12, 0));
-  });
+  let end: ReturnType<typeof buildTemplate> = null;
+  loadInto(() => (end = buildTemplate(track, template)));
   worlds.change(DEFAULT_WORLD);
   pristine = true;
   editor.history.clear();
   run.stop();
   editor.showStart();
+  // A template carries on from the end of its track.
+  const e = end as ReturnType<typeof buildTemplate>;
+  if (e) {
+    editor.work.moveTo(e.end, e.tangent);
+    // Carry on from the end of the template.
+    editor.showTip();
+  }
 }
 
 function enterTitle() {
@@ -562,15 +573,17 @@ async function titleFlow() {
       if (await openGallery()) return;
       continue;
     }
-    if (choice === 'create') {
-      const id = currentSlot();
-      if (id) openSlot(id);
-      else startNewTrack();
-    } else {
-      startNewTrack();
-      const seen = readText(KEYS.helpSeen) !== null;
+    if (choice === 'create' && currentSlot()) {
+      openSlot(currentSlot()!);
+      return;
+    }
+    const tpl = await ui.pickTemplate(TEMPLATES);
+    if (!tpl) continue;
+    startNewTrack(tpl);
+    // A first track gets the walkthrough (the full help stays in the menu).
+    if (readText(KEYS.editorTour) === null) {
       writeText(KEYS.helpSeen, '1');
-      if (!seen) setTimeout(() => ui.showHelp(), 900);
+      setTimeout(() => ui.startTour(() => writeText(KEYS.editorTour, '1')), 1500);
     }
     return;
   }

@@ -9,7 +9,7 @@ import { PATH_PIECES, PROFILE_PIECES } from '../editor/pieces';
 import { BIOMES, DEFAULT_WORLD, TIMES, WEATHERS, biomeById, type WorldConfig } from '../world/worlds';
 import { KMH, METERS, TOUCH, button, h, keyless, overlayOpen, setText } from './dom';
 import type { ScreenCtx, UIHandlers } from './types';
-import { confirm, showLink } from './screens/dialogs';
+import { confirm, pickTemplate, showLink } from './screens/dialogs';
 import { BADGE, showTitle, worldCaption } from './screens/title';
 import { showLevels } from './screens/levels';
 import { showWardrobe } from './screens/wardrobe';
@@ -19,6 +19,7 @@ import { showDailyIntro, showLevelIntro, showSharedIntro } from './screens/intro
 import { hideSummary, showSummary } from './screens/summary';
 import { showPause, showPhotoMode, showSettings } from './screens/menus';
 import { showHelp } from './screens/help';
+import { startTour, type Tour } from './screens/editorTour';
 import { showPhone } from './screens/phone';
 import { showPuzzleIntro, showPuzzles } from './screens/puzzles';
 import { showGallery } from './screens/gallery';
@@ -43,6 +44,10 @@ const TOOLS: { id: Tool; icon: string; label: string; key: string }[] = [
   { id: 'start', icon: 'flag', label: 'Start', key: 'S' },
 ];
 
+/** Touch toolbar: these sit behind the Draw button, and these behind More. */
+const DRAW_TOOLS: Tool[] = ['pencil', 'line', 'curve'];
+const MORE_TOOLS: Tool[] = ['item', 'decor', 'start', 'bank'];
+
 const LINE_TYPES: { id: LineType; label: string }[] = [
   { id: 'normal', label: 'Track' },
   { id: 'accel', label: 'Boost' },
@@ -54,6 +59,17 @@ const LINE_TYPES: { id: LineType; label: string }[] = [
 export class UI {
   private root: HTMLElement;
   private toolButtons = new Map<Tool, HTMLButtonElement>();
+  private drawBtn!: HTMLButtonElement;
+  private moreBtn!: HTMLButtonElement;
+  private pop!: HTMLElement;
+  private dockUndo: HTMLButtonElement[] = [];
+  private dockView!: HTMLButtonElement;
+  /** The draw tool the touch Draw button picks. */
+  private lastDraw: Tool = 'pencil';
+  /** Touch: the options panel shows every row, not just the first. */
+  private panelExpanded = false;
+  private tour: Tour | null = null;
+  private historySize = 0;
   private viewButtons: HTMLButtonElement[] = [];
   private panel: HTMLElement;
   private playBtn: HTMLButtonElement;
@@ -305,8 +321,19 @@ export class UI {
       this.editor.fit();
     };
     toolbar.append(views, fitBtn, h('i', 'tool-sep'));
+    // Touch: one Draw button stands for Pencil, Line and Curve (the last one used); More
+    // holds the rest, so the toolbar fits a phone without scrolling.
+    const drawBtn = button('tool touch-only draw-tool', '', 'Draw');
+    drawBtn.onclick = () => {
+      handlers.click();
+      if (DRAW_TOOLS.includes(this.editor.tool) && !this.worldOpen) this.togglePop('draw');
+      else this.selectTool(this.lastDraw);
+    };
+    this.drawBtn = drawBtn;
+    toolbar.append(drawBtn);
     for (const t of TOOLS) {
-      const b = button('tool', `${icon(t.icon)}<span class="label">${t.label}</span><kbd>${t.key}</kbd>`, `${t.label} (${t.key})`);
+      const kind = DRAW_TOOLS.includes(t.id) ? 'draw-kind' : MORE_TOOLS.includes(t.id) ? 'more-kind' : '';
+      const b = button(`tool ${kind}`, `${icon(t.icon)}<span class="label">${t.label}</span><kbd>${t.key}</kbd>`, `${t.label} (${t.key})`);
       // Tapping the active tool again folds its options away (handy on phones).
       b.onclick = () => {
         handlers.click();
@@ -322,11 +349,45 @@ export class UI {
       handlers.click();
       this.toggleWorldPanel();
     };
+    this.worldBtn.classList.add('more-kind');
     toolbar.append(this.worldBtn);
+    const moreBtn = button('tool touch-only more-tool', `${icon('menu')}<span class="label">More</span>`, 'More tools');
+    moreBtn.onclick = () => {
+      handlers.click();
+      this.togglePop('more');
+    };
+    this.moreBtn = moreBtn;
+    toolbar.append(moreBtn);
+    // Pop-ups above the toolbar: the three draw tools, and the other tools.
+    this.pop = h('div', 'tool-pop hidden');
+    document.addEventListener('pointerdown', (e) => {
+      if (!this.pop.contains(e.target as Node) && !drawBtn.contains(e.target as Node) && !moreBtn.contains(e.target as Node)) this.pop.classList.add('hidden');
+    });
+    // Touch dock above the options: undo and redo for the left thumb, the view for the right.
+    const dock = h('div', 'dock touch-only');
+    const dUndo = button('dock-btn', icon('undo'), 'Undo (or tap with two fingers)');
+    dUndo.onclick = () => editor.history.undo();
+    const dRedo = button('dock-btn', icon('redo'), 'Redo (or tap with three fingers)');
+    dRedo.onclick = () => editor.history.redo();
+    this.dockUndo = [dUndo, dRedo];
+    const dView = button('dock-btn view-toggle', '', 'Draw view or 3D view');
+    dView.onclick = () => {
+      handlers.click();
+      this.editor.toggleView();
+    };
+    this.dockView = dView;
+    const dFit = button('dock-btn', icon('fit'), 'Fit the whole track (or pinch in quickly)');
+    dFit.onclick = () => {
+      handlers.click();
+      this.editor.fit();
+    };
+    dock.append(h('div', 'dock-group'), h('div', 'dock-group'));
+    dock.children[0].append(dUndo, dRedo);
+    dock.children[1].append(dView, dFit);
     const bottom = h('div', 'bottom');
     // Puzzles: how much ink is left (the par mark is the three-star line).
     this.inkMeter = h('div', 'ink-meter hidden', `<span class="ink-label">${icon('pencil', 14)} Ink</span><div class="ink-bar"><i class="ink-fill"></i><i class="ink-par"></i></div><b class="ink-left">0 m</b>`);
-    bottom.append(this.inkMeter, this.panel, toolbar);
+    bottom.append(this.inkMeter, dock, this.panel, this.pop, toolbar);
 
     this.hint = h('div', 'hint hidden');
     const replayTag = h('div', 'replay-tag', '<i></i>REPLAY');
@@ -350,6 +411,7 @@ export class UI {
       if (!this.worldOpen) this.renderPanel();
     };
     editor.onView = (v) => this.showView(v);
+    editor.onStroke = (on) => document.body.classList.toggle('stroking', on);
     const measure = h('div', 'measure hidden');
     root.append(measure);
     editor.onMeasure = (text, x, y) => {
@@ -400,6 +462,7 @@ export class UI {
     this.worldBtn.classList.toggle('active', this.worldOpen);
     for (const [id, b] of this.toolButtons) b.classList.toggle('active', !this.worldOpen && id === this.editor.tool);
     this.renderPanel();
+    this.refreshTouchTools();
   }
 
   selectTool(tool: Tool) {
@@ -410,11 +473,15 @@ export class UI {
     this.panel.classList.remove('folded');
     for (const [id, b] of this.toolButtons) b.classList.toggle('active', id === tool);
     this.renderPanel();
+    this.refreshTouchTools();
   }
 
   private showView(v: EditView) {
     for (const b of this.viewButtons) b.classList.toggle('active', b.dataset.view === v);
     document.body.classList.toggle('edit-orbit', v === 'orbit');
+    // The dock button offers the other view.
+    if (this.dockView) this.dockView.innerHTML = v === 'draw' ? `${icon('cube')}<span>3D</span>` : `${icon('plane')}<span>Draw</span>`;
+    if (v === 'orbit') this.tour?.event('orbit');
     this.renderPanel();
   }
 
@@ -426,6 +493,7 @@ export class UI {
     const s = this.editor.settings;
     const tool = this.editor.tool;
     this.panel.innerHTML = '';
+    this.panel.classList.remove('compact');
     const row = () => {
       const r = h('div', 'row');
       this.panel.append(r);
@@ -518,6 +586,7 @@ export class UI {
       r.append(done, cancel);
       row().append(h('span', 'tip', 'Drag the round handle to bend the curve. Tap anywhere else to lay it down.'));
     } else if (tool === 'build') {
+      const r3 = row();
       const r1 = row();
       seg(r1, LINE_TYPES.map((t) => ({ ...t, color: LINE_COLORS[t.id] })), s.lineType, (v) => (s.lineType = v));
       const r2 = row();
@@ -532,7 +601,6 @@ export class UI {
       );
       seg(r2, (['S', 'M', 'L'] as const).map((z) => ({ id: z, label: z })), s.pieceSize, (v) => (s.pieceSize = v));
       this.planeControls(r2);
-      const r3 = row();
       if (s.mode === 'profile') seg(r3, PROFILE_PIECES, s.piece, (v) => (s.piece = v));
       else seg(r3, PATH_PIECES, s.pathPiece, (v) => (s.pathPiece = v));
       const add = button('chip action primary add-piece', `${icon('plus', 16)}<span>Add</span><kbd>↵</kbd>`, 'Add the piece (Enter)');
@@ -645,6 +713,18 @@ export class UI {
           : 'Right-drag orbits, middle-drag pans · Tab: Draw view · hold on a line to draw on its plane.';
       row().append(h('span', 'tip', camera));
     }
+    // Touch: just the first row, with a button for the rest.
+    const rows = this.panel.querySelectorAll(':scope > .row');
+    if (TOUCH && rows.length > 1) {
+      this.panel.classList.toggle('compact', !this.panelExpanded);
+      const more = button('panel-more', this.panelExpanded ? icon('close', 16) : '•••', this.panelExpanded ? 'Fewer options' : 'More options');
+      more.onclick = () => {
+        this.handlers.click();
+        this.panelExpanded = !this.panelExpanded;
+        this.renderPanel();
+      };
+      rows[0].append(more);
+    }
   }
 
   /** Where lines go: turn the plane, step it nearer or further (path: up or down). */
@@ -673,14 +753,85 @@ export class UI {
   }
 
   private refreshHistory() {
-    this.undoBtn.disabled = !this.editor.history.canUndo;
-    this.redoBtn.disabled = !this.editor.history.canRedo;
+    const h = this.editor.history;
+    this.undoBtn.disabled = !h.canUndo;
+    this.redoBtn.disabled = !h.canRedo;
+    if (this.dockUndo.length) {
+      this.dockUndo[0].disabled = !h.canUndo;
+      this.dockUndo[1].disabled = !h.canRedo;
+    }
+    // A new edit (not an undo or redo) moves the tour on.
+    if (h.size > this.historySize && h.size > 0 && !h.canRedo) this.tour?.event(this.editor.tool === 'build' ? 'piece' : 'stroke');
+    this.historySize = h.size;
+  }
+
+  /** Touch pop-ups above the toolbar: the draw tools, or everything under More. */
+  private togglePop(which: 'draw' | 'more') {
+    const open = !this.pop.classList.contains('hidden') && this.pop.dataset.kind === which;
+    this.pop.classList.toggle('hidden', open);
+    if (open) return;
+    this.pop.dataset.kind = which;
+    this.pop.innerHTML = '';
+    const ids = which === 'draw' ? DRAW_TOOLS : MORE_TOOLS;
+    for (const id of ids) {
+      const t = TOOLS.find((x) => x.id === id)!;
+      if (!this.editor.allows(id)) continue;
+      const b = button(`pop-btn ${this.editor.tool === id && !this.worldOpen ? 'active' : ''}`, `${icon(t.icon)}<span>${t.label}</span>`);
+      b.onclick = () => {
+        this.handlers.click();
+        this.pop.classList.add('hidden');
+        this.selectTool(id);
+      };
+      this.pop.append(b);
+    }
+    if (which === 'more' && !this.editor.rules) {
+      const w = button(`pop-btn ${this.worldOpen ? 'active' : ''}`, `${icon('globe')}<span>World</span>`);
+      w.onclick = () => {
+        this.handlers.click();
+        this.pop.classList.add('hidden');
+        if (!this.worldOpen) this.toggleWorldPanel();
+      };
+      this.pop.append(w);
+    }
+  }
+
+  /** The touch Draw and More buttons show what they stand for. */
+  private refreshTouchTools() {
+    const tool = this.editor.tool;
+    if (DRAW_TOOLS.includes(tool)) this.lastDraw = tool;
+    const t = TOOLS.find((x) => x.id === this.lastDraw)!;
+    this.drawBtn.innerHTML = `${icon(t.icon)}<span class="label">${t.label}</span><i class="caret"></i>`;
+    this.drawBtn.classList.toggle('active', DRAW_TOOLS.includes(tool) && !this.worldOpen);
+    const more = MORE_TOOLS.includes(tool) || this.worldOpen;
+    this.moreBtn.classList.toggle('active', more);
+    const m = more ? (this.worldOpen ? { icon: 'globe', label: 'World' } : TOOLS.find((x) => x.id === tool)!) : { icon: 'menu', label: 'More' };
+    this.moreBtn.innerHTML = `${icon(m.icon)}<span class="label">${m.label}</span>`;
+    // Puzzles: only what's allowed.
+    this.moreBtn.classList.toggle('hidden', !!this.editor.rules && !MORE_TOOLS.some((id) => this.editor.allows(id)));
+  }
+
+  /** First track: a few coach marks, one at a time. */
+  startTour(done: () => void) {
+    this.tour?.stop();
+    this.tour = startTour(
+      [
+        { text: 'Drag from the <b>glowing dot</b> to draw a line. Draw left to right: the coloured side is the floor.', at: () => this.editor.tipOnScreen(), until: 'stroke' },
+        { text: 'Lines carry on from the dot. Tap <b>Build</b>, then <b>Add</b> a piece: it joins on by itself.', at: () => this.toolButtons.get('build') ?? null, until: 'piece' },
+        { text: `Tap <b>3D</b> to look around. Your lines stay where you drew them${TOUCH ? '. Two fingers pan and zoom' : ''}.`, at: () => (TOUCH ? this.dockView : this.viewButtons[1]), until: 'orbit' },
+        { text: 'Press <b>Play</b> and watch Bosh ride it!', at: () => this.playBtn, until: 'play' },
+      ],
+      () => {
+        this.tour = null;
+        done();
+      },
+    );
   }
 
   // ---------------------------------------------------------------- play state
 
   setPlaying(playing: boolean) {
     this.playing = playing;
+    if (playing) this.tour?.event('play');
     this.playBtn.innerHTML = icon(playing ? 'pause' : 'play', 24);
     this.playBtn.classList.toggle('is-playing', playing);
     document.body.classList.toggle('is-playing', playing);
@@ -1012,6 +1163,9 @@ export class UI {
 
   confirm(...a: Rest<typeof confirm>) {
     return confirm(this.ctx, ...a);
+  }
+  pickTemplate<T extends string>(templates: { id: T; name: string; blurb: string; icon: string }[]) {
+    return pickTemplate(this.ctx, templates);
   }
   showTitle(...a: Rest<typeof showTitle>) {
     return showTitle(this.ctx, ...a);

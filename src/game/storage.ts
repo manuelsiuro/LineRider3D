@@ -27,6 +27,10 @@ export const KEYS = {
   vehicle: 'lr3d.vehicle',
   riderMode: 'lr3d.riderMode',
   helpSeen: 'lr3d.helpSeen',
+  /** The editor walkthrough was shown (or skipped). */
+  editorTour: 'lr3d.editorTour',
+  /** Drawing preferences: Draw/3D view, snapping, smoothing, piece size. */
+  editorPrefs: 'lr3d.editorPrefs',
   sfx: 'lr3d.sfx',
   music: 'lr3d.music',
   /** The single editor track of saves before version 2 (moved into the gallery). */

@@ -1,0 +1,366 @@
+/* ------------------------------------------------------------ editor on touch */
+/* Phones and tablets: five big tools (Draw, Build, Erase, Select, More) that fit without
+   scrolling, a dock with undo/redo for the left thumb and the view for the right, and an
+   options panel that shows one row until asked for more. */
+
+.touch-only {
+  display: none;
+}
+
+body.touch .toolbar .touch-only {
+  display: flex;
+}
+
+body.touch .toolbar .draw-kind,
+body.touch .toolbar .more-kind,
+body.touch .toolbar .view-seg,
+body.touch .toolbar .fit-tool,
+body.touch .toolbar .tool-sep {
+  display: none;
+}
+
+/* Undo and redo live in the dock. */
+body.touch .top-right .btn-group:first-child {
+  display: none;
+}
+
+body.touch .toolbar {
+  width: 100%;
+  justify-content: space-between;
+  overflow: visible;
+}
+
+body.touch .tool {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  padding: 7px 2px 5px;
+}
+
+body.touch .tool .label {
+  display: block;
+  font-size: 10.5px;
+}
+
+body.touch .tool.hidden {
+  display: none;
+}
+
+/* The Draw button opens the other draw tools: a small caret says so. */
+.draw-tool .caret {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 5px solid currentColor;
+  opacity: 0.55;
+}
+
+/* Pop-up of tools above the toolbar. */
+.tool-pop {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 20px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid var(--stroke);
+  box-shadow: var(--shadow-lg);
+  animation: fade-up 0.2s var(--ease);
+}
+
+.tool-pop.hidden {
+  display: none;
+}
+
+.pop-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 64px;
+  min-height: 52px;
+  padding: 7px 8px 5px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.pop-btn.active {
+  color: white;
+  background: linear-gradient(180deg, #4b98ec, #2a6fc4);
+}
+
+/* Dock: undo/redo on the left, Draw/3D and Fit on the right. */
+body.touch .dock {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0 2px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  transition: opacity 0.2s;
+}
+
+.dock-group {
+  display: flex;
+  gap: 8px;
+}
+
+.dock-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 48px;
+  height: 48px;
+  padding: 0 12px;
+  border-radius: 24px;
+  font: 700 13px var(--font-ui);
+  color: var(--ink);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--stroke);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  transition: transform 0.15s var(--spring), opacity 0.2s;
+}
+
+.dock-btn:active {
+  transform: scale(0.92);
+}
+
+.dock-btn:disabled {
+  opacity: 0.45;
+}
+
+.dock-btn.view-toggle {
+  color: white;
+  background: linear-gradient(180deg, #4b98ec, #2a6fc4);
+  border-color: transparent;
+}
+
+/* Options: the first row, and a ••• button for the rest. */
+body.touch .panel.compact > .row:not(:first-child) {
+  display: none;
+}
+
+.panel-more {
+  display: inline-grid;
+  place-items: center;
+  min-width: 40px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font: 800 13px var(--font-ui);
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  background: #eef3f8;
+}
+
+/* While a finger draws, the options and dock step aside. */
+body.touch.stroking .bottom .panel,
+body.touch.stroking .bottom .dock {
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.touch.stroking .bottom .dock-btn {
+  pointer-events: none;
+}
+
+/* The touch panel scrolls sideways rather than piling rows up. */
+body.touch .panel.compact > .row:first-child {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  justify-content: flex-start;
+  scrollbar-width: none;
+}
+
+body.touch .panel.compact > .row:first-child::-webkit-scrollbar {
+  display: none;
+}
+
+body.touch .panel.compact > .row:first-child .seg {
+  flex-wrap: nowrap;
+}
+
+body.touch .panel.compact > .row:first-child > * {
+  flex: none;
+}
+
+/* ------------------------------------------------------------ editor tour */
+.coach {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 12px 10px 12px 14px;
+  border-radius: 18px;
+  color: white;
+  background: #1d2b44;
+  box-shadow: 0 16px 36px -12px rgba(10, 20, 40, 0.6);
+  font: 500 14px/1.4 var(--font-ui);
+  pointer-events: auto;
+}
+
+.coach p {
+  margin: 0;
+  flex: 1;
+}
+
+.coach b {
+  color: #ffd27a;
+}
+
+.coach::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--arrow-x, 50%) - 8px);
+  bottom: -7px;
+  width: 16px;
+  height: 16px;
+  background: inherit;
+  transform: rotate(45deg);
+  border-radius: 3px;
+}
+
+.coach.below::after {
+  top: -7px;
+  bottom: auto;
+}
+
+.coach.coach-in {
+  animation: pop-in 0.3s var(--spring);
+}
+
+.coach-step {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font: 700 11px var(--font-ui);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.coach-skip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: white;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ------------------------------------------------------------ new-track templates */
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 6px;
+}
+
+.template-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  text-align: left;
+  color: var(--ink);
+  background: #f2f6fb;
+  box-shadow: inset 0 0 0 1px rgba(18, 35, 58, 0.06);
+  transition: transform 0.15s var(--spring), background 0.2s;
+}
+
+.template-card:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) {
+  .template-card:hover {
+    background: #e6eef8;
+  }
+}
+
+.template-card i {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  color: white;
+  background: linear-gradient(150deg, #4b98ec, #2a6fc4);
+}
+
+.template-card span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.template-card b {
+  font: 700 16px var(--font-display);
+}
+
+.template-card small {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+/* ••• stays in reach at the end of the scrolling row. */
+body.touch .panel.compact > .row:first-child .panel-more,
+body.touch .panel > .row:first-child .panel-more {
+  position: sticky;
+  right: 0;
+  box-shadow: -10px 0 12px 2px var(--glass-strong, rgba(255, 255, 255, 0.9));
+}
+
+/* A phone on its side: a narrower toolbar, with the dock's two groups beside it
+   instead of a row above, so the track keeps most of the screen. */
+@media (max-height: 500px) {
+  body.touch .bottom {
+    width: min(500px, calc(100vw - 270px));
+  }
+  body.touch .dock {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 0;
+    padding: 0;
+  }
+  body.touch .dock-group {
+    position: absolute;
+    bottom: 2px;
+  }
+  body.touch .dock-group:first-child {
+    right: calc(100% + 12px);
+  }
+  body.touch .dock-group:last-child {
+    left: calc(100% + 12px);
+  }
+  body.touch .tool {
+    min-height: 46px;
+    padding: 5px 2px 4px;
+  }
+  body.touch .tool .label {
+    font-size: 10px;
+  }
+}

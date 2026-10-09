@@ -40,7 +40,7 @@ export function createStage(app: HTMLElement): Stage {
   controls.target.set(10, 15, 0);
   controls.enableDamping = true;
   controls.dampingFactor = 0.12;
-  controls.maxDistance = 250;
+  controls.maxDistance = 400;
   controls.minDistance = 2;
   controls.update();
 

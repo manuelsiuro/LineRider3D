@@ -4,3 +4,5 @@ jump     smooth sled:ok skis:ok snowboard:ok bike:ok moto:ok buggy:ok coffin:ok
 loop     smooth skis:ok snowboard:ok bike:ok moto:ok buggy:ok
 small    smooth sled:ok skis:ok snowboard:ok bike:ok moto:ok buggy:ok coffin:ok
 path     sled:ok skis:ok snowboard:ok bike:ok moto:ok buggy:ok coffin:ok
+slope    sled:ok skis:ok snowboard:ok bike:ok moto:ok buggy:ok coffin:ok
+jumps    sled:ok skis:ok snowboard:ok bike:ok moto:ok buggy:ok coffin:ok

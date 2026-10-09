@@ -63,3 +63,29 @@ export function showLink(ctx: ScreenCtx, url: string, challenge: number) {
   };
   document.body.append(overlay);
 }
+
+/** New track: start blank or from a ready-made layout. Resolves null when dismissed. */
+export function pickTemplate<T extends string>(ctx: ScreenCtx, templates: { id: T; name: string; blurb: string; icon: string }[]): Promise<T | null> {
+  return new Promise((resolve) => {
+    const overlay = h(
+      'div',
+      'modal',
+      `<div class="card small templates">
+        <h2>New track</h2>
+        <p>Start from scratch, or from a track to change and ride.</p>
+        <div class="template-list">${templates
+          .map((t, i) => `<button class="template-card ${i === 0 ? 'primary' : ''}" data-v="${t.id}"><i>${icon(t.icon, 26)}</i><span><b>${t.name}</b><small>${t.blurb}</small></span></button>`)
+          .join('')}</div>
+        <div class="actions"><button class="big-btn ghost" data-cancel>Cancel</button></div>
+      </div>`,
+    );
+    overlay.onclick = (e) => {
+      const btn = (e.target as HTMLElement).closest('button');
+      if (!btn && e.target !== overlay) return;
+      ctx.click();
+      closeOverlay(overlay, 200);
+      resolve(btn && !btn.hasAttribute('data-cancel') ? (btn.dataset.v as T) : null);
+    };
+    document.body.append(overlay);
+  });
+}

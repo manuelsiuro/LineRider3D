@@ -143,13 +143,18 @@ export function profilePiece(kind: ProfilePiece, size: PieceSize, f: ProfileFram
       t.arcTo(deg(22), 7 * s);
       t.straight(1.5 * s);
       lines.push(t.cut());
-      t.x += 7 * s;
-      t.y -= 1.5 * s;
-      t.h = deg(-25);
-      t.pts = [{ x: t.x, y: t.y, z: t.z }];
-      // Long enough for the fastest rides to touch down on.
-      t.straight(26 * s);
-      t.arcTo(deg(-12), 22 * s);
+      // The landing follows the measured flight off this lip (about the same for every
+      // ride), closing in on it so riders touch down smoothly, then a long run-out.
+      const lip = { x: t.x, y: t.y };
+      const flight = (dx: number) => -0.0266 * dx * dx + 0.35 * dx + 0.7;
+      const gapAt = (dx: number) => 1.6 - (dx - 10) / 16;
+      t.pts = [];
+      for (let dx = 10; dx <= 26 + 1e-6; dx += 0.5) t.pts.push({ x: lip.x + dx, y: lip.y + flight(dx) - gapAt(dx), z: t.z });
+      const lastPt = t.pts[t.pts.length - 1];
+      t.x = lastPt.x;
+      t.y = lastPt.y;
+      t.h = Math.atan(-0.0532 * 26 + 0.35 + 1 / 16);
+      t.arcTo(deg(-12), 45 * s);
       break;
     }
     case 'loop': {
@@ -169,7 +174,8 @@ export function profilePiece(kind: ProfilePiece, size: PieceSize, f: ProfileFram
       break;
     }
     case 'finish':
-      t.arcTo(0, 10 * s);
+      // A wide pull-out: fast rides land here off a slope.
+      t.arcTo(0, 24 * s);
       t.straight(12 * s);
       finishAt = { x: t.x - 4 * s, y: t.y };
       break;

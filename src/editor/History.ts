@@ -37,6 +37,11 @@ export class History {
     this.onChange?.();
   }
 
+  /** Steps that can be undone (grows with every new edit). */
+  get size() {
+    return this.done.length;
+  }
+
   get canUndo() {
     return this.done.length > 0;
   }
