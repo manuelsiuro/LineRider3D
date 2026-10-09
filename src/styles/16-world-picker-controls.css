@@ -232,6 +232,15 @@
   background: #4f3fd1;
 }
 
+.pad-chip.jump {
+  background: #2a6fc4;
+}
+
+.key.jump {
+  color: #2a6fc4;
+  min-width: 52px;
+}
+
 .ctl-note {
   display: flex;
   align-items: center;

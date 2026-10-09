@@ -247,6 +247,7 @@
   inset: auto 0 calc(max(16px, env(safe-area-inset-bottom)) + 8px) 0;
   display: flex;
   justify-content: space-between;
+  align-items: flex-end;
   padding: 0 max(16px, env(safe-area-inset-left));
   pointer-events: none !important;
 }
@@ -282,6 +283,23 @@
 
 .pad-push.down {
   background: rgba(36, 192, 122, 0.75);
+}
+
+/* Jump sits above Push, in reach of the same thumb. */
+.pad-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.pad-jump {
+  width: 76px;
+  height: 76px;
+}
+
+.pad-jump.down {
+  background: rgba(47, 127, 216, 0.8);
 }
 
 /* In rider mode on touch screens the gauge moves to the middle so the pads fit. */

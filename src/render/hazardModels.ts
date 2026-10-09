@@ -77,9 +77,9 @@ const BUILDERS: Record<HazardKind, (g: THREE.Group) => void> = {
     g.add(mesh(spikyBall(0.38, 40, 0.42, 2), MATS.spine, 0, 0.4, 0));
   },
   cactus(g) {
-    g.add(mesh(new THREE.CylinderGeometry(0.34, 0.38, 2.4, 8), MATS.cactus, 0, 1.2, 0));
-    g.add(mesh(new THREE.SphereGeometry(0.34, 8, 6), MATS.cactus, 0, 2.4, 0));
-    for (const [z, y0, y1] of [[-0.6, 1.1, 1.85], [0.6, 1.3, 2.05]] as const) {
+    g.add(mesh(new THREE.CylinderGeometry(0.34, 0.38, 1.85, 8), MATS.cactus, 0, 0.92, 0));
+    g.add(mesh(new THREE.SphereGeometry(0.34, 8, 6), MATS.cactus, 0, 1.85, 0));
+    for (const [z, y0, y1] of [[-0.6, 0.85, 1.4], [0.6, 1, 1.55]] as const) {
       g.add(mesh(new THREE.CylinderGeometry(0.2, 0.2, y1 - y0, 7), MATS.cactus, 0, (y0 + y1) / 2, z));
       g.add(mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.5, 7).rotateX(Math.PI / 2), MATS.cactus, 0, y0, z / 2));
       g.add(mesh(new THREE.SphereGeometry(0.2, 7, 5), MATS.cactus, 0, y1, z));
@@ -87,7 +87,7 @@ const BUILDERS: Record<HazardKind, (g: THREE.Group) => void> = {
     const spines = new THREE.Group();
     for (let i = 0; i < 26; i++) {
       const a = i * 2.4;
-      const y = 0.3 + (i / 26) * 2.1;
+      const y = 0.3 + (i / 26) * 1.55;
       const s = mesh(new THREE.ConeGeometry(0.03, 0.22, 3), MATS.cactusSpine, Math.cos(a) * 0.42, y, Math.sin(a) * 0.42);
       s.rotation.z = -Math.cos(a) * Math.PI / 2;
       s.rotation.x = Math.sin(a) * Math.PI / 2;

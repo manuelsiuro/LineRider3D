@@ -5,3 +5,5 @@ hazard   crash at 106 x38.5 (hazard Cactus)
 checkpt  passed 83 crash 140 respawn → x24.3 y10.8 respawns 1
 gravity  airtime earth 41 steps, moon 61 steps
 format   mud,crumble checkpoints 1 hazards lava
+jump     cactus cleared pressing at steps 106–120 (15)
+gap pit  urchin in the pit at x36.1: finish

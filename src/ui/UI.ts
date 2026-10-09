@@ -281,7 +281,10 @@ export class UI {
       'touch-pad hidden',
       `<button class="pad pad-brake" data-bit="2" aria-label="Brake / backflip">${icon('chevronLeft', 34)}<span>Brake</span></button>
        <button class="pad pad-spin" data-bit="4" aria-label="Spin">${icon('replay', 30)}<span>Spin</span></button>
-       <button class="pad pad-push" data-bit="1" aria-label="Push / frontflip">${icon('chevronRight', 34)}<span>Push</span></button>`,
+       <div class="pad-col">
+         <button class="pad pad-jump" data-bit="8" aria-label="Jump">${icon('chevronUp', 30)}<span>Jump</span></button>
+         <button class="pad pad-push" data-bit="1" aria-label="Push / frontflip">${icon('chevronRight', 34)}<span>Push</span></button>
+       </div>`,
     );
     let mask = 0;
     const held = new Map<number, number>();
@@ -716,6 +719,16 @@ export class UI {
           (v) => (s.hazard = v),
         );
         toggle(r, this.allHazards, 'All worlds', (v) => (this.allHazards = v));
+        seg(
+          row(),
+          [
+            { id: '0.6', label: 'Small' },
+            { id: '1', label: 'Normal' },
+            { id: '1.4', label: 'Big' },
+          ],
+          String(s.hazardScale),
+          (v) => (s.hazardScale = Number(v)),
+        );
       }
       const r2 = row();
       slider(r2, '3rd star target', 500, 30000, 500, this.editor.targetScore, ' pts', (v) => (this.editor.targetScore = v));
@@ -724,7 +737,7 @@ export class UI {
         ring: 'Tap a track to hang a ring over it.',
         finish: 'Tap a track to place the finish gate.',
         checkpoint: 'Tap a track to put up a checkpoint: after a wipeout the rider comes back to it.',
-        hazard: 'Tap a track to set a hazard on it: touching one is a wipeout.',
+        hazard: 'Tap a track to set a hazard on it: touching one is a wipeout. Riders jump small ones; build over big ones and lava.',
       };
       r2.append(h('span', 'tip', tips[s.item]));
     } else if (tool === 'decor') {
@@ -1169,6 +1182,8 @@ export class UI {
       if (mod) return;
       if (e.code === 'Space') {
         e.preventDefault();
+        // Riding with controls on, Space is the jump key (Esc pauses).
+        if (this.playing && this.handlers.spaceJumps()) return;
         if (this.playing) this.handlers.pause();
         else this.handlers.play();
         return;

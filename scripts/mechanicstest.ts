@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { Track, validateTrack } from '../src/track/Track';
 import { Simulation } from '../src/physics/Simulation';
-import { CRUMBLE_HOLD, P } from '../src/physics/Rider';
+import { CRUMBLE_HOLD, INPUT, P } from '../src/physics/Rider';
+import { buildTemplate } from '../src/editor/templates';
 import { RunStats } from '../src/game/RunStats';
 import { check } from './assert';
 import type { LineType } from '../src/track/types';
@@ -169,4 +170,58 @@ const x = (sim: Simulation) => sim.rider.pos[P.butt].x;
   // Old tracks have none of them.
   const old = validateTrack({ version: 1, start: [0, 12, 0], strokes: [], decor: [] });
   check(!('checkpoints' in old) && !('hazards' in old), 'format: old tracks unchanged');
+}
+
+// Jump: a well-timed hop clears a cactus on the track; holding the key hops only once.
+{
+  const t = new Track();
+  line(t, 'normal', -2, 110, (x) => Math.max(4, 22 - x * 0.25));
+  t.setStart(new THREE.Vector3(0, 22.8, 0));
+  t.addHazard({ kind: 'cactus', position: new THREE.Vector3(40, 12, 0), rotation: 0, scale: 1 });
+  const clears = (from: number, frames: number) => {
+    const sim = new Simulation(t);
+    for (let k = from; k < from + frames; k++) sim.setInput(k, INPUT.jump);
+    for (let g = 0; g < 400; g++) {
+      sim.seek(g);
+      if (sim.rider.crashed) return false;
+      if (x(sim) > 52) return true;
+    }
+    return false;
+  };
+  const window: number[] = [];
+  for (let f = 60; f < 160; f++) if (clears(f, 4)) window.push(f);
+  console.log(`jump     cactus cleared pressing at steps ${window[0]}–${window[window.length - 1]} (${window.length})`);
+  check(!clears(0, 0), 'jump: riding straight into the cactus is a crash');
+  check(window.length >= 8, 'jump: a fair timing window over a cactus');
+  // Held from the start: one hop, then the key must be let go.
+  const sim = new Simulation(t);
+  for (let k = 0; k < 400; k++) sim.setInput(k, INPUT.jump);
+  // A hop shows as the body rising off the slope (it only ever drops while riding it).
+  let hops = 0;
+  let rising = false;
+  for (let g = 1; g < 160; g++) {
+    sim.seek(g);
+    const up = sim.rider.velocity(new THREE.Vector3()).y > 0.05;
+    if (up && !rising) hops++;
+    rising = up;
+  }
+  check(hops === 1, `jump: holding the key hops once (${hops})`);
+}
+
+// Gap jump piece: a hazard in its pit stays under the flight.
+{
+  const t = new Track();
+  buildTemplate(t, 'jumps');
+  const pit = [...t.strokes.values()].find((s) => s.points.every((p) => Math.abs(p.y - s.points[0].y) < 1e-6) && s.points.length < 20)!;
+  const mid = pit.points[Math.floor(pit.points.length / 2)];
+  t.addHazard({ kind: 'urchin', position: mid.clone(), rotation: 0, scale: 1 });
+  const sim = new Simulation(t);
+  let end = '';
+  for (let f = 0; f < 900 && !end; f++) {
+    sim.seek(f);
+    if (sim.rider.crashed) end = 'crash';
+    else if (sim.rider.finished) end = 'finish';
+  }
+  console.log(`gap pit  urchin in the pit at x${mid.x.toFixed(1)}: ${end}`);
+  check(end === 'finish', 'gap pit: the jump clears a hazard in the pit');
 }

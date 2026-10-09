@@ -6,6 +6,7 @@ const KEY_BITS: Record<string, number> = {
   ArrowUp: INPUT.spin,
   ArrowLeft: INPUT.brake,
   ArrowDown: INPUT.brake,
+  ' ': INPUT.jump,
 };
 
 /** Live rider input from the arrow keys and the on-screen touch pad. */

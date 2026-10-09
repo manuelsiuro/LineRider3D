@@ -51,8 +51,8 @@ export function showHelp(ctx: ScreenCtx) {
           <div class="air-hint">${icon('replay', 16)} In the air, ${TOUCH ? '<b>Brake</b> and <b>Push</b>' : '<b>←</b> and <b>→</b>'} flip</div>
         </div>`,
       text: TOUCH
-        ? 'Turn on <b>rider mode</b> (the gamepad button) and steer Bosh with the buttons at the bottom of the screen. <b>Let go before landing</b> and touch down flat for a Perfect.'
-        : 'Turn on <b>rider mode</b> to steer Bosh. <b>Let go before landing</b> and touch down flat for a Perfect.',
+        ? 'Turn on <b>rider mode</b> (the gamepad button) and steer Bosh with the buttons at the bottom of the screen. <b>Jump</b> hops over hazards. <b>Let go before landing</b> and touch down flat for a Perfect.'
+        : 'Turn on <b>rider mode</b> to steer Bosh, and press <b>Space</b> to jump over hazards. <b>Let go before landing</b> and touch down flat for a Perfect.',
     },
     {
       title: 'Watch out',
@@ -66,7 +66,7 @@ export function showHelp(ctx: ScreenCtx) {
       )
         .map(([c, n]) => `<span><i style="background:${c}"></i>${n}</span>`)
         .join('')}</div>`,
-      text: 'Later levels get tricky. <b>Crumbling</b> lines only hold for a moment, so keep your speed. Steer clear of <b>hazards</b>. Passed a <b>checkpoint</b>? A wipeout only costs you time (but no medal).',
+      text: 'Later levels get tricky. <b>Crumbling</b> lines only hold for a moment, so keep your speed. <b>Jump</b> over low <b>hazards</b>, or build the track to fly over tall ones. Passed a <b>checkpoint</b>? A wipeout only costs you time (but no medal).',
     },
     {
       title: 'Rides and worlds',
@@ -81,7 +81,7 @@ export function showHelp(ctx: ScreenCtx) {
       title: 'Shortcuts',
       art: `<div class="help-short">
           ${keyGroup('Play', 'play', [
-            [['Space'], 'Play'],
+            [['Space'], 'Play · jump'],
             [['Esc'], 'Pause'],
             [['C'], 'Camera'],
             [['F'], 'Find Bosh'],

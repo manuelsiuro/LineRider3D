@@ -31,8 +31,9 @@ export interface EditorSettings {
   autoBank: boolean;
   decor: DecorKind;
   item: ItemKind;
-  /** The hazard the Items tool places. */
+  /** The hazard the Items tool places, and its size (small ones are easy to jump). */
   hazard: HazardKind;
+  hazardScale: number;
   /** Line and Curve: 15° steps (Shift draws freely). */
   angleSnap: boolean;
   /** Line, Curve and placed points land on the 1-unit grid. */
@@ -110,6 +111,7 @@ export class Editor {
     decor: 'pine',
     item: 'star',
     hazard: 'icicles',
+    hazardScale: 1,
     angleSnap: true,
     gridSnap: false,
     smooth: TOUCH_DEVICE ? 60 : 40,
@@ -1428,10 +1430,11 @@ export class Editor {
     const hit = this.placementHit(e);
     if (!hit) return;
     const kind = this.settings.hazard;
+    const scale = this.settings.hazardScale;
     const position = hit.point.clone();
-    if (HAZARDS[kind].hangs) position.addScaledVector(hit.normal, 3.6);
+    if (HAZARDS[kind].hangs) position.addScaledVector(hit.normal, 3.6 * scale);
     const rotation = Math.atan2(-hit.dir.z, hit.dir.x);
-    let h = this.track.addHazard({ kind, position, rotation, scale: 1 });
+    let h = this.track.addHazard({ kind, position, rotation, scale });
     this.history.push({ undo: () => this.track.removeHazard(h), redo: () => (h = this.track.addHazard(h)) });
   }
 

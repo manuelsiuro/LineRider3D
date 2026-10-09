@@ -2,8 +2,8 @@ import { TOUCH } from './dom';
 import { icon } from './icons';
 import type { Controls } from './types';
 
-const KEYCAP = { left: '←', right: '→', up: '↑' };
-const PADNAME = { left: 'Brake', right: 'Push', up: 'Spin' };
+const KEYCAP = { left: '←', right: '→', up: '↑', jump: 'Space' };
+const PADNAME = { left: 'Brake', right: 'Push', up: 'Spin', jump: 'Jump' };
 
 /** Tips and blurbs name keys (← → ↑); on touch they name the on-screen buttons instead. */
 export function padWords(text: string) {
@@ -25,7 +25,7 @@ export function controlsHtml(c: Controls) {
         // Touch: a little copy of the on-screen pad, then what it does (once, if that differs).
         if (c.touch) {
           const pad = PADNAME[it.key];
-          const ic = icon(it.key === 'up' ? 'replay' : it.key === 'left' ? 'chevronLeft' : 'chevronRight', 14);
+          const ic = icon(it.key === 'up' ? 'replay' : it.key === 'jump' ? 'chevronUp' : it.key === 'left' ? 'chevronLeft' : 'chevronRight', 14);
           return `<span class="ctl"><span class="pad-chip ${it.key}">${ic}${pad}</span>${it.label !== pad ? `<span>${it.label}</span>` : ''}</span>`;
         }
         return `<span class="ctl"><kbd class="key ${it.key}">${KEYCAP[it.key]}</kbd><span>${it.label}</span></span>`;

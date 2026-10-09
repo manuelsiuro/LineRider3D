@@ -36,7 +36,7 @@ const STEP = 0.5;
 const deg = THREE.MathUtils.degToRad;
 
 export interface PieceResult {
-  /** One or more lines (a gap jump is two). */
+  /** One or more lines (a gap jump is three: ramp, pit floor, landing). */
   strokes: THREE.Vector3[][];
   /** Where the next piece starts, and its direction. */
   end: THREE.Vector3;
@@ -146,6 +146,10 @@ export function profilePiece(kind: ProfilePiece, size: PieceSize, f: ProfileFram
       // The landing follows the measured flight off this lip (about the same for every
       // ride), closing in on it so riders touch down smoothly, then a long run-out.
       const lip = { x: t.x, y: t.y };
+      // A pit floor well under the flight: room for a hazard in the gap.
+      const pit: typeof t.pts = [];
+      for (let dx = 1.5; dx <= 8.5 + 1e-6; dx += 0.5) pit.push({ x: lip.x + dx, y: lip.y - 2.8, z: t.z });
+      lines.push(pit);
       const flight = (dx: number) => -0.0266 * dx * dx + 0.35 * dx + 0.7;
       const gapAt = (dx: number) => 1.6 - (dx - 10) / 16;
       t.pts = [];

@@ -38,9 +38,9 @@ export const HAZARDS: Record<HazardKind, HazardDef> = {
     kind: 'cactus',
     name: 'Cactus',
     shape: [
-      { a: [0, 0, 0], b: [0, 2.3, 0], r: 0.32 },
-      { a: [0, 1.1, -0.55], b: [0, 1.8, -0.55], r: 0.2 },
-      { a: [0, 1.3, 0.55], b: [0, 2, 0.55], r: 0.2 },
+      { a: [0, 0, 0], b: [0, 1.75, 0], r: 0.32 },
+      { a: [0, 0.85, -0.55], b: [0, 1.35, -0.55], r: 0.2 },
+      { a: [0, 1, 0.55], b: [0, 1.5, 0.55], r: 0.2 },
     ],
   },
   barrier: { kind: 'barrier', name: 'Road barrier', shape: [{ a: [0, 0.55, -1.25], b: [0, 0.55, 1.25], r: 0.4 }] },

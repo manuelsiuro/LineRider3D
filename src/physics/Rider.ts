@@ -33,7 +33,9 @@ export const CRUMBLE_HOLD = 24;
 const CRUMBLE_END = CRUMBLE_HOLD + 80;
 
 /** Player input bits for one step (rider mode). */
-export const INPUT = { push: 1, brake: 2, spin: 4 } as const;
+export const INPUT = { push: 1, brake: 2, spin: 4, jump: 8 } as const;
+/** Upward speed of a jump (units/step): about 2.5 m of air on Earth. */
+const HOP = 0.3;
 
 /** One-off events of a step, for sound and effects. */
 export const EVENT = { ring: 1, bounce: 2, star: 4, finish: 8, checkpoint: 16, respawn: 32 } as const;
@@ -49,8 +51,8 @@ export { P };
  * then these fields at `points * 6 + offset`, then one number per crumbling
  * line of the track (steps since it was first touched, 0 = not yet).
  */
-export const META = { crashed: 0, contact: 1, events: 2, spin: 3, stars: 4, finished: 5, yaw: 6, checkpoint: 7 } as const;
-export const META_SIZE = 8;
+export const META = { crashed: 0, contact: 1, events: 2, spin: 3, stars: 4, finished: 5, yaw: 6, checkpoint: 7, hopReady: 8 } as const;
+export const META_SIZE = 9;
 
 /**
  * The same bones with left/right swapped. Gauss-Seidel relaxation is order
@@ -114,6 +116,8 @@ export class Rider {
   checkpoint = 0;
   /** Touched mud this step. */
   private inMud = false;
+  /** The jump key was let go since the last jump (holding it jumps once, on landing if need be). */
+  hopReady = true;
 
   constructor(readonly def: VehicleDef = SLED) {
     this.count = def.points.length;
@@ -156,6 +160,7 @@ export class Rider {
     this.stars = 0;
     this.finished = false;
     this.checkpoint = 0;
+    this.hopReady = true;
     this.crumble.fill(0);
   }
 
@@ -175,6 +180,7 @@ export class Rider {
     // Without flat spins, the spin key simply pushes.
     if (input & INPUT.spin && !this.def.handling.yaw) input |= INPUT.push;
     if (input && !this.crashed) this.control(input);
+    this.hop(input);
     this.applySpin(input);
     this.ringRef.copy(this.pos[P.butt]);
     this.bounce = null;
@@ -434,6 +440,30 @@ export class Rider {
   }
 
   /**
+   * Jump: the whole ride hops off the track (or the ground), away from the surface it
+   * stands on, as one rigid body (no spin, so it lands as it took off).
+   */
+  private hop(input: number) {
+    if (!(input & INPUT.jump)) {
+      this.hopReady = true;
+      return;
+    }
+    if (!this.hopReady || this.crashed) return;
+    const down = [P.tailL, P.tailR, P.noseL, P.noseR].some((i) => this.contact[i]);
+    if (!down) return;
+    this.hopReady = false;
+    // Mostly up, leaning with the surface (last step's contact normals).
+    const up = sN.set(0, 1, 0);
+    if (this.normalSum.lengthSq() > 1e-6) up.add(sD.copy(this.normalSum).normalize()).normalize();
+    for (let i = 0; i < this.count; i++) this.prev[i].addScaledVector(up, -HOP * this.hopScale);
+  }
+
+  /** Jumps reach about the same height on the Moon (less push for less gravity). */
+  private get hopScale() {
+    return Math.sqrt(this.gravityScale);
+  }
+
+  /**
    * Arcade air control: holding a key spins the rider around the vehicle's
    * lateral axis (flips) or up axis (flat spins); releasing it settles the
    * spin. Positions and previous positions are rotated about their own
@@ -658,6 +688,7 @@ export class Rider {
     buf[m + META.finished] = this.finished ? 1 : 0;
     buf[m + META.yaw] = this.yawSpin;
     buf[m + META.checkpoint] = this.checkpoint;
+    buf[m + META.hopReady] = this.hopReady ? 1 : 0;
     for (let k = 0; k < this.crumble.length; k++) buf[m + META_SIZE + k] = this.crumble[k];
   }
 
@@ -677,6 +708,7 @@ export class Rider {
     this.finished = buf[m + META.finished] === 1;
     this.yawSpin = buf[m + META.yaw];
     this.checkpoint = buf[m + META.checkpoint];
+    this.hopReady = buf[m + META.hopReady] === 1;
     for (let k = 0; k < this.crumble.length; k++) this.crumble[k] = buf[m + META_SIZE + k] ?? 0;
   }
 }

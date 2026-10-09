@@ -282,3 +282,17 @@ body.touch .help-short .key {
   background: white;
   box-shadow: 0 2px 6px -2px rgba(18, 35, 58, 0.3), inset 0 0 0 1px rgba(18, 35, 58, 0.1);
 }
+
+/* Jump stays a step smaller than Push, on every screen. */
+.pad.pad-jump {
+  width: 68px;
+  height: 68px;
+  font-size: 11px;
+}
+
+@media (max-height: 500px) {
+  .pad.pad-jump {
+    width: 58px;
+    height: 58px;
+  }
+}

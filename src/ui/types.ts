@@ -36,6 +36,8 @@ export interface UIHandlers {
   cycleVehicle(): void;
   /** Touch pad input: bit mask from the on-screen buttons. */
   touchInput(mask: number): void;
+  /** Space jumps (riding with controls on) instead of pausing. */
+  spaceJumps(): boolean;
   /** The world of the track being edited. */
   world(): WorldConfig;
   /** Changes it; returns the (validated) world now shown. */
@@ -133,8 +135,8 @@ export interface MedalRow {
 export interface Controls {
   /** Touch device: name the on-screen buttons instead of keys. */
   touch: boolean;
-  ground: { key: 'left' | 'right' | 'up'; label: string }[];
-  air: { key: 'left' | 'right' | 'up'; label: string }[];
+  ground: { key: 'left' | 'right' | 'up' | 'jump'; label: string }[];
+  air: { key: 'left' | 'right' | 'up' | 'jump'; label: string }[];
   note: string;
 }
 

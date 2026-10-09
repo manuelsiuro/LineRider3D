@@ -95,6 +95,7 @@ export class Rides {
       ground: [
         { key: 'right', label: PUSH_LABEL[def.id] },
         { key: 'left', label: 'Brake' },
+        { key: 'jump', label: 'Jump' },
       ],
       air: [
         { key: back, label: 'Backflip' },

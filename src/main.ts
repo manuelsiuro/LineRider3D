@@ -378,6 +378,7 @@ const ui = new UI(stage.app.appendChild(Object.assign(document.createElement('di
   touchInput(mask) {
     input.touch = mask;
   },
+  spaceJumps: () => run.playing && playingGame() && riderOn() && !run.replaying,
   cycleVehicle,
   testHere,
   async gallery() {
