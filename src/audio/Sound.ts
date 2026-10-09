@@ -591,6 +591,23 @@ export class Sound {
     lfo.stop(t + 0.35);
   }
 
+  /** Take-off whoosh: higher and longer for a bigger jump (power 0..1). */
+  jump(power: number) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const len = 0.12 + power * 0.18;
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(220 + power * 80, t);
+    osc.frequency.exponentialRampToValueAtTime(520 + power * 520, t + len);
+    const g = ctx.createGain();
+    this.env(g, t, 0.16 + power * 0.08, 0.005, len);
+    osc.connect(g).connect(this.sfx);
+    osc.start(t);
+    osc.stop(t + len + 0.05);
+  }
+
   click(high = false) {
     const ctx = this.ctx;
     if (!ctx) return;

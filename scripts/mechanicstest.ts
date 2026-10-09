@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Track, validateTrack } from '../src/track/Track';
 import { Simulation } from '../src/physics/Simulation';
-import { CRUMBLE_HOLD, INPUT, P } from '../src/physics/Rider';
+import { CRUMBLE_HOLD, EVENT, INPUT, P } from '../src/physics/Rider';
 import { buildTemplate } from '../src/editor/templates';
 import { RunStats } from '../src/game/RunStats';
 import { check } from './assert';
@@ -172,15 +172,39 @@ const x = (sim: Simulation) => sim.rider.pos[P.butt].x;
   check(!('checkpoints' in old) && !('hazards' in old), 'format: old tracks unchanged');
 }
 
-// Jump: a well-timed hop clears a cactus on the track; holding the key hops only once.
+// Jump: holding charges it, letting go jumps. A tap hops about 1 m, a full charge about 3.6 m.
 {
+  const flat = new Track();
+  line(flat, 'normal', -2, 200, () => 2);
+  flat.setStart(new THREE.Vector3(0, 2.8, 0));
+  const apex = (hold: number) => {
+    const sim = new Simulation(flat);
+    for (let k = 40; k < 40 + hold; k++) sim.setInput(k, INPUT.jump);
+    sim.seek(39);
+    const base = sim.rider.pos[P.butt].y;
+    let top = base;
+    for (let g = 40; g < 260; g++) {
+      sim.seek(g);
+      top = Math.max(top, sim.rider.pos[P.butt].y);
+    }
+    return { rise: top - base, crashed: sim.rider.crashed };
+  };
+  const heights = [1, 8, 16, 24, 60].map((hold) => ({ hold, ...apex(hold) }));
+  console.log(`jump     rise by hold: ${heights.map((h) => `${h.hold} steps ${h.rise.toFixed(2)} m${h.crashed ? ' X' : ''}`).join(', ')}`);
+  check(Math.abs(heights[0].rise - 1) < 0.3, 'jump: a tap hops about 1 m');
+  check(Math.abs(heights[3].rise - 3.6) < 0.4, 'jump: a full charge leaps about 3.6 m');
+  check(heights.every((h, k) => k === 0 || h.rise >= heights[k - 1].rise - 1e-6), 'jump: longer holds jump higher');
+  check(Math.abs(heights[4].rise - heights[3].rise) < 0.05, 'jump: the charge stops at full');
+  check(heights.every((h) => !h.crashed), 'jump: lands safely on the flat');
+
+  // A cactus on a slope: a tap isn't enough, a well-timed full charge clears it.
   const t = new Track();
   line(t, 'normal', -2, 110, (x) => Math.max(4, 22 - x * 0.25));
   t.setStart(new THREE.Vector3(0, 22.8, 0));
   t.addHazard({ kind: 'cactus', position: new THREE.Vector3(40, 12, 0), rotation: 0, scale: 1 });
-  const clears = (from: number, frames: number) => {
+  const clears = (release: number, hold: number) => {
     const sim = new Simulation(t);
-    for (let k = from; k < from + frames; k++) sim.setInput(k, INPUT.jump);
+    for (let k = release - hold; k < release; k++) sim.setInput(k, INPUT.jump);
     for (let g = 0; g < 400; g++) {
       sim.seek(g);
       if (sim.rider.crashed) return false;
@@ -188,24 +212,29 @@ const x = (sim: Simulation) => sim.rider.pos[P.butt].x;
     }
     return false;
   };
-  const window: number[] = [];
-  for (let f = 60; f < 160; f++) if (clears(f, 4)) window.push(f);
-  console.log(`jump     cactus cleared pressing at steps ${window[0]}–${window[window.length - 1]} (${window.length})`);
+  const win = (hold: number) => {
+    const ok: number[] = [];
+    for (let f = 60; f < 160; f++) if (clears(f, hold)) ok.push(f);
+    return ok;
+  };
+  const tap = win(1);
+  const full = win(24);
+  console.log(`jump     cactus: tap clears ${tap.length} release steps, full charge ${full.length} (${full[0]}–${full[full.length - 1]})`);
   check(!clears(0, 0), 'jump: riding straight into the cactus is a crash');
-  check(window.length >= 8, 'jump: a fair timing window over a cactus');
-  // Held from the start: one hop, then the key must be let go.
-  const sim = new Simulation(t);
-  for (let k = 0; k < 400; k++) sim.setInput(k, INPUT.jump);
-  // A hop shows as the body rising off the slope (it only ever drops while riding it).
-  let hops = 0;
-  let rising = false;
-  for (let g = 1; g < 160; g++) {
+  check(full.length >= 12 && full.length > tap.length, 'jump: a full charge gives a fair window over a cactus');
+
+  // Let go just before landing: the jump fires on touchdown.
+  const sim = new Simulation(flat);
+  for (let k = 40; k < 64; k++) sim.setInput(k, INPUT.jump);
+  for (let k = 120; k < 124; k++) sim.setInput(k, INPUT.jump);
+  let jumps = 0;
+  let airFrom = -1;
+  for (let g = 1; g < 300; g++) {
     sim.seek(g);
-    const up = sim.rider.velocity(new THREE.Vector3()).y > 0.05;
-    if (up && !rising) hops++;
-    rising = up;
+    if (sim.rider.events & EVENT.jump) jumps++;
+    if (jumps === 1 && airFrom < 0 && !sim.rider.contact.some((c) => c)) airFrom = g;
   }
-  check(hops === 1, `jump: holding the key hops once (${hops})`);
+  check(jumps === 2, `jump: a jump let go of just before landing fires on touchdown (${jumps} jumps)`);
 }
 
 // Gap jump piece: a hazard in its pit stays under the flight.

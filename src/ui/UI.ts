@@ -93,6 +93,10 @@ export class UI {
   private starsChip: HTMLElement;
   private gapChip: HTMLElement;
   private touchPad: HTMLElement;
+  /** Jump power, beside the rider while Jump is held. */
+  private jumpMeter = h('div', 'jump-meter hidden', '<div class="jm-bar"><i></i><b style="bottom:33%"></b><b style="bottom:66%"></b></div><span>Jump</span>');
+  private jumpPad: HTMLElement | null = null;
+  private lastCharge = -1;
   private riderBtn: HTMLButtonElement;
   private vehicleBtn: HTMLButtonElement;
   private sfxBtn!: HTMLButtonElement;
@@ -420,7 +424,8 @@ export class UI {
       puckAt = { x: e.clientX, y: e.clientY };
     };
     puck.onpointerup = puck.onpointercancel = () => (puckAt = null);
-    root.append(h('div', 'letterbox'), top, player, floatPause, this.hud, this.popups, this.touchPad, puck, bottom, this.hint, replayTag);
+    root.append(h('div', 'letterbox'), top, player, floatPause, this.hud, this.popups, this.touchPad, this.jumpMeter, puck, bottom, this.hint, replayTag);
+    this.jumpPad = this.touchPad.querySelector('.pad-jump');
     this.setRiderMode(riderMode);
     editor.onHint = (t) => this.flash(t);
     editor.onChange = () => {
@@ -964,6 +969,28 @@ export class UI {
   }
 
   /** Shows the on-screen push/brake (and spin) buttons (touch devices, rider mode, riding). */
+  /**
+   * Jump charge (0..1) while Jump is held, shown beside the rider at (x, y) on screen and
+   * as a ring on the touch Jump button; null hides it.
+   */
+  setJumpCharge(charge: number | null, x = 0, y = 0) {
+    const m = this.jumpMeter;
+    m.classList.toggle('hidden', charge === null);
+    if (charge !== null) {
+      // Beside the rider, kept on screen.
+      const left = Math.min(Math.max(8, x + 34), innerWidth - 44);
+      const top = Math.min(Math.max(8, y - 70), innerHeight - 110);
+      m.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+    }
+    const c = charge ?? 0;
+    if (c === this.lastCharge) return;
+    this.lastCharge = c;
+    m.style.setProperty('--charge', String(c));
+    m.classList.toggle('full', c >= 1);
+    this.jumpPad?.style.setProperty('--charge', String(c));
+    this.jumpPad?.classList.toggle('full', c >= 1);
+  }
+
   setTouchPad(visible: boolean, spin = false) {
     this.touchPad.classList.toggle('hidden', !visible);
     this.touchPad.classList.toggle('with-spin', spin);

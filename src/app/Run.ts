@@ -247,6 +247,7 @@ export class Run {
       ui.popup('BOOST!', 'boost', true);
       this.flash = 0.35;
     }
+    if (events & EVENT.jump) sound.jump(sim.rider.hopPower);
     if (events & EVENT.checkpoint) {
       sound.ring();
       ui.popup('CHECKPOINT', 'boost', true);

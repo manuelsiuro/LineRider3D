@@ -51,8 +51,8 @@ export function showHelp(ctx: ScreenCtx) {
           <div class="air-hint">${icon('replay', 16)} In the air, ${TOUCH ? '<b>Brake</b> and <b>Push</b>' : '<b>←</b> and <b>→</b>'} flip</div>
         </div>`,
       text: TOUCH
-        ? 'Turn on <b>rider mode</b> (the gamepad button) and steer Bosh with the buttons at the bottom of the screen. <b>Jump</b> hops over hazards. <b>Let go before landing</b> and touch down flat for a Perfect.'
-        : 'Turn on <b>rider mode</b> to steer Bosh, and press <b>Space</b> to jump over hazards. <b>Let go before landing</b> and touch down flat for a Perfect.',
+        ? 'Turn on <b>rider mode</b> (the gamepad button) and steer Bosh with the buttons at the bottom of the screen. Hold <b>Jump</b> to charge it, let go to jump: the longer you hold, the higher you go. <b>Let go before landing</b> and touch down flat for a Perfect.'
+        : 'Turn on <b>rider mode</b> to steer Bosh, and hold <b>Space</b> to charge a jump (let go to take off: the longer, the higher). <b>Let go before landing</b> and touch down flat for a Perfect.',
     },
     {
       title: 'Watch out',

@@ -7,8 +7,8 @@ import { VEHICLES } from '../../src/physics/vehicles';
 import type { HazardKind } from '../../src/track/types';
 
 /**
- * Which hazards a jump clears: a gentle slope with one hazard on it; tries every
- * moment to press Jump and reports the timing window (in steps) that gets past clean.
+ * Which hazards a jump clears: a gentle slope with one hazard on it; tries a full-charge
+ * jump let go at every step and reports the timing window (in steps) that gets past clean.
  */
 const slope = (x: number) => Math.max(4, 22 - x * 0.25);
 function windowFor(kind: HazardKind, scale: number, vehicle = VEHICLES[0]) {
@@ -22,7 +22,7 @@ function windowFor(kind: HazardKind, scale: number, vehicle = VEHICLES[0]) {
   const ok: number[] = [];
   for (let f = 40; f < 160; f++) {
     const sim = new Simulation(t, vehicle);
-    for (let k = f; k < f + 4; k++) sim.setInput(k, INPUT.jump);
+    for (let k = f - 24; k < f; k++) sim.setInput(k, INPUT.jump);
     let clean = false;
     for (let g = 0; g < 400; g++) {
       sim.seek(g);

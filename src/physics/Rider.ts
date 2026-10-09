@@ -34,11 +34,16 @@ const CRUMBLE_END = CRUMBLE_HOLD + 80;
 
 /** Player input bits for one step (rider mode). */
 export const INPUT = { push: 1, brake: 2, spin: 4, jump: 8 } as const;
-/** Upward speed of a jump (units/step): about 2.5 m of air on Earth. */
-const HOP = 0.3;
+/** Steps of holding Jump for a full-power jump (0.6 s). */
+export const HOP_FULL = 24;
+/** Jump height (m) from a tap to a full charge. */
+const HOP_LOW = 1;
+const HOP_HIGH = 3.6;
+/** Steps a jump let go of in the air waits for the ride to touch down. */
+const HOP_BUFFER = 6;
 
 /** One-off events of a step, for sound and effects. */
-export const EVENT = { ring: 1, bounce: 2, star: 4, finish: 8, checkpoint: 16, respawn: 32 } as const;
+export const EVENT = { ring: 1, bounce: 2, star: 4, finish: 8, checkpoint: 16, respawn: 32, jump: 64 } as const;
 
 /** Max number of stars per track (one bit each in the recorded state). */
 export const MAX_STARS = 48;
@@ -51,8 +56,8 @@ export { P };
  * then these fields at `points * 6 + offset`, then one number per crumbling
  * line of the track (steps since it was first touched, 0 = not yet).
  */
-export const META = { crashed: 0, contact: 1, events: 2, spin: 3, stars: 4, finished: 5, yaw: 6, checkpoint: 7, hopReady: 8 } as const;
-export const META_SIZE = 9;
+export const META = { crashed: 0, contact: 1, events: 2, spin: 3, stars: 4, finished: 5, yaw: 6, checkpoint: 7, hopCharge: 8, hopPending: 9, hopWait: 10, hopPower: 11 } as const;
+export const META_SIZE = 12;
 
 /**
  * The same bones with left/right swapped. Gauss-Seidel relaxation is order
@@ -116,8 +121,13 @@ export class Rider {
   checkpoint = 0;
   /** Touched mud this step. */
   private inMud = false;
-  /** The jump key was let go since the last jump (holding it jumps once, on landing if need be). */
-  hopReady = true;
+  /** Steps Jump has been held (the charge, up to HOP_FULL). */
+  hopCharge = 0;
+  /** A jump let go of in the air, waiting to touch down: its charge, and steps left. */
+  hopPending = 0;
+  hopWait = 0;
+  /** Power (0..1) of the last jump (for its sound and effects). */
+  hopPower = 0;
 
   constructor(readonly def: VehicleDef = SLED) {
     this.count = def.points.length;
@@ -160,7 +170,10 @@ export class Rider {
     this.stars = 0;
     this.finished = false;
     this.checkpoint = 0;
-    this.hopReady = true;
+    this.hopCharge = 0;
+    this.hopPending = 0;
+    this.hopWait = 0;
+    this.hopPower = 0;
     this.crumble.fill(0);
   }
 
@@ -184,7 +197,8 @@ export class Rider {
     this.applySpin(input);
     this.ringRef.copy(this.pos[P.butt]);
     this.bounce = null;
-    this.events = 0;
+    this.events = this.jumped ? EVENT.jump : 0;
+    this.jumped = false;
     this.inMud = false;
     // Touched crumbling lines count down to falling away.
     for (let k = 0; k < this.crumble.length; k++) if (this.crumble[k] > 0 && this.crumble[k] < CRUMBLE_END) this.crumble[k]++;
@@ -440,28 +454,42 @@ export class Rider {
   }
 
   /**
-   * Jump: the whole ride hops off the track (or the ground), away from the surface it
-   * stands on, as one rigid body (no spin, so it lands as it took off).
+   * Jump: holding the key charges it, letting go jumps (a tap is a small hop, a full
+   * charge a big leap). The whole ride leaves the surface as one rigid body (no spin, so
+   * it lands as it took off). Let go in the air, it fires on touching down.
    */
   private hop(input: number) {
-    if (!(input & INPUT.jump)) {
-      this.hopReady = true;
+    if (input & INPUT.jump) {
+      if (!this.crashed) this.hopCharge = Math.min(HOP_FULL, this.hopCharge + 1);
       return;
     }
-    if (!this.hopReady || this.crashed) return;
+    if (this.hopCharge > 0) {
+      this.hopPending = this.hopCharge;
+      this.hopWait = HOP_BUFFER;
+      this.hopCharge = 0;
+    }
+    if (this.hopPending === 0) return;
     const down = [P.tailL, P.tailR, P.noseL, P.noseR].some((i) => this.contact[i]);
+    if (this.crashed || (!down && --this.hopWait <= 0)) {
+      this.hopPending = 0;
+      return;
+    }
     if (!down) return;
-    this.hopReady = false;
+    // Height from the charge (eased: the top end is reached only near full), speed from height.
+    const t = (this.hopPending - 1) / (HOP_FULL - 1);
+    const height = HOP_LOW + (HOP_HIGH - HOP_LOW) * t * (2 - t);
+    const speed = Math.sqrt(2 * -GRAVITY.y * this.gravityScale * height);
+    this.hopPending = 0;
+    this.hopPower = t;
     // Mostly up, leaning with the surface (last step's contact normals).
     const up = sN.set(0, 1, 0);
     if (this.normalSum.lengthSq() > 1e-6) up.add(sD.copy(this.normalSum).normalize()).normalize();
-    for (let i = 0; i < this.count; i++) this.prev[i].addScaledVector(up, -HOP * this.hopScale);
+    for (let i = 0; i < this.count; i++) this.prev[i].addScaledVector(up, -speed);
+    this.jumped = true;
   }
 
-  /** Jumps reach about the same height on the Moon (less push for less gravity). */
-  private get hopScale() {
-    return Math.sqrt(this.gravityScale);
-  }
+  /** Jumped this step (the event is raised once the step's events are cleared). */
+  private jumped = false;
 
   /**
    * Arcade air control: holding a key spins the rider around the vehicle's
@@ -688,7 +716,10 @@ export class Rider {
     buf[m + META.finished] = this.finished ? 1 : 0;
     buf[m + META.yaw] = this.yawSpin;
     buf[m + META.checkpoint] = this.checkpoint;
-    buf[m + META.hopReady] = this.hopReady ? 1 : 0;
+    buf[m + META.hopCharge] = this.hopCharge;
+    buf[m + META.hopPending] = this.hopPending;
+    buf[m + META.hopWait] = this.hopWait;
+    buf[m + META.hopPower] = this.hopPower;
     for (let k = 0; k < this.crumble.length; k++) buf[m + META_SIZE + k] = this.crumble[k];
   }
 
@@ -708,7 +739,10 @@ export class Rider {
     this.finished = buf[m + META.finished] === 1;
     this.yawSpin = buf[m + META.yaw];
     this.checkpoint = buf[m + META.checkpoint];
-    this.hopReady = buf[m + META.hopReady] === 1;
+    this.hopCharge = buf[m + META.hopCharge];
+    this.hopPending = buf[m + META.hopPending];
+    this.hopWait = buf[m + META.hopWait];
+    this.hopPower = buf[m + META.hopPower];
     for (let k = 0; k < this.crumble.length; k++) this.crumble[k] = buf[m + META_SIZE + k] ?? 0;
   }
 }

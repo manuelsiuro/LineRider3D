@@ -4,7 +4,7 @@ import './styles/index.css';
 import { TrackFormatError, validateTrack, type SerializedTrack } from './track/Track';
 import { CAMERA_LABELS, type CameraMode } from './render/CameraRig';
 import { STEPS_PER_SECOND } from './physics/Simulation';
-import { P } from './physics/Rider';
+import { HOP_FULL, P } from './physics/Rider';
 import { vehicleById, type VehicleDef } from './physics/vehicles';
 import { DEFAULT_WORLD, TIMES, WEATHERS, biomeById, normalizeWorld, sameWorld, surfaceOf, worldLabel, type BiomeId, type WorldConfig } from './world/worlds';
 import { UI, type SettingsView, type SummaryInfo } from './ui/UI';
@@ -1078,6 +1078,11 @@ function loop(time: number) {
   ui.setHud(game && (run.playing || run.frame > 0) && !run.summaryShown, runStats.stats, track.stars.size);
   ui.setGap(game && !run.summaryShown ? run.gap : null);
   ui.setTouchPad(stage.isTouch && riderOn() && game && run.playing && !run.replaying, rides.current.handling.yaw !== null);
+  // Jump power while the key is held.
+  if (game && riderOn() && !run.replaying && rider.hopCharge > 0 && !rider.crashed) {
+    const p = jumpAt.copy(riderCenter).project(camera);
+    ui.setJumpCharge(rider.hopCharge / HOP_FULL, ((p.x + 1) / 2) * innerWidth, ((1 - p.y) / 2) * innerHeight);
+  } else ui.setJumpCharge(null);
   stage.postfx.render(dt);
 
   if (!booted) {
@@ -1095,6 +1100,8 @@ function loop(time: number) {
       });
   }
 }
+/** Scratch: the rider's spot on screen for the jump meter. */
+const jumpAt = new THREE.Vector3();
 stage.renderer.setAnimationLoop(loop);
 
 // ------------------------------------------------------------------ dev hooks
