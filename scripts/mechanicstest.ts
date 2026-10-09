@@ -235,6 +235,23 @@ const x = (sim: Simulation) => sim.rider.pos[P.butt].x;
     if (jumps === 1 && airFrom < 0 && !sim.rider.contact.some((c) => c)) airFrom = g;
   }
   check(jumps === 2, `jump: a jump let go of just before landing fires on touchdown (${jumps} jumps)`);
+  // Holding Jump in the air doesn't charge: it starts on touching down.
+  const air = new Simulation(flat);
+  for (let k = 40; k < 64; k++) air.setInput(k, INPUT.jump);
+  for (let k = 70; k < 160; k++) air.setInput(k, INPUT.jump);
+  let land = -1;
+  let chargeAtLand = -1;
+  for (let g = 65; g < 160; g++) {
+    air.seek(g);
+    const down = air.rider.contact.some((c) => c);
+    if (g > 70 && down && land < 0) {
+      land = g;
+      chargeAtLand = air.rider.hopCharge;
+    }
+  }
+  air.seek(land + 10);
+  console.log(`jump     held through the air: charge ${chargeAtLand} on landing (step ${land}), ${air.rider.hopCharge} ten steps later`);
+  check(land > 0 && chargeAtLand <= 1 && air.rider.hopCharge >= 9, 'jump: charging only starts on the ground');
 }
 
 // Gap jump piece: a hazard in its pit stays under the flight.

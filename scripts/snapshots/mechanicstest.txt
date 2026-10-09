@@ -7,4 +7,5 @@ gravity  airtime earth 41 steps, moon 61 steps
 format   mud,crumble checkpoints 1 hazards lava
 jump     rise by hold: 1 steps 0.88 m, 8 steps 2.20 m, 16 steps 3.09 m, 24 steps 3.41 m, 60 steps 3.42 m
 jump     cactus: tap clears 0 release steps, full charge 23 (99–121)
+jump     held through the air: charge 0 on landing (step 104), 10 ten steps later
 gap pit  urchin in the pit at x36.1: finish

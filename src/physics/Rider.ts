@@ -454,13 +454,15 @@ export class Rider {
   }
 
   /**
-   * Jump: holding the key charges it, letting go jumps (a tap is a small hop, a full
-   * charge a big leap). The whole ride leaves the surface as one rigid body (no spin, so
-   * it lands as it took off). Let go in the air, it fires on touching down.
+   * Jump: holding the key on the ground charges it, letting go jumps (a tap is a small
+   * hop, a full charge a big leap). The whole ride leaves the surface as one rigid body
+   * (no spin, so it lands as it took off). A charge carried over a bump holds; let go in
+   * the air, it fires on touching down.
    */
   private hop(input: number) {
     if (input & INPUT.jump) {
-      if (!this.crashed) this.hopCharge = Math.min(HOP_FULL, this.hopCharge + 1);
+      const down = [P.tailL, P.tailR, P.noseL, P.noseR].some((i) => this.contact[i]);
+      if (down && !this.crashed) this.hopCharge = Math.min(HOP_FULL, this.hopCharge + 1);
       return;
     }
     if (this.hopCharge > 0) {
