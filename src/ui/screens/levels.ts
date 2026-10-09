@@ -18,13 +18,13 @@ export function showLevels(ctx: ScreenCtx, levels: LevelCard[], worlds: WorldTab
     let current: BiomeId = focus ?? [...open].reverse().find((w) => got(w.id) > 0 && got(w.id) < inWorld(w.id).length * 3)?.id ?? open[0]?.id ?? worlds[0].id;
 
     const pips = (n: number) => `<span class="level-diff" title="Difficulty ${n} of 5">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= n ? 'on' : ''}"></i>`).join('')}</span>`;
-    const card = (l: LevelCard, i: number, k: number) => `<button class="level-card ${l.unlocked ? '' : 'locked'}" data-world="${l.world}" data-i="${i}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${Math.min(k, 14) * 0.03}s">
+    const card = (l: LevelCard, i: number, k: number, worldIsOpen: boolean) => `<button class="level-card ${l.unlocked ? '' : 'locked'}" data-world="${l.world}" data-i="${i}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${Math.min(k, 14) * 0.03}s">
           <span class="level-num">${l.unlocked ? i + 1 : icon('lock', 20)}</span>
           <span class="level-badges">${l.skill ? `<span title="Needs your controls">${icon('gamepad', 18)}</span>` : ''}${l.ride ? `<span title="Made for one ride">${icon(l.ride, 18)}</span>` : ''}</span>
           <span class="level-name">${l.name}</span>
           ${pips(l.difficulty)}
-          <span class="level-stars">${[0, 1, 2].map((s) => `<i class="${s < l.stars ? 'on' : ''}">${icon('star', 18)}</i>`).join('')}${l.medal ? `<b class="level-medal ${l.medal}" title="${l.medal} medal">${icon('medal', 16)}</b>` : ''}</span>
-          <span class="level-best">${l.unlocked ? (l.score ? `Best ${l.score.toLocaleString()}` : 'Not played') : 'Get a star on the previous level'}</span>
+          <span class="level-stars">${[0, 1, 2].map((s) => `<i class="${s < l.stars ? 'on' : ''}">${icon('star', 18)}</i>`).join('')}${l.medal && l.unlocked ? `<b class="level-medal ${l.medal}" title="${l.medal} medal">${icon('medal', 16)}</b>` : ''}</span>
+          <span class="level-best">${l.unlocked ? (l.score ? `Best ${l.score.toLocaleString()}` : 'Not played') : worldIsOpen ? `Star level ${i} to open` : 'Opens with the world'}</span>
         </button>`;
 
     const tabs = () =>
@@ -33,7 +33,7 @@ export function showLevels(ctx: ScreenCtx, levels: LevelCard[], worlds: WorldTab
         .map((w) => {
           const n = inWorld(w.id).length * 3;
           return `<button class="world-tab ${w.id === current ? 'active' : ''} ${w.open ? '' : 'locked'}" data-world="${w.id}" data-tab="${w.id}">
-            <span class="world-tab-ic">${icon(w.open ? w.id : 'lock', 20)}</span>
+            <span class="world-tab-ic">${icon(w.id, 20)}${w.open ? '' : `<i class="world-tab-lock">${icon('lock', 11)}</i>`}</span>
             <span class="world-tab-text"><b>${biomeById(w.id).name}</b><small>${w.open ? `${icon('star', 12)} ${got(w.id)}/${n}` : `${icon('star', 12)} ${w.gate} to open`}</small></span>
           </button>`;
         })
@@ -45,7 +45,14 @@ export function showLevels(ctx: ScreenCtx, levels: LevelCard[], worlds: WorldTab
       const items = inWorld(current);
       const lock = w.open
         ? ''
-        : `<div class="world-lock">${icon('lock', 18)}<span>Collect <b>${w.gate - stars}</b> more ${icon('star', 14)} to open ${b.name} (${stars} / ${w.gate}).</span></div>`;
+        : `<div class="world-lock">
+            <span class="world-lock-ic">${icon('lock', 20)}</span>
+            <div class="world-lock-body">
+              <p>Collect <b>${w.gate - stars}</b> more stars to open ${b.name}</p>
+              <div class="world-lock-bar"><i style="width:${Math.min(100, (stars / Math.max(1, w.gate)) * 100).toFixed(1)}%"></i></div>
+            </div>
+            <span class="world-lock-count">${icon('star', 14)} ${stars} / ${w.gate}</span>
+          </div>`;
       return `<section class="chapter" data-world="${current}">
           <header class="chapter-head">
             <span class="chapter-icon">${icon(current, 26)}</span>
@@ -53,7 +60,7 @@ export function showLevels(ctx: ScreenCtx, levels: LevelCard[], worlds: WorldTab
             <span class="pill">${icon('star', 14)} ${got(current)} / ${items.length * 3}</span>
           </header>
           ${lock}
-          <div class="level-grid">${items.map(([l, i], k) => card(l, i, k)).join('')}</div>
+          <div class="level-grid">${items.map(([l, i], k) => card(l, i, k, w.open)).join('')}</div>
         </section>`;
     };
 

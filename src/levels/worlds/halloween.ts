@@ -300,26 +300,36 @@ export const levels: LevelDef[] = [
     name: 'Gravedigger',
     difficulty: 4,
     world: { biome: 'halloween', time: 'night', weather: 'clear' },
-    tip: 'Down into the open grave and out again: too fast and you overshoot the ledge. Brake (←) first.',
-    // Braking down the slope, before the kicker.
-    solution: [[60, 2], [100, 0]],
+    tip: 'Two open graves down the hillside, each with a narrow lip beyond. Brake (←) before each jump, or sail past it.',
+    // A brake before each grave.
+    solution: [[85, 2], [125, 0], [230, 2], [270, 0]],
     build(t) {
       t.clear();
-      const h = cosine(44, 14, -2, 48);
-      profile(t, h, -2, 48);
-      profile(t, () => 14, 48, 58);
-      profile(t, (x) => 14 + 0.05 * (x - 58) ** 2, 58, 62);
-      const deck = (x: number) => 12.5 - (x - 72) * 0.25 * Math.max(0, Math.min(1, (x - 72) / 6));
-      profile(t, deck, 68, 98);
-      profile(t, () => deck(98), 98, 122);
+      const h = cosine(52, 30, -2, 46);
+      profile(t, h, -2, 46);
+      profile(t, () => 30, 46, 54);
+      profile(t, (x) => 30 + 0.05 * (x - 54) ** 2, 54, 58);
+      // The first lip: a short slope down to the second grave.
+      const lip = (x0: number, y0: number) => (x: number) => y0 - (x - x0) * 0.25 * Math.max(0, Math.min(1, (x - x0) / 6));
+      const d1 = lip(68, 28.5);
+      profile(t, d1, 64, 90);
+      profile(t, () => d1(90), 90, 96);
+      const drop = cosine(d1(90), 12, 96, 122);
+      profile(t, drop, 96, 122);
+      profile(t, () => 12, 122, 130);
+      profile(t, (x) => 12 + 0.05 * (x - 130) ** 2, 130, 134);
+      const d2 = lip(144, 10.5);
+      profile(t, d2, 140, 160);
+      profile(t, () => d2(160), 160, 168);
       start(t, 0, h(0));
       star(t, 24, h(24) + 1.3);
-      star(t, 52, 15.3);
-      star(t, 110, deck(98) + 1.3);
-      finish(t, 116, deck(98));
-      for (const x of [126, 134, 142, 150]) hazard(t, 'spikes', x, 0);
-      t.targetScore = 600;
-      forest(t, -8, 128, 136, ['pumpkin', 'tombstone', 'deadtree', 'ghost', 'cauldron', 'scarecrow', 'crypt', 'candles'], 6, 8);
+      star(t, 82, d1(82) + 1.3);
+      star(t, 154, d2(154) + 1.3);
+      finish(t, 164, d2(160));
+      pit(t, 58, 64, 30, 'spikes', 1, 6);
+      for (const x of [172, 180, 188]) hazard(t, 'spikes', x, 0);
+      t.targetScore = 800;
+      forest(t, -8, 176, 136, ['pumpkin', 'tombstone', 'deadtree', 'ghost', 'cauldron', 'scarecrow', 'crypt', 'candles'], 6, 8);
     },
   },
   {

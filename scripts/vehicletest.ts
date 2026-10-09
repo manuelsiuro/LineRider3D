@@ -6,13 +6,14 @@ import { LEVELS } from '../src/levels/levels';
 import { VEHICLES } from '../src/physics/vehicles';
 import { P } from '../src/physics/Rider';
 import { buildDemoTrack } from '../src/demoTrack';
-import { rideLevel } from '../src/levels/ride';
+import { rideLevel, solutionFor } from '../src/levels/ride';
+import { RIDE_SOLUTIONS } from '../src/levels/rideSolutions';
 
 /**
- * Every vehicle on every level, on its home world, untouched (or with the level's
- * solution, for levels that need input): finish, stars, crashes. Levels made for one ride
- * are only played with it; a solution only has to work for the level's own ride (the sled
- * unless it names one).
+ * Every vehicle on every level, on its home world, untouched (or, for levels that need
+ * input, with the inputs found for that ride, else the level's solution): finish, stars,
+ * crashes. Levels made for one ride are only played with it; inputs must work for the ride
+ * they were found for (the level's own solution: its own ride, the sled unless it names one).
  */
 const only = process.argv[2];
 let failed = false;
@@ -38,12 +39,12 @@ for (const v of VEHICLES) {
   const row: string[] = [];
   for (const level of [null, ...LEVELS]) {
     if (level?.vehicle && level.vehicle !== v.id) continue;
-    const r = level ? { ...rideLevel(level, { vehicle: v, plan: level.solution, maxFrames: 1600 }), nan: false } : demo(v);
+    const r = level ? { ...rideLevel(level, { vehicle: v, plan: solutionFor(level, v.id), maxFrames: 1600 }), nan: false } : demo(v);
     const s = r.stats;
     const rating = rateRun(r.track, s);
     const ok = s.finished && s.stars === r.track.stars.size && !s.crashed;
-    // A solution is timed for one ride: others only report.
-    const mustPass = !level?.solution || (level.vehicle ?? 'sled') === v.id;
+    // Inputs are timed for one ride: others only report.
+    const mustPass = !level?.solution || (level.vehicle ?? 'sled') === v.id || !!RIDE_SOLUTIONS[`${level.id}:${v.id}`];
     if (r.nan || (!ok && mustPass)) failed = true;
     const name = level?.name ?? 'Demo';
     row.push(`${name.slice(0, 12).padEnd(12)} ${r.nan ? 'NaN' : ok ? 'ok ' : s.crashed ? `X@${(r.frames / 40).toFixed(1)}` : s.finished ? `☆${s.stars}/${r.track.stars.size}` : 'stop'}${mustPass ? '' : '?'} ${'★'.repeat(rating.stars)}`);

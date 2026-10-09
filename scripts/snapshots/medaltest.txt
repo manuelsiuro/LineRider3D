@@ -33,13 +33,13 @@ log-flume:skis             14.5 / 10.5 / 8.9 / 8.6
 log-flume:buggy            14.4 / 9.9 / 7.7 / 7.4
 push-through:snowboard     8.8 / 7.8 / 7.6 / 7.3
 push-through:coffin        8.4 / 7.4 / 7.2 / 7
-thorn-gully:bike           undefined
+thorn-gully:bike           10.2 / 9 / 8.8 / 8.4
 deep-woods:sled            11.4 / 10 / 9.8 / 9.4
-deep-woods:moto            undefined
-canopy-run:skis            undefined
+deep-woods:moto            9.7 / 8.5 / 8.3 / 8
+canopy-run:skis            10.2 / 9 / 8.8 / 8.5
 canopy-run:buggy           10.3 / 9.1 / 8.9 / 8.5
-wildwood:snowboard         undefined
-wildwood:coffin            undefined
+wildwood:snowboard         14.7 / 12.8 / 12.6 / 12.2
+wildwood:coffin            15.5 / 13.5 / 13.3 / 12.8
 boardwalk:bike             7.6 / 6.8 / 6.6 / 6.3
 shell-beach:sled           9 / 7.4 / 7.2 / 6.9
 shell-beach:moto           9 / 7.9 / 7.7 / 7.4
@@ -47,32 +47,32 @@ tide-pools:sled            7.9 / 7 / 6.8 / 6.5
 tide-pools:moto            7.9 / 7 / 6.8 / 6.6
 pier-run:sled              12.7 / 11.1 / 10.9 / 10.5
 pier-run:moto              12.9 / 11.3 / 11.1 / 10.7
-spike-strip:skis           undefined
+spike-strip:skis           9.5 / 8.3 / 8.1 / 7.8
 spike-strip:buggy          9.6 / 8.4 / 8.2 / 7.9
-crab-cove:snowboard        undefined
+crab-cove:snowboard        11.5 / 10.1 / 9.9 / 9.5
 crab-cove:coffin           11.4 / 10 / 9.8 / 9.4
 lighthouse:bike            10.5 / 9.3 / 9.1 / 8.7
 high-tide:sled             7.3 / 6.2 / 6 / 5.8
-high-tide:moto             undefined
-reef-hopper:skis           undefined
-reef-hopper:buggy          undefined
-coral-coast:snowboard      undefined
-coral-coast:coffin         undefined
+high-tide:moto             5.7 / 5.1 / 4.9 / 4.8
+reef-hopper:skis           10.4 / 9.1 / 8.9 / 8.6
+reef-hopper:buggy          8.5 / 7.5 / 7.3 / 7.1
+coral-coast:snowboard      13.9 / 12.2 / 12 / 11.5
+coral-coast:coffin         14 / 12.2 / 12 / 11.6
 mesa-drop:bike             10.5 / 8.5 / 8.2 / 7.9
 canyon-jump:moto           7.9 / 7 / 6.8 / 6.5
 cracked-mesa:sled          9.1 / 7.4 / 7.1 / 6.8
 cracked-mesa:moto          9.2 / 8.1 / 7.9 / 7.6
 mirage:sled                11.5 / 10.1 / 9.9 / 9.5
 mirage:moto                11.5 / 10.1 / 9.9 / 9.5
-cactus-row:skis            undefined
+cactus-row:skis            10 / 8.8 / 8.6 / 8.3
 cactus-row:buggy           10.1 / 8.9 / 8.7 / 8.3
-sinking-bridge:snowboard   undefined
+sinking-bridge:snowboard   9.6 / 8.4 / 8.2 / 7.9
 sinking-bridge:coffin      9.3 / 8.2 / 8 / 7.7
 canyon-crumble:bike        10 / 8.8 / 8.6 / 8.3
 rattlesnake-pass:sled      10.2 / 8.9 / 8.7 / 8.4
 rattlesnake-pass:moto      undefined
 sun-temple:skis            14.1 / 12.3 / 12.1 / 11.6
-sun-temple:buggy           undefined
+sun-temple:buggy           14 / 12.2 / 12 / 11.6
 rooftop-run:snowboard      11.1 / 9 / 8.8 / 8.5
 rooftop-run:coffin         11 / 8.9 / 8.7 / 8.4
 neon-nights:snowboard      9.1 / 7.8 / 7.6 / 7.3
@@ -82,13 +82,13 @@ skyline-drop:sled          9.7 / 8.5 / 8.3 / 8
 skyline-drop:moto          9.7 / 8.6 / 8.4 / 8
 subway-dash:skis           13.2 / 9.5 / 7.9 / 7.6
 subway-dash:buggy          13.2 / 8.9 / 6.8 / 6.5
-rooftop-hop:snowboard      undefined
+rooftop-hop:snowboard      10.5 / 9.2 / 9 / 8.7
 rooftop-hop:coffin         11.8 / 10.3 / 10.1 / 9.8
-roadworks:bike             undefined
+roadworks:bike             11.6 / 10.2 / 10 / 9.6
 crosstown:sled             11.7 / 10.2 / 10 / 9.7
-crosstown:moto             undefined
-construction-site:skis     undefined
-construction-site:buggy    undefined
+crosstown:moto             8.8 / 7.8 / 7.6 / 7.3
+construction-site:skis     9.8 / 8.6 / 8.4 / 8.1
+construction-site:buggy    7.7 / 6.8 / 6.6 / 6.3
 brake-lights:snowboard     7.8 / 6.8 / 6.6 / 6.4
 brake-lights:coffin        7.5 / 6.4 / 6.2 / 6
 midnight-express:bike      11.3 / 9.9 / 9.7 / 9.4
@@ -105,13 +105,13 @@ ghost-train:skis           13.5 / 9.6 / 8 / 7.7
 ghost-train:buggy          13.4 / 9.1 / 6.9 / 6.6
 haunted-hayride:snowboard  12.8 / 10.8 / 10.6 / 10.2
 haunted-hayride:coffin     12.7 / 10.8 / 10.6 / 10.2
-wisp-woods:bike            undefined
+wisp-woods:bike            10.6 / 9.3 / 9.1 / 8.8
 bog-of-souls:sled          11.5 / 10.1 / 9.9 / 9.5
-bog-of-souls:moto          undefined
+bog-of-souls:moto          8 / 7 / 6.8 / 6.6
 crumbling-crypt:skis       undefined
 crumbling-crypt:buggy      undefined
-gravedigger:snowboard      7.5 / 6.5 / 6.3 / 6
-gravedigger:coffin         7.2 / 6.2 / 6 / 5.8
+gravedigger:snowboard      13.7 / 11.1 / 10.9 / 10.5
+gravedigger:coffin         12.7 / 10.2 / 9.8 / 9.4
 nightmare:bike             13.2 / 11.5 / 11.3 / 10.9
 ember-run:sled             8.7 / 7.7 / 7.5 / 7.2
 ember-run:moto             8.8 / 7.7 / 7.5 / 7.3
@@ -121,18 +121,18 @@ magma-flow:snowboard       13.7 / 10.1 / 8.7 / 8.3
 magma-flow:coffin          14.8 / 11 / 9.6 / 9.2
 obsidian-steps:bike        15.4 / 12.7 / 12.5 / 12
 geyser-field:sled          11 / 9.6 / 9.4 / 9.1
-geyser-field:moto          undefined
+geyser-field:moto          11 / 9.6 / 9.4 / 9.1
 caldera-crossing:skis      undefined
 caldera-crossing:buggy     10.8 / 9.5 / 9.3 / 8.9
-ash-bog:snowboard          undefined
-ash-bog:coffin             undefined
-pyroclastic:bike           undefined
+ash-bog:snowboard          15.5 / 13.5 / 13.3 / 12.8
+ash-bog:coffin             14.5 / 12.7 / 12.5 / 12
+pyroclastic:bike           6.6 / 5.2 / 4.9 / 4.7
 eruption:sled              9.9 / 8.7 / 8.5 / 8.2
 eruption:moto              10 / 8.8 / 8.6 / 8.3
-firewalk:skis              undefined
+firewalk:skis              11.7 / 10.3 / 10.1 / 9.7
 firewalk:buggy             11.8 / 10.3 / 10.1 / 9.8
-cinder-cone:snowboard      undefined
-cinder-cone:coffin         undefined
+cinder-cone:snowboard      12.7 / 11.1 / 10.9 / 10.5
+cinder-cone:coffin         12.3 / 10.8 / 10.6 / 10.2
 inferno:bike               13.9 / 12.2 / 12 / 11.5
 moonwalk:sled              10.3 / 9.1 / 8.9 / 8.5
 moonwalk:moto              10.4 / 9.2 / 9 / 8.6
@@ -145,13 +145,13 @@ crater-bounce:sled         14.4 / 12.6 / 12.4 / 11.9
 crater-bounce:moto         14.4 / 12.6 / 12.4 / 11.9
 crystal-field:skis         14.8 / 12.9 / 12.7 / 12.3
 crystal-field:buggy        14.9 / 13 / 12.8 / 12.3
-dust-sea:snowboard         undefined
-dust-sea:coffin            undefined
+dust-sea:snowboard         16.1 / 14.1 / 13.9 / 13.3
+dust-sea:coffin            15.2 / 13.3 / 13.1 / 12.5
 fractured-ridge:bike       13.8 / 12 / 11.8 / 11.4
 lander-pad:sled            10.5 / 8 / 7.3 / 7
 lander-pad:moto            11.1 / 9.7 / 9.5 / 9.1
 earthrise:skis             14.5 / 11.4 / 10.6 / 10.2
 earthrise:buggy            14.8 / 12.9 / 12.7 / 12.3
-far-side:snowboard         undefined
+far-side:snowboard         16 / 14 / 13.8 / 13.2
 far-side:coffin            16.1 / 14.1 / 13.9 / 13.3
 moonshot:bike              undefined

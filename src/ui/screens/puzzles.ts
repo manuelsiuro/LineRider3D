@@ -20,32 +20,59 @@ const KINDS: Record<PuzzleKind, { name: string; icon: string; steps: [string, st
 export function showPuzzles(ctx: ScreenCtx, puzzles: PuzzleCard[], worlds: WorldTab[]): Promise<number | null> {
   return new Promise((resolve) => {
     const total = puzzles.reduce((n, p) => n + p.stars, 0);
-    const card = (p: PuzzleCard, i: number, open: boolean) => `<button class="level-card puzzle-card ${open ? '' : 'locked'}" data-world="${p.world}" data-i="${i}" ${open ? '' : 'disabled'} style="animation-delay:${Math.min(i, 14) * 0.03}s">
+    const card = (p: PuzzleCard, i: number, open: boolean, k: number) => `<button class="level-card puzzle-card ${open ? '' : 'locked'}" data-world="${p.world}" data-i="${i}" ${open ? '' : 'disabled'} style="animation-delay:${Math.min(k, 14) * 0.03}s">
           <span class="level-num">${open ? i + 1 : icon('lock', 20)}</span>
           <span class="level-badges"><span title="${KINDS[p.kind].name} puzzle">${icon(KINDS[p.kind].icon, 18)}</span></span>
           <span class="level-name">${p.name}</span>
           <span class="level-stars">${[0, 1, 2].map((k) => `<i class="${k < p.stars ? 'on' : ''}">${icon('star', 18)}</i>`).join('')}</span>
-          <span class="level-best">${p.best ? `Best ${p.best} · par ${p.par}` : `Par ${p.par}`}</span>
+          <span class="level-best">${open ? (p.best ? `Best ${p.best} · par ${p.par}` : `Par ${p.par}`) : 'Opens with the world'}</span>
         </button>`;
-    const sections = worlds
-      .map((w) => {
-        const items = puzzles.map((p, i) => [p, i] as const).filter(([p]) => p.world === w.id);
-        if (!items.length) return '';
-        const b = biomeById(w.id);
-        const got = items.reduce((n, [p]) => n + p.stars, 0);
-        return `<section class="chapter puzzles" data-world="${w.id}">
+    const inWorld = (w: BiomeId) => puzzles.map((p, i) => [p, i] as const).filter(([p]) => p.world === w);
+    const got = (w: BiomeId) => inWorld(w).reduce((n, [p]) => n + p.stars, 0);
+    // Start at the furthest open world that isn't finished, else the first.
+    const open = worlds.filter((w) => w.open && inWorld(w.id).length);
+    let current: BiomeId = [...open].reverse().find((w) => got(w.id) < inWorld(w.id).length * 3)?.id ?? open[0]?.id ?? worlds[0].id;
+
+    const tabs = () =>
+      worlds
+        .filter((w) => inWorld(w.id).length)
+        .map((w) => {
+          const n = inWorld(w.id).length * 3;
+          return `<button class="world-tab ${w.id === current ? 'active' : ''} ${w.open ? '' : 'locked'}" data-world="${w.id}" data-tab="${w.id}">
+            <span class="world-tab-ic">${icon(w.id, 20)}${w.open ? '' : `<i class="world-tab-lock">${icon('lock', 11)}</i>`}</span>
+            <span class="world-tab-text"><b>${biomeById(w.id).name}</b><small>${icon('star', 12)} ${w.open ? `${got(w.id)}/${n}` : `${w.gate} to open`}</small></span>
+          </button>`;
+        })
+        .join('');
+
+    const page = () => {
+      const w = worlds.find((x) => x.id === current)!;
+      const b = biomeById(current);
+      const items = inWorld(current);
+      const lock = w.open
+        ? ''
+        : `<div class="world-lock">
+            <span class="world-lock-ic">${icon('lock', 20)}</span>
+            <div class="world-lock-body">
+              <p>Collect <b>${w.gate - total}</b> more puzzle stars to open ${b.name}</p>
+              <div class="world-lock-bar"><i style="width:${Math.min(100, (total / Math.max(1, w.gate)) * 100).toFixed(1)}%"></i></div>
+            </div>
+            <span class="world-lock-count">${icon('star', 14)} ${total} / ${w.gate}</span>
+          </div>`;
+      return `<section class="chapter puzzles" data-world="${current}">
           <header class="chapter-head">
-            <span class="chapter-icon">${icon(w.open ? w.id : 'lock', 26)}</span>
-            <div><h3>${b.name}</h3><p>${w.open ? `${items.length} puzzles` : `Collect ${w.gate - total} more puzzle stars to open (${total} / ${w.gate})`}</p></div>
-            <span class="pill">${icon('star', 14)} ${got} / ${items.length * 3}</span>
+            <span class="chapter-icon">${icon(current, 26)}</span>
+            <div><h3>${b.name}</h3><p>${items.length} puzzles</p></div>
+            <span class="pill">${icon('star', 14)} ${got(current)} / ${items.length * 3}</span>
           </header>
-          <div class="level-grid">${items.map(([p, i]) => card(p, i, w.open)).join('')}</div>
+          ${lock}
+          <div class="level-grid">${items.map(([p, i], k) => card(p, i, w.open, k)).join('')}</div>
         </section>`;
-      })
-      .join('');
+    };
+
     const overlay = h(
       'div',
-      'screen',
+      'screen levels-screen',
       `<div class="screen-inner">
         <div class="screen-head">
           <button class="btn icon-btn" data-back>${icon('chevronLeft')}</button>
@@ -53,13 +80,24 @@ export function showPuzzles(ctx: ScreenCtx, puzzles: PuzzleCard[], worlds: World
           <span class="pill big">${icon('star', 16)} ${total} / ${puzzles.length * 3}</span>
         </div>
         <p class="screen-sub">Each track is broken: draw what's missing, place rings, or erase what's in the way, then press Play. The less you use, the more stars.</p>
-        <div class="chapters">${sections}</div>
+        <div class="world-tabs"></div>
+        <div class="world-page"></div>
       </div>`,
     );
+    const render = () => {
+      overlay.querySelector('.world-tabs')!.innerHTML = tabs();
+      overlay.querySelector('.world-page')!.innerHTML = page();
+      overlay.querySelector('.world-tab.active')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    };
     overlay.onclick = (e) => {
       const btn = (e.target as HTMLElement).closest('button');
       if (!btn) return;
       ctx.click();
+      if (btn.dataset.tab) {
+        current = btn.dataset.tab as BiomeId;
+        render();
+        return;
+      }
       closeOverlay(overlay);
       if (btn.dataset.back !== undefined) {
         resolve(null);
@@ -69,10 +107,7 @@ export function showPuzzles(ctx: ScreenCtx, puzzles: PuzzleCard[], worlds: World
       resolve(Number(btn.dataset.i));
     };
     document.body.append(overlay);
-    // Start at the furthest open world.
-    const open = worlds.filter((w) => w.open && puzzles.some((p) => p.world === w.id));
-    const focus: BiomeId | undefined = open[open.length - 1]?.id;
-    if (focus && focus !== open[0]?.id) overlay.querySelector(`.chapter[data-world="${focus}"]`)?.scrollIntoView({ block: 'start' });
+    render();
   });
 }
 

@@ -119,9 +119,3 @@
   color: #7a4d00;
   background: linear-gradient(180deg, #ffd34d, #ffc23d);
 }
-
-/* Puzzle select: one chapter in the editor's blue. */
-.chapter.puzzles .chapter-icon {
-  color: white;
-  background: linear-gradient(180deg, #4b98ec, #2a6fc4);
-}
