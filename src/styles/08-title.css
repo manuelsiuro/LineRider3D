@@ -109,7 +109,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(400px, 100%);
+  width: min(440px, 100%);
   animation: fade-up 0.8s 0.2s var(--ease) backwards;
 }
 
@@ -164,8 +164,15 @@
   }
 }
 
+/* Short windows: only the sound switch is left in the footer. */
 @media (max-height: 700px) {
   .title-foot {
+    padding: 0;
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .title-foot > span {
     display: none;
   }
 }
@@ -218,9 +225,10 @@
     height: 46px;
     font-size: 17px;
   }
-  .title-actions .big-btn.daily-btn {
+  .title-actions .big-btn.daily-btn,
+  .title-actions .big-btn.daily-btn.play-card {
     min-height: 0;
-    height: 52px;
+    height: 50px;
     padding-top: 4px;
     padding-bottom: 4px;
   }
@@ -234,15 +242,26 @@
   .title-row {
     gap: 6px;
   }
-  .title-row .big-btn {
+  .title-actions .title-row .big-btn {
     height: 40px;
     font-size: 14.5px;
+  }
+  .title-row .menu-text small,
+  .create-card .daily-text small {
+    display: none;
+  }
+  .title-actions .big-btn.daily-btn.create-card {
+    min-height: 0;
+    height: 44px;
   }
   .title-row .menu-ic {
     width: 30px;
     height: 30px;
   }
+  /* The sound switch moves to the bottom corner. */
   .title-foot {
-    display: none;
+    position: absolute;
+    left: max(14px, env(safe-area-inset-left));
+    bottom: max(10px, env(safe-area-inset-bottom));
   }
 }

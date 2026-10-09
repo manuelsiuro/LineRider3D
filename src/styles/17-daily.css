@@ -115,6 +115,25 @@
   }
 }
 
+/* Title Create: an orange card, two lines, like Play and Daily. */
+.big-btn.daily-btn.create-card {
+  min-height: 60px;
+  background: linear-gradient(180deg, #ffa45c, #e8662a);
+  box-shadow: 0 10px 24px -8px rgba(232, 102, 42, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.create-card > .ic:last-child {
+  flex: none;
+  opacity: 0.75;
+  transition: transform 0.2s var(--spring);
+}
+
+@media (hover: hover) {
+  .create-card:hover > .ic:last-child {
+    transform: translateX(3px);
+  }
+}
+
 .pill.streak {
   color: #7a2e00;
   background: linear-gradient(180deg, #ffd34d, #ff9f55);

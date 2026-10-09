@@ -36,7 +36,7 @@ export class Quality {
   /** Pushes the settings to sound, camera and renderer. */
   apply(first = false) {
     const { settings, sound, rig, ui } = this.c;
-    sound.setVolumes(settings.sfxVolume, settings.musicVolume);
+    sound.setVolumes(settings.muted ? 0 : settings.sfxVolume, settings.muted ? 0 : settings.musicVolume);
     rig.distanceScale = settings.cameraDistance;
     rig.reducedMotion = settings.reducedMotion;
     if (first || rig.mode !== settings.camera) {

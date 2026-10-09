@@ -2,6 +2,18 @@ import type { PuzzleKind } from '../levels/puzzles';
 import type { WorldConfig } from '../world/worlds';
 import type { BiomeId } from '../world/worlds';
 
+/** What the title's menu shows under each entry. */
+export interface TitleMenu {
+  puzzles: { stars: number; max: number; open: number; total: number };
+  ride: string;
+  outfit: { name: string; got: number; total: number };
+  trophies: { got: number; total: number };
+  tracks: number;
+  muted: boolean;
+  /** Flips sound on or off; returns whether it's now muted. */
+  toggleSound: () => boolean;
+}
+
 export type TitleChoice = 'daily' | 'puzzles' | 'gallery' | 'levels' | 'create' | 'new' | 'wardrobe' | 'garage' | 'settings' | 'trophies' | 'phone' | 'season';
 export type PauseChoice = 'resume' | 'restart' | 'settings' | 'levels' | 'menu';
 

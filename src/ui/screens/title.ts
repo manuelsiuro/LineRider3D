@@ -2,14 +2,18 @@ import { TIMES, biomeById } from '../../world/worlds';
 import { MOBILE, TOUCH, h } from '../dom';
 import { icon } from '../icons';
 import type { BiomeId, WorldConfig } from '../../world/worlds';
-import type { DailyCard, ScreenCtx, TitleChoice } from '../types';
+import type { DailyCard, ScreenCtx, TitleChoice, TitleMenu } from '../types';
 
 /** Badge icon of each world (the logo follows the world on screen). */
 export const BADGE: Record<BiomeId, string> = { alpine: 'snowflake', forest: 'forest', beach: 'beach', desert: 'desert', city: 'city', halloween: 'pumpkin', volcano: 'volcano', moon: 'moon' };
 
 /** Title screen; resolves with the player's choice. */
-export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxStars: number, daily: DailyCard, season: { stars: number; max: number } | null = null, next: { name: string; world: BiomeId; number: number; fresh: boolean } | null = null): Promise<TitleChoice> {
+export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxStars: number, daily: DailyCard, season: { stars: number; max: number } | null = null, next: { name: string; world: BiomeId; number: number; fresh: boolean } | null = null, menu: TitleMenu | null = null): Promise<TitleChoice> {
   document.body.classList.add('on-title');
+  const m = menu;
+  /** A menu entry: icon, name, a line of facts and, for progress, a thin bar. */
+  const entry = (c: string, ic: string, label: string, sub: string, done: number | null = null) =>
+    `<button class="big-btn menu-btn" data-c="${c}"${done !== null ? ` style="--done:${(Math.min(1, done) * 100).toFixed(1)}%"` : ''}><span class="menu-ic">${icon(ic, 18)}</span><span class="menu-text"><span class="menu-label">${label}</span>${sub ? `<small>${sub}</small>` : ''}</span>${icon('chevronRight', 16)}${done !== null ? '<i class="menu-bar"></i>' : ''}</button>`;
   return new Promise((resolve) => {
     const overlay = h(
       'div',
@@ -41,22 +45,38 @@ export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxSt
           </button>`
               : ''
           }
-          <button class="big-btn secondary" data-c="${hasSave ? 'create' : 'new'}">${icon('pencil', 20)} ${hasSave ? 'Continue my track' : 'Create a track'}</button>
+          <button class="big-btn daily-btn create-card" data-c="${hasSave ? 'create' : 'new'}">
+            <span class="daily-ic">${icon('pencil', 22)}</span>
+            <span class="daily-text"><b>${hasSave ? 'Continue my track' : 'Create a track'}</b><small>${hasSave ? 'Pick up where you left off' : 'Draw it, ride it, share it'}</small></span>
+            ${icon('chevronRight', 18)}
+          </button>
           <div class="title-row">
-            <button class="big-btn menu-btn" data-c="puzzles"><span class="menu-ic">${icon('pencil', 18)}</span><span class="menu-label">Puzzles</span>${icon('chevronRight', 16)}</button>
-            ${hasSave ? `<button class="big-btn menu-btn" data-c="gallery"><span class="menu-ic">${icon('folder', 18)}</span><span class="menu-label">My tracks</span>${icon('chevronRight', 16)}</button>` : ''}
-            <button class="big-btn menu-btn" data-c="garage"><span class="menu-ic">${icon('garage', 18)}</span><span class="menu-label">Garage</span>${icon('chevronRight', 16)}</button>
-            <button class="big-btn menu-btn" data-c="wardrobe"><span class="menu-ic">${icon('sled', 18)}</span><span class="menu-label">Wardrobe</span>${icon('chevronRight', 16)}</button>
-            <button class="big-btn menu-btn" data-c="trophies"><span class="menu-ic">${icon('trophy', 18)}</span><span class="menu-label">Trophies</span>${icon('chevronRight', 16)}</button>
-            <button class="big-btn menu-btn" data-c="settings"><span class="menu-ic">${icon('gear', 18)}</span><span class="menu-label">Settings</span>${icon('chevronRight', 16)}</button>
-            ${onPhone() ? '' : `<button class="big-btn menu-btn" data-c="phone"><span class="menu-ic">${icon('phone', 18)}</span><span class="menu-label">Play on phone</span>${icon('chevronRight', 16)}</button>`}
+            ${entry('puzzles', 'pencil', 'Puzzles', m ? `${icon('star', 12)} ${m.puzzles.stars}/${m.puzzles.max}<span class="wide-only"> · ${m.puzzles.open} open</span>` : '', m ? m.puzzles.stars / m.puzzles.max : null)}
+            ${hasSave ? entry('gallery', 'folder', 'My tracks', m ? `${m.tracks} saved` : '') : ''}
+            ${entry('garage', 'garage', 'Garage', m ? `Riding the ${m.ride}` : '')}
+            ${entry('wardrobe', 'sled', 'Wardrobe', m ? `${m.outfit.got}/${m.outfit.total} outfits` : '')}
+            ${entry('trophies', 'trophy', 'Trophies', m ? `${m.trophies.got}/${m.trophies.total} unlocked` : '', m ? m.trophies.got / m.trophies.total : null)}
+            ${entry('settings', 'gear', 'Settings', 'Sound &amp; camera')}
+            ${onPhone() ? '' : entry('phone', 'phone', 'Play on phone', 'Scan a QR code')}
           </div>
         </div>
-        <p class="title-foot">${icon('sound', 16)} Best with sound on${TOUCH ? '' : ' · works with mouse and touch'}</p>
+        <div class="title-foot">
+          ${m ? `<button class="sound-toggle ${m.muted ? 'off' : ''}" data-sound aria-pressed="${!m.muted}">${icon(m.muted ? 'mute' : 'sound', 16)}<span>${m.muted ? 'Sound off' : 'Sound on'}</span></button>` : icon('sound', 16)}
+          <span>Best with headphones${TOUCH ? '' : ' · mouse or touch'}</span>
+        </div>
       </div>
       <span class="title-version">v${__APP_VERSION__}</span>`,
     );
     overlay.onclick = (e) => {
+      const toggle = (e.target as HTMLElement).closest<HTMLElement>('[data-sound]');
+      if (toggle && m) {
+        const muted = m.toggleSound();
+        toggle.classList.toggle('off', muted);
+        toggle.setAttribute('aria-pressed', String(!muted));
+        toggle.innerHTML = `${icon(muted ? 'mute' : 'sound', 16)}<span>${muted ? 'Sound off' : 'Sound on'}</span>`;
+        if (!muted) ctx.click();
+        return;
+      }
       const c = (e.target as HTMLElement).closest('button')?.dataset.c as TitleChoice | undefined;
       if (!c) return;
       ctx.click();

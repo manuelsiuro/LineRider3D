@@ -18,6 +18,8 @@ export interface Settings {
   reducedMotion: boolean;
   /** Seasonal events (Halloween look on the title, etc.). */
   seasonal: SeasonPref;
+  /** All sound off (the title's toggle), volumes kept for when it comes back. */
+  muted: boolean;
 }
 
 
@@ -29,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
   cameraDistance: 1,
   reducedMotion: matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
   seasonal: 'auto',
+  muted: false,
 };
 
 export function loadSettings(): Settings {

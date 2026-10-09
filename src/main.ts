@@ -497,7 +497,7 @@ async function closeUp<T>(show: () => Promise<T>): Promise<T> {
 async function titleFlow() {
   for (;;) {
     const progress = loadProgress();
-    const choice = await ui.showTitle(savedTrack() !== null, totalStars(progress), LEVELS.length * 3, dailyCard(), seasonCard(progress), nextLevel(progress));
+    const choice = await ui.showTitle(savedTrack() !== null, totalStars(progress), LEVELS.length * 3, dailyCard(), seasonCard(progress), nextLevel(progress), titleMenu());
     if (choice === 'wardrobe') {
       const stars = totalStars(progress);
       await closeUp(() =>
@@ -592,6 +592,32 @@ async function titleFlow() {
 }
 
 /** The Haunted Hollow button on the title, during the season. */
+/** The facts under each title menu entry, and the sound toggle. */
+function titleMenu() {
+  const done = loadPuzzles();
+  const got = unlockedAchievements();
+  const stars = totalStars();
+  return {
+    puzzles: {
+      stars: PUZZLES.reduce((n, p) => n + (done[p.id]?.stars ?? 0), 0),
+      max: PUZZLES.length * 3,
+      open: PUZZLES.filter((p) => puzzleWorldOpen(puzzleWorld(p), done)).length,
+      total: PUZZLES.length,
+    },
+    ride: rides.current.name,
+    outfit: { name: selectedOutfit().name, got: OUTFITS.filter((o) => outfitUnlocked(o, stars, got)).length, total: OUTFITS.length },
+    trophies: { got: ACHIEVEMENTS.filter((a) => got[a.id]).length, total: ACHIEVEMENTS.length },
+    tracks: listSlots().length,
+    muted: core.settings.muted,
+    toggleSound: () => {
+      core.settings.muted = !core.settings.muted;
+      saveSettings(core.settings);
+      quality.apply();
+      return core.settings.muted;
+    },
+  };
+}
+
 /** The level Play leads to: the first open one not yet won, for the title's Play card. */
 function nextLevel(progress: ReturnType<typeof loadProgress>) {
   const i = LEVELS.findIndex((l, k) => isUnlocked(k, progress) && !(progress[l.id]?.stars ?? 0));
@@ -1009,6 +1035,8 @@ async function openSettings() {
     view,
     (v) => {
       const qualityChanged = v.quality !== settings.quality;
+      // Moving a volume slider brings the sound back.
+      if (v.sfxVolume !== settings.sfxVolume || v.musicVolume !== settings.musicVolume) settings.muted = false;
       Object.assign(settings, {
         quality: v.quality as QualitySetting,
         sfxVolume: v.sfxVolume,
