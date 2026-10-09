@@ -28,6 +28,10 @@ OK   Graveyard Shift round trip, compressed
 OK   Bat Cave Drop  round trip, compressed
 OK   Haunted Manor  round trip, compressed
 OK   Witching Hour  round trip, compressed
+OK   Ember Run      round trip, compressed
+OK   Ash Chute      round trip, compressed
+OK   Moonwalk       round trip, compressed
+OK   Crater Hop     round trip, compressed
 cut off          → That share link is incomplete: was it cut off when copied?
 garbage          → That share link is incomplete: was it cut off when copied?
 unknown encoding → That share link looks broken

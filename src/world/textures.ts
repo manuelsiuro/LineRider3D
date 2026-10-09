@@ -84,6 +84,10 @@ export interface GroundTextures {
   roughness: number;
   /** Base color multiplied with the map and the vertex colors. */
   color: number;
+  /** Glowing parts (lava in the cracks), lit by `emissive` color. */
+  emissive?: { map: THREE.Texture; color: number; intensity: number };
+  /** Tiles across the ground (default 180): fewer for patterns that read big. */
+  repeat?: number;
 }
 
 /** Soft wind-blown snow ripples (the original look). */
@@ -205,9 +209,99 @@ function concrete(): GroundTextures {
   return { map, normal, normalScale: 0.6, roughness: 0.88, color: 0xffffff };
 }
 
+/** Cooled black lava: rough plates split by cracks with lava glowing in them. */
+function basalt(): GroundTextures {
+  const size = 256;
+  const big = valueNoise(size, 6, 81);
+  const fine = valueNoise(size, 96, 82);
+  // Cell edges of a jittered grid: the cracks between plates.
+  const rand = rng(83);
+  const cells = 7;
+  const cw = size / cells;
+  const pts: [number, number][] = [];
+  for (let y = 0; y < cells; y++) for (let x = 0; x < cells; x++) pts.push([(x + 0.15 + rand() * 0.7) * cw, (y + 0.15 + rand() * 0.7) * cw]);
+  const crack = new Float32Array(size * size);
+  const heat = valueNoise(size, 3, 84);
+  const hotness = (i: number) => THREE.MathUtils.smoothstep(heat[i], 0.55, 0.75);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      let d1 = 1e9;
+      let d2 = 1e9;
+      // Only the 3×3 cells around (wrapping, so the texture tiles).
+      const cx = Math.floor(x / cw);
+      const cy = Math.floor(y / cw);
+      for (let oy = -1; oy <= 1; oy++)
+        for (let ox = -1; ox <= 1; ox++) {
+          const gx = cx + ox;
+          const gy = cy + oy;
+          const [px, py] = pts[((gy + cells) % cells) * cells + ((gx + cells) % cells)];
+          const d = Math.hypot(x - (px + Math.floor(gx / cells) * size), y - (py + Math.floor(gy / cells) * size));
+          if (d < d1) {
+            d2 = d1;
+            d1 = d;
+          } else if (d < d2) d2 = d;
+        }
+      crack[y * size + x] = Math.max(0, 1 - (d2 - d1) / 2.4);
+    }
+  const map = colorMap(size, (x, y, c) => {
+    const i = y * size + x;
+    const k = 0.13 + big[i] * 0.07 + fine[i] * 0.06;
+    c[0] = k * 1.02;
+    c[1] = k * 0.97;
+    c[2] = k;
+    // Most cracks are dark; lava shows only in some.
+    const hot = crack[i] * hotness(i);
+    c[0] = c[0] * (1 - hot) + 0.5 * hot;
+    c[1] = c[1] * (1 - hot) + 0.1 * hot;
+    c[2] *= 1 - hot;
+    c[0] *= 1 - crack[i] * 0.5 * (1 - hotness(i));
+    c[1] *= 1 - crack[i] * 0.5 * (1 - hotness(i));
+    c[2] *= 1 - crack[i] * 0.5 * (1 - hotness(i));
+  });
+  const glowData = new Uint8Array(size * size * 4);
+  for (let i = 0; i < size * size; i++) {
+    const g = crack[i] * hotness(i);
+    glowData.set([255 * g, 110 * g, 20 * g, 255], i * 4);
+  }
+  const glow = finish(new THREE.DataTexture(glowData, size, size), true);
+  const normal = normalMap(size, (x, y) => fine[y * size + x] * 0.5 - crack[y * size + x] * 0.8, 3);
+  return { map, normal, normalScale: 0.9, roughness: 0.85, color: 0xffffff, emissive: { map: glow, color: 0xffffff, intensity: 1.6 }, repeat: 70 };
+}
+
+/** Grey moon dust pocked with little craters. */
+function regolith(): GroundTextures {
+  const size = 256;
+  const big = valueNoise(size, 5, 91);
+  const fine = valueNoise(size, 128, 92);
+  const rand = rng(93);
+  const pits: [number, number, number][] = Array.from({ length: 34 }, () => [rand() * size, rand() * size, 3 + rand() * 12]);
+  const height = new Float32Array(size * size);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      let h = fine[y * size + x] * 0.25;
+      for (const [px, py, r] of pits) {
+        const dx = Math.min(Math.abs(x - px), size - Math.abs(x - px));
+        const dy = Math.min(Math.abs(y - py), size - Math.abs(y - py));
+        const d = Math.hypot(dx, dy) / r;
+        // A bowl with a raised rim.
+        if (d < 1.3) h += d < 1 ? -(1 - d * d) * 0.8 : (1.3 - d) * 1.2;
+      }
+      height[y * size + x] = h;
+    }
+  const map = colorMap(size, (x, y, c) => {
+    const i = y * size + x;
+    const k = 0.58 + big[i] * 0.12 + fine[i] * 0.08 + height[i] * 0.05;
+    c[0] = k;
+    c[1] = k;
+    c[2] = k * 1.02;
+  });
+  const normal = normalMap(size, (x, y) => height[y * size + x], 2.4);
+  return { map, normal, normalScale: 0.9, roughness: 0.96, color: 0xffffff };
+}
+
 const cache = new Map<string, GroundTextures>();
 
-export type GroundKind = 'snow' | 'grass' | 'sand' | 'redsand' | 'concrete' | 'grave';
+export type GroundKind = 'snow' | 'grass' | 'sand' | 'redsand' | 'concrete' | 'grave' | 'basalt' | 'regolith';
 
 /** Ground textures, made once and shared. */
 export function groundTextures(kind: GroundKind): GroundTextures {
@@ -224,7 +318,11 @@ export function groundTextures(kind: GroundKind): GroundTextures {
             ? sand(61, [0.93, 0.84, 0.64])
             : kind === 'redsand'
               ? sand(71, [0.86, 0.6, 0.4])
-              : concrete();
+              : kind === 'basalt'
+                ? basalt()
+                : kind === 'regolith'
+                  ? regolith()
+                  : concrete();
     cache.set(kind, t);
   }
   return t;

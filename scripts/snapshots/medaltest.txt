@@ -36,3 +36,10 @@ haunted-manor:sled         11.4 / 8.6 / 7.6 / 7.4
 haunted-manor:moto         10.8 / 9.4 / 9.2 / 8.9
 witching-hour:skis         9.4 / 8.1 / 7.9 / 7.6
 witching-hour:buggy        9.8 / 8.1 / 7.9 / 7.5
+ember-run:snowboard        8.8 / 7 / 6.7 / 6.5
+ember-run:coffin           8.7 / 7 / 6.6 / 6.3
+ash-chute:bike             10.7 / 8.7 / 8.5 / 8.2
+moonwalk:sled              10.3 / 9.1 / 8.9 / 8.5
+moonwalk:moto              10.4 / 9.2 / 9 / 8.6
+crater-hop:skis            12.9 / 11.3 / 11.1 / 10.7
+crater-hop:buggy           12.9 / 11.3 / 11.1 / 10.7

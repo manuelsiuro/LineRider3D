@@ -27,16 +27,38 @@ export function totalStars(progress = loadProgress()) {
   return Object.values(progress).reduce((n, p) => n + p.stars, 0);
 }
 
+/** Share of all the stars of the worlds before it that a world needs to open. */
+const GATE_SHARE = 0.55;
+
+/** Stars needed to open a world: a little over half of the stars of the worlds before it. */
+export function worldGate(biome: BiomeId): number {
+  const first = LEVELS.findIndex((l) => chapterOf(l) === biome);
+  return first <= 0 ? 0 : Math.round(GATE_SHARE * 3 * first);
+}
+
 /**
- * A level opens once the previous one of its world has at least one star;
- * the first level of every world is open from the start.
+ * A world is open once the player has its gate's stars. Worlds already played in (or
+ * with later worlds played) stay open, so nobody loses a world when gates change; Haunted
+ * Hollow opens for everyone during the Halloween season.
+ */
+export function worldOpen(biome: BiomeId, progress = loadProgress()): boolean {
+  if (totalStars(progress) >= worldGate(biome)) return true;
+  if (biome === 'halloween' && halloweenSeason()) return true;
+  const first = LEVELS.findIndex((l) => chapterOf(l) === biome);
+  return LEVELS.some((l, i) => i >= first && (progress[l.id]?.stars ?? 0) > 0);
+}
+
+/**
+ * A level opens once its world is open and the previous level of the world has at least
+ * one star; a world's first level opens with the world.
  */
 export function isUnlocked(index: number, progress = loadProgress()) {
-  if (index <= 0 || index >= LEVELS.length) return index === 0;
+  if (index < 0 || index >= LEVELS.length) return false;
   // Levels already won stay open (e.g. after levels were reordered).
   if ((progress[LEVELS[index].id]?.stars ?? 0) > 0) return true;
+  if (!worldOpen(chapterOf(LEVELS[index]), progress)) return false;
   const prev = LEVELS[index - 1];
-  if (chapterOf(prev) !== chapterOf(LEVELS[index])) return true;
+  if (!prev || chapterOf(prev) !== chapterOf(LEVELS[index])) return true;
   return (progress[prev.id]?.stars ?? 0) >= 1;
 }
 

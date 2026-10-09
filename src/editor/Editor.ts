@@ -4,6 +4,7 @@ import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js
 import type { Track } from '../track/Track';
 import type { DecorKind, DrawMode, Finish, HazardKind, LineType, Stroke } from '../track/types';
 import { HAZARDS } from '../physics/hazards';
+import type { PuzzleBase, PuzzleKind } from '../levels/puzzles';
 import type { TrackView } from '../render/TrackView';
 import { buildRibbonMesh } from '../render/ribbon';
 import { History } from './History';
@@ -84,12 +85,16 @@ interface DrawState {
 /** Build tool: the next piece, see-through. */
 const GHOST = new THREE.MeshBasicMaterial({ color: 0xffb02e, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
 
-/** Puzzle limits: a fixed amount of ink, and only some tools and line types. */
+/** Puzzle limits: a budget (ink, rings or erasures), and only some tools and line types. */
 export interface EditRules {
-  /** Ink available (world units of track). */
+  /** The budget: ink (world units of track), rings to place, or lines to erase. */
   ink: number;
   tools: Tool[];
   types: LineType[];
+  /** What the player does ('draw' when not set). */
+  kind?: PuzzleKind;
+  /** What the puzzle built (rings and erasable lines aren't the player's). */
+  base?: PuzzleBase;
 }
 
 export class Editor {
@@ -250,8 +255,18 @@ export class Editor {
     this.work.setNormal(new THREE.Vector3(0, 0, 1));
     this.editView = 'draw';
     this.onView?.('draw');
+    if (rules.kind === 'rings') this.settings.item = 'ring';
     if (!rules.types.includes(this.settings.lineType)) this.settings.lineType = rules.types[0];
     if (!rules.tools.includes(this.tool)) this.setTool(rules.tools[0]);
+  }
+
+  /** What's left of a puzzle's budget: ink, rings or erasures (Infinity without rules). */
+  budgetLeft() {
+    const r = this.rules;
+    if (!r) return Infinity;
+    if (r.kind === 'rings') return r.ink - [...this.track.rings.keys()].filter((id) => !r.base?.rings.has(id)).length;
+    if (r.kind === 'erase') return r.ink - [...(r.base?.erasable ?? [])].filter((id) => !this.track.strokes.has(id)).length;
+    return this.inkLeft();
   }
 
   /** Ink left, counting the stroke being drawn (Infinity without rules). */
@@ -659,6 +674,10 @@ export class Editor {
       case 'pencil':
       case 'line':
       case 'curve': {
+        if (this.rules?.kind === 'oneline' && [...this.track.strokes.values()].some((s) => !s.locked)) {
+          this.onHint?.('One line only: erase it to draw again');
+          break;
+        }
         // Holding still on a line takes its plane instead of drawing.
         const hit = this.planeLocked ? null : this.pickStroke(e);
         this.beginStroke(e);
@@ -1276,9 +1295,23 @@ export class Editor {
 
   private eraseAt(e: PointerEvent) {
     if (this.rules) {
-      // Puzzles: only the player's own lines can go (the ink comes back).
+      if (this.rules.kind === 'rings') {
+        // Ring puzzles: only the player's own rings can go.
+        const ring = this.pickRing(e);
+        if (!ring || this.rules.base?.rings.has(ring.id)) return;
+        let r = ring;
+        this.track.removeRing(r);
+        this.history.push({ undo: () => (r = this.track.addRing(r)), redo: () => this.track.removeRing(r) });
+        return;
+      }
+      // Puzzles: only the player's own lines can go (the ink comes back), or, in erase
+      // puzzles, the lines that may be erased, up to the budget.
       const hit = this.pickStroke(e);
       if (!hit || hit.stroke.locked) return;
+      if (this.rules.kind === 'erase' && this.budgetLeft() <= 0) {
+        this.onHint?.('No erasing left: undo to try other lines');
+        return;
+      }
       let stroke = hit.stroke;
       this.track.removeStroke(stroke);
       this.history.push({ undo: () => (stroke = this.track.addStroke(stroke)), redo: () => this.track.removeStroke(stroke) });
@@ -1349,6 +1382,10 @@ export class Editor {
    * the track; elsewhere it sits on the drawing plane.
    */
   private placeRing(e: PointerEvent) {
+    if (this.rules?.kind === 'rings' && this.budgetLeft() <= 0) {
+      this.onHint?.('No rings left: erase one to move it');
+      return;
+    }
     const radius = 1.6;
     const hit = this.pickStroke(e);
     let position: THREE.Vector3 | null = null;

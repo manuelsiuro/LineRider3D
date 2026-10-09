@@ -1,9 +1,27 @@
 import * as THREE from 'three';
 import type { Track } from '../track/Track';
-import type { DecorKind, LineType } from '../track/types';
+import type { DecorKind, HazardKind, LineType } from '../track/types';
 import { Simulation } from '../physics/Simulation';
 import type { VehicleDef } from '../physics/vehicles';
 import { P } from '../physics/Rider';
+import { SURFACES, gravityOf, normalizeWorld, surfaceOf, type WorldConfig } from '../world/worlds';
+
+/**
+ * Sets the world a level is built for (call right after clearing): the helpers that
+ * measure the rider's path then use its gravity and ground, so landings fit on the Moon.
+ */
+export function home(track: Track, world: Partial<WorldConfig>) {
+  track.setWorld(world);
+}
+
+/** A simulation of the track so far, on the track's world (gravity and ground drag). */
+function measureSim(track: Track, vehicle?: VehicleDef) {
+  const sim = new Simulation(track, vehicle);
+  const world = normalizeWorld(track.world as Partial<WorldConfig> | null);
+  sim.setGravity(gravityOf(world));
+  sim.setGroundDrag(SURFACES[surfaceOf(world)].drag);
+  return sim;
+}
 
 /** Profile stroke along +X (z = 0) from a height function. */
 export function profile(track: Track, fn: (x: number) => number, x0: number, x1: number, type: LineType = 'normal', z = 0, width = 2.4) {
@@ -27,7 +45,7 @@ export function path(track: Track, pts: THREE.Vector3[], type: LineType = 'norma
  * measured with the real physics, so landings can follow it exactly.
  */
 export function measureArc(track: Track, fromX: number, vehicle?: VehicleDef): (x: number) => number {
-  const sim = new Simulation(track, vehicle);
+  const sim = measureSim(track, vehicle);
   const arc: [number, number][] = [];
   for (let f = 0; f < 800; f++) {
     sim.seek(f);
@@ -52,7 +70,7 @@ export function measureArc(track: Track, fromX: number, vehicle?: VehicleDef): (
  * the body position the first time the run reaches each requested x.
  */
 export function riderLine(track: Track, xs: number[], vehicle?: VehicleDef): THREE.Vector3[] {
-  const sim = new Simulation(track, vehicle);
+  const sim = measureSim(track, vehicle);
   const out: (THREE.Vector3 | null)[] = xs.map(() => null);
   for (let f = 0; f < 1200 && out.some((p) => !p); f++) {
     sim.seek(f);
@@ -131,4 +149,24 @@ export function apex(arc: (x: number) => number, x0: number, x1: number) {
   let best = x0;
   for (let x = x0; x <= x1; x += 0.25) if (arc(x) > arc(best)) best = x;
   return { x: best, y: arc(best) };
+}
+
+/** A straight player line between two points (side view). */
+export function line(track: Track, a: [number, number], b: [number, number], type: LineType = 'normal') {
+  const A = new THREE.Vector3(a[0], a[1], 0);
+  const B = new THREE.Vector3(b[0], b[1], 0);
+  const n = Math.max(1, Math.ceil(A.distanceTo(B) / 0.5));
+  const points: THREE.Vector3[] = [];
+  for (let i = 0; i <= n; i++) points.push(new THREE.Vector3().lerpVectors(A, B, i / n));
+  return track.addStroke({ type, mode: 'profile', points, planeNormal: new THREE.Vector3(0, 0, 1), bank: 0, width: 2.4 });
+}
+
+/** A hazard standing on the run at (x, y) (icicles hang from y). */
+export function hazard(track: Track, kind: HazardKind, x: number, y: number, z = 0, scale = 1) {
+  return track.addHazard({ kind, position: new THREE.Vector3(x, y, z), rotation: 0, scale });
+}
+
+/** A checkpoint gate across the run at (x, y). */
+export function checkpoint(track: Track, x: number, y: number, z = 0) {
+  return track.addCheckpoint({ position: new THREE.Vector3(x, y + 0.4, z), axis: new THREE.Vector3(1, 0, 0), halfWidth: 2.3 });
 }

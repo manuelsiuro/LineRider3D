@@ -1,9 +1,9 @@
 import type { DecorKind, HazardKind } from '../track/types';
 
-export type BiomeId = 'alpine' | 'forest' | 'beach' | 'desert' | 'city' | 'halloween';
+export type BiomeId = 'alpine' | 'forest' | 'beach' | 'desert' | 'city' | 'halloween' | 'volcano' | 'moon';
 export type TimeId = 'dawn' | 'day' | 'sunset' | 'night';
-export type WeatherId = 'clear' | 'snow' | 'rain' | 'fog' | 'storm' | 'sandstorm';
-export type SurfaceId = 'snow' | 'grass' | 'sand' | 'asphalt';
+export type WeatherId = 'clear' | 'snow' | 'rain' | 'fog' | 'storm' | 'sandstorm' | 'ash';
+export type SurfaceId = 'snow' | 'grass' | 'sand' | 'asphalt' | 'rock' | 'regolith';
 
 /** Where a run takes place: landscape, time of day and weather. */
 export interface WorldConfig {
@@ -86,6 +86,26 @@ export const BIOMES: BiomeDef[] = [
     hazards: ['wisp', 'spikes'],
     time: 'night',
   },
+  {
+    id: 'volcano',
+    name: 'Volcano',
+    blurb: 'Black rock, rivers of lava and a sky full of ash.',
+    surface: 'rock',
+    weathers: ['clear', 'ash', 'storm'],
+    decor: ['basalt', 'vent', 'charred', 'lavarock', 'obsidian', 'rock'],
+    hazards: ['lava', 'spikes'],
+  },
+  {
+    id: 'moon',
+    name: 'Moon',
+    blurb: 'Grey dust, deep craters and the Earth hanging overhead. Jumps float.',
+    surface: 'regolith',
+    weathers: ['clear'],
+    decor: ['crater', 'lander', 'moonflag', 'dish', 'rover', 'crystal', 'rock'],
+    hazards: ['crystal', 'spikes'],
+    time: 'night',
+    gravity: 0.45,
+  },
 ];
 
 export const TIMES: { id: TimeId; name: string }[] = [
@@ -102,6 +122,7 @@ export const WEATHERS: { id: WeatherId; name: string }[] = [
   { id: 'fog', name: 'Fog' },
   { id: 'storm', name: 'Storm' },
   { id: 'sandstorm', name: 'Sandstorm' },
+  { id: 'ash', name: 'Ash fall' },
 ];
 
 /** How the ground feels: drag multiplier (snow is the reference, exactly 1). */
@@ -110,6 +131,8 @@ export const SURFACES: Record<SurfaceId, { name: string; drag: number }> = {
   grass: { name: 'Grass', drag: 1.15 },
   sand: { name: 'Sand', drag: 1.6 },
   asphalt: { name: 'Asphalt', drag: 0.75 },
+  rock: { name: 'Rock', drag: 1.3 },
+  regolith: { name: 'Moon dust', drag: 1.2 },
 };
 
 export const DEFAULT_WORLD: WorldConfig = { biome: 'alpine', time: 'day', weather: 'snow' };

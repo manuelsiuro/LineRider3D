@@ -25,6 +25,10 @@ const MUSIC: Record<BiomeId, { chords: number[][]; notes: number[]; voice: Voice
   city: { chords: [[50, 53, 57, 60, 64], [43, 53, 57, 59, 64], [48, 52, 55, 59, 62], [45, 49, 55, 57, 61]], notes: [62, 64, 65, 69, 72, 74, 76, 77], voice: 'keys', beat: 'lofi' },
   // Dm Bb Gm A7b9 in D harmonic minor: a haunted organ over a slow heartbeat.
   halloween: { chords: [[38, 45, 50, 53], [34, 46, 50, 53], [43, 46, 50, 55], [45, 49, 52, 55, 58]], notes: [62, 64, 65, 69, 70, 73, 74, 77], voice: 'organ', beat: 'heart' },
+  // Cm Ab Bb G7, low and smoldering, over the heartbeat drum.
+  volcano: { chords: [[36, 43, 48, 51], [32, 44, 48, 51], [34, 46, 50, 53], [31, 43, 47, 50, 53]], notes: [60, 62, 63, 67, 68, 71, 72, 75], voice: 'twang', beat: 'heart' },
+  // Lydian floating chords (Fmaj7#11, Gmaj7, Em9): spacey bells.
+  moon: { chords: [[41, 48, 52, 57, 59], [43, 50, 54, 59], [40, 47, 54, 55, 59], [45, 52, 57, 59, 64]], notes: [69, 71, 72, 76, 77, 79, 83, 84], voice: 'bell' },
 };
 
 /** How each ground sounds under the rider: filter and loudness. */
@@ -33,9 +37,12 @@ const GROUND: Record<SurfaceId, { type: BiquadFilterType; freq: number; q: numbe
   sand: { type: 'bandpass', freq: 1500, q: 0.7, gain: 0.9 },
   grass: { type: 'lowpass', freq: 1300, q: 0.4, gain: 0.7 },
   asphalt: { type: 'lowpass', freq: 380, q: 1.6, gain: 1.15 },
+  rock: { type: 'bandpass', freq: 520, q: 1.2, gain: 1.1 },
+  regolith: { type: 'lowpass', freq: 520, q: 0.6, gain: 0.6 },
 };
 
-const WIND: Record<BiomeId, number> = { alpine: 0.025, forest: 0.012, beach: 0.02, desert: 0.032, city: 0.01, halloween: 0.03 };
+// No air on the Moon: no wind.
+const WIND: Record<BiomeId, number> = { alpine: 0.025, forest: 0.012, beach: 0.02, desert: 0.032, city: 0.01, halloween: 0.03, volcano: 0.022, moon: 0 };
 
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
@@ -360,6 +367,15 @@ export class Sound {
             break;
           case 'alpine':
             if (!night && !wet && r() < 0.3) this.chirp('sine', 3200, 2600, t, 0.12, 0.01);
+            break;
+          case 'volcano':
+            // A deep rumble from the mountain, or lava popping.
+            if (r() < 0.45) this.chirp('sawtooth', 55, 38, t, 2.2, 0.03, 160);
+            else for (let k = 0; k < 2 + Math.floor(r() * 3); k++) this.chirp('sine', 180 + r() * 90, 90, t + k * 0.13, 0.09, 0.02);
+            break;
+          case 'moon':
+            // Only the radio crackles up here: a short blip from mission control.
+            if (r() < 0.35) for (let k = 0; k < 2; k++) this.chirp('square', 1200, 1200, t + k * 0.16, 0.06, 0.006, 2400);
             break;
           case 'halloween': {
             const pick = r();

@@ -27,6 +27,10 @@ export interface Atmosphere {
   envIntensity: number;
   /** 0 day .. 1 night: stars, moon, city lights, headlights. */
   night: number;
+  /** Stars shown even by day (no air on the Moon). */
+  stars: number;
+  /** The Earth hangs in the sky (the Moon). */
+  earth: boolean;
   /** 0..1 overcast: grey sky, more and darker clouds. */
   overcast: number;
   cloudColor: THREE.Color;
@@ -34,7 +38,7 @@ export interface Atmosphere {
   wet: number;
   /** Lightning flashes. */
   lightning: boolean;
-  precip: { kind: 'none' | 'snow' | 'rain' | 'dust'; amount: number; wind: number };
+  precip: { kind: 'none' | 'snow' | 'rain' | 'dust' | 'ash'; amount: number; wind: number };
   grade: { saturation: number; contrast: number; vignette: number; shadows: THREE.Vector3; highlights: THREE.Vector3 };
 }
 
@@ -168,6 +172,14 @@ const BIOME: Record<BiomeId, { tints: Partial<Record<'top' | 'mid' | 'horizon' |
     fogFar: 0.85,
     saturation: -0.02,
   },
+  volcano: {
+    tints: { top: [0x3a2a30, 0.6], mid: [0x7a4a40, 0.6], horizon: [0xff8a4a, 0.55], fog: [0x5a4642, 0.8], hemiGround: [0x5a2a1a, 0.7], hemiSky: [0xc89a8a, 0.35] },
+    fogFar: 0.95,
+    saturation: 0.02,
+    exposure: -0.06,
+  },
+  // The sky is set black below (no air); these tint the light and the haze over the dust.
+  moon: { tints: { fog: [0x2a2c34, 0.8], hemiGround: [0x8a8884, 0.8], hemiSky: [0x9aa8c8, 0.5] }, fogFar: 2.2, saturation: -0.12 },
 };
 
 const lum = (c: THREE.Color) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
@@ -194,7 +206,9 @@ const precipFor = (biome: BiomeId, weather: WeatherId): Atmosphere['precip'] => 
     case 'rain':
       return { kind: 'rain', amount: 1, wind: 0.2 };
     case 'storm':
-      return biome === 'alpine' ? { kind: 'snow', amount: 2.2, wind: 2.5 } : { kind: 'rain', amount: 1.8, wind: 1.2 };
+      return biome === 'alpine' ? { kind: 'snow', amount: 2.2, wind: 2.5 } : biome === 'volcano' ? { kind: 'ash', amount: 2, wind: 1.6 } : { kind: 'rain', amount: 1.8, wind: 1.2 };
+    case 'ash':
+      return { kind: 'ash', amount: 1, wind: 0.4 };
     case 'sandstorm':
       return { kind: 'dust', amount: 1.6, wind: 3 };
     default:
@@ -226,6 +240,8 @@ export function resolveAtmosphere(w: WorldConfig): Atmosphere {
     exposure: t.exposure + (b.exposure ?? 0),
     envIntensity: t.env,
     night: t.night,
+    stars: 0,
+    earth: false,
     overcast: 0,
     cloudColor: c(t.cloud),
     wet: 0,
@@ -272,7 +288,7 @@ export function resolveAtmosphere(w: WorldConfig): Atmosphere {
       overcast(0.88, 0.42);
       a.fogNear *= 0.3;
       a.fogFar *= w.biome === 'alpine' ? 0.32 : 0.45;
-      a.wet = w.biome === 'alpine' ? 0 : 1;
+      a.wet = w.biome === 'alpine' || w.biome === 'volcano' ? 0 : 1;
       a.lightning = w.biome !== 'alpine';
       a.grade.vignette += 0.08;
       break;
@@ -302,6 +318,48 @@ export function resolveAtmosphere(w: WorldConfig): Atmosphere {
       a.grade.highlights.set(0.03, 0.012, -0.02);
       break;
     }
+  }
+  if (w.weather === 'ash') {
+    // Grey ash hangs in the air and dims the sun.
+    const ash = c(0x6a625e).multiplyScalar(w.time === 'night' ? 0.3 : 1);
+    a.fog.lerp(ash, 0.6);
+    a.fogFar *= 0.55;
+    a.skyMid.lerp(a.fog, 0.4);
+    a.skyHorizon.lerp(a.fog, 0.5);
+    a.sunIntensity *= 0.7;
+    a.sunDisc = 0.5;
+    a.overcast = Math.max(a.overcast, 0.3);
+  }
+  if (w.biome === 'volcano') {
+    // Smoke hangs over everything: a darker haze and sky.
+    a.fog.multiplyScalar(0.62);
+    a.skyMid.lerp(a.fog, 0.35);
+    a.skyHorizon.multiplyScalar(0.85);
+    a.cloudColor.lerp(c(0x6a5a56), 0.7);
+    a.hemiIntensity *= w.time === 'night' ? 1.2 : 1;
+    // Lava light from below: a warm glow on the undersides and a red horizon at night.
+    a.hemiGround.lerp(c(0xff5a20), w.time === 'night' ? 0.55 : 0.25);
+    a.hemiIntensity *= w.time === 'night' ? 1.4 : 1.05;
+    if (w.time === 'night') a.skyHorizon.lerp(c(0x8a2a10), 0.6);
+    a.grade.highlights.set(0.035, 0.01, -0.025);
+  }
+  if (w.biome === 'moon') {
+    // No air: a black sky full of stars at any hour, harsh sunlight, no haze to speak of.
+    for (const col of [a.skyTop, a.skyMid, a.skyHorizon]) col.multiplyScalar(0.04);
+    a.skyHorizon.lerp(c(0x1a1c26), 0.5);
+    a.fog.setHex(0x14161e);
+    a.fogNear = 160;
+    a.stars = 1;
+    a.earth = true;
+    a.overcast = 0;
+    a.sunDisc = 1;
+    if (w.time !== 'night') {
+      a.sunColor.setHex(0xfff6ec);
+      a.sunIntensity = 3.2;
+    } else a.sunIntensity = Math.max(a.sunIntensity, 1.1);
+    a.hemiIntensity *= 0.75;
+    a.grade.saturation -= 0.05;
+    a.grade.contrast += 0.06;
   }
   if (w.biome === 'halloween') {
     // A huge orange harvest moon that the fog never quite hides, and violet shadows.

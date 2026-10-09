@@ -9,6 +9,8 @@ const MARKS: Record<SurfaceId, [number, number, number, number]> = {
   sand: [0.55, 0.4, 0.26, 0.5],
   grass: [0.2, 0.3, 0.12, 0.45],
   asphalt: [0.06, 0.06, 0.07, 0.5],
+  rock: [0.08, 0.06, 0.06, 0.4],
+  regolith: [0.32, 0.31, 0.3, 0.7],
 };
 
 /** Segments kept per lane (oldest are overwritten). */

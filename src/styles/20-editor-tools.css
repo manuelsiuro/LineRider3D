@@ -106,6 +106,8 @@
 .gallery-ic[data-world='desert'] { background: linear-gradient(160deg, #ffb066, #d9692a); }
 .gallery-ic[data-world='city'] { background: linear-gradient(160deg, #a08cff, #5b3fd6); }
 .gallery-ic[data-world='halloween'] { background: linear-gradient(160deg, #ff9a3d, #5b2a86); }
+.gallery-ic[data-world='volcano'] { background: linear-gradient(160deg, #ff7a3d, #3a1c1e); }
+.gallery-ic[data-world='moon'] { background: linear-gradient(160deg, #8a98b8, #1b2236); }
 
 .gallery-name,
 .gallery-rename {

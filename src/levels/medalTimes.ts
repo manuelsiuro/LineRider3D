@@ -5,15 +5,18 @@ import { VEHICLES, type VehicleDef } from '../physics/vehicles';
 import { RunStats } from '../game/RunStats';
 import { SURFACES, normalizeWorld, surfaceOf, gravityOf } from '../world/worlds';
 import type { LevelDef } from './levels';
+import { planAt } from './ride';
 
 /** Bronze, silver, gold and dev finish times, in seconds. */
 export type MedalTimes = [number, number, number, number];
 
 /**
- * Finish time of a run on the level's home ground: untouched, or pushing
- * whenever the ride touches something (a simple autopilot). Null: no clean finish.
+ * Finish time of a run on the level's home ground: untouched (or the level's own
+ * solution, for levels that need input), or with an autopilot that also pushes whenever
+ * the ride touches something. Null: no clean finish.
  */
 function finishTime(level: LevelDef, v: VehicleDef, push: boolean): number | null {
+  const plan = level.solution ?? [];
   const t = new Track();
   level.build(t);
   const sim = new Simulation(t, v);
@@ -28,7 +31,9 @@ function finishTime(level: LevelDef, v: VehicleDef, push: boolean): number | nul
     if (s.crashed) return null;
     if (s.finished) return s.finishTime;
     if (s.still > 1.5 && f > 80) return null;
-    if (push) sim.setInput(f, sim.rider.contact.some((c) => c) ? INPUT.push : 0);
+    let mask = planAt(plan, f);
+    if (push && sim.rider.contact.some((c) => c) && !(mask & INPUT.brake)) mask |= INPUT.push;
+    sim.setInput(f, mask);
   }
   return null;
 }

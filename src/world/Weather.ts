@@ -49,7 +49,9 @@ export class Weather {
       const col = atm.night > 0.5 ? 0x8494b8 : 0xc4d0e0;
       this.obj = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.38, depthWrite: false }));
     } else {
-      const snow = p.kind === 'snow';
+      // Ash falls like slow, grey snow (with a few glowing embers mixed in by color).
+      const snow = p.kind === 'snow' || p.kind === 'ash';
+      const ash = p.kind === 'ash';
       this.box = snow ? 70 : 50;
       const n = Math.round((snow ? 3000 : 1800) * p.amount * detail);
       const pos = new Float32Array(n * 3);
@@ -58,7 +60,7 @@ export class Weather {
         pos[i * 3] = (rand() - 0.5) * this.box * 2;
         pos[i * 3 + 1] = rand() * this.box;
         pos[i * 3 + 2] = (rand() - 0.5) * this.box * 2;
-        this.vel[i] = snow ? 1.5 + rand() * 2 : 0.3 + rand() * 1.2;
+        this.vel[i] = ash ? 0.6 + rand() * 1 : snow ? 1.5 + rand() * 2 : 0.3 + rand() * 1.2;
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -66,7 +68,9 @@ export class Weather {
       this.obj = new THREE.Points(
         geo,
         new THREE.PointsMaterial(
-          snow
+          ash
+            ? { size: 0.3, map: dotTexture(), color: new THREE.Color(0x8a8480).multiplyScalar(atm.night > 0.5 ? 0.5 : 1), transparent: true, depthWrite: false, opacity: 0.85 }
+            : snow
             ? { size: 0.35, map: dotTexture(), transparent: true, depthWrite: false, opacity: 0.9 }
             : { size: 0.9, map: dotTexture(), color: dust, transparent: true, depthWrite: false, opacity: 0.4 },
         ),
@@ -105,7 +109,7 @@ export class Weather {
         dx = wx * dt;
         dy = -v * dt;
         dz = wind * 1.5 * dt;
-      } else if (this.kind === 'snow') {
+      } else if (this.kind === 'snow' || this.kind === 'ash') {
         dx = (Math.sin(time * 0.7 + i) * 0.3 + wx) * dt;
         dy = -v * dt;
         dz = Math.cos(time * 0.5 + i * 0.3) * wind * 0.6 * dt;

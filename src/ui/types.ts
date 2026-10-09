@@ -1,3 +1,4 @@
+import type { PuzzleKind } from '../levels/puzzles';
 import type { WorldConfig } from '../world/worlds';
 import type { BiomeId } from '../world/worlds';
 
@@ -68,7 +69,8 @@ export interface SummaryInfo {
   /** Finish-time medal (levels on their home world). */
   medal?: { medal: string | null; newMedal: boolean; time: number; best: number; newBest: boolean; next: { name: string; time: number } | null };
   /** Set when solving a puzzle (ink in meters). */
-  puzzle?: { number: number; name: string; ink: number; par: number; hasNext: boolean };
+  /** Puzzles: the budget spent and the par, as text, and whether it made par. */
+  puzzle?: { number: number; name: string; used: string; par: string; under: boolean; hasNext: boolean };
   /** Set when playing the daily ride. */
   daily?: { number: number; name: string; streak: number };
   /** Name of the ride used. */
@@ -152,6 +154,18 @@ export interface LevelCard {
   ride?: string;
   /** Best medal won on the level (any ride). */
   medal?: string | null;
+  /** 1 (gentle) to 5 (expert). */
+  difficulty: number;
+  /** Needs the player's controls (push, brake, jump, flips). */
+  skill: boolean;
+}
+
+/** A world's tab on the level select. */
+export interface WorldTab {
+  id: BiomeId;
+  open: boolean;
+  /** Stars needed to open it. */
+  gate: number;
 }
 
 export interface OutfitCard {
@@ -195,9 +209,12 @@ export interface PuzzleCard {
   name: string;
   tip: string;
   stars: number;
-  /** Best ink used (m), 0 when unsolved. */
-  ink: number;
-  par: number;
+  kind: PuzzleKind;
+  world: BiomeId;
+  /** Least budget spent (text), '' when unsolved. */
+  best: string;
+  /** Par (text). */
+  par: string;
 }
 
 /** A saved track in the gallery. */

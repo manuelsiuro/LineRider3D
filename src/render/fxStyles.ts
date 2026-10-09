@@ -87,6 +87,26 @@ const BASE: Record<WorldConfig['biome'], FxStyle> = {
     sparks: false,
     puff: { size: 1.2, life: 1.3, gravity: -3, drag: 2, rise: 0.8 },
   },
+  // Black grit and glowing embers, sparks off the rock, lava-orange sparkles.
+  volcano: {
+    ground: [s(0.22, 0.2, 0.21), s(0.12, 0.11, 0.12)],
+    bits: [c(1.8, 0.6, 0.15), c(1.6, 0.35, 0.08)],
+    spray: [s(0.45, 0.42, 0.42), s(0.3, 0.28, 0.28)],
+    sparkle: [c(1.9, 0.9, 0.25), c(1.8, 0.45, 0.15)],
+    trail: c(1, 0.5, 0.25),
+    sparks: true,
+    puff: { size: 1.1, life: 1.1, gravity: -5, drag: 2.2, rise: 0.8 },
+  },
+  // No air: grey dust flies in slow, long arcs and doesn't billow.
+  moon: {
+    ground: [s(0.72, 0.71, 0.69), s(0.55, 0.54, 0.53)],
+    bits: null,
+    spray: [s(0.8, 0.8, 0.78), s(0.62, 0.62, 0.6)],
+    sparkle: [c(0.6, 1.3, 1.8), c(1.5, 1.5, 1.7)],
+    trail: c(0.6, 0.9, 1.1),
+    sparks: false,
+    puff: { size: 0.7, life: 2.2, gravity: -2.5, drag: 0.15, rise: 1.3 },
+  },
 };
 
 const SNOW = BASE.alpine;

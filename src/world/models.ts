@@ -87,6 +87,20 @@ export const M = {
   plaid: mat(0x8a3a5a),
   candle: mat(0xf2ead2),
   flame: glowMat(0xffd27a, 0xffa020, 2.6),
+  // Volcano
+  basalt: mat(0x2e2a2c),
+  basaltLight: mat(0x4a4246),
+  obsidian: mat(0x15121c, { metalness: 0.3, roughness: 0.25 }),
+  lava: glowMat(0xff7a1a, 0xff4a00, 2.2),
+  ember: glowMat(0xffb040, 0xff6a10, 2.6),
+  charred: mat(0x1e1a18),
+  ash: mat(0x8a8684),
+  // Moon
+  regolith: mat(0xb4b2ae),
+  regolithDark: mat(0x7e7c7a),
+  foil: mat(0xe0b040, { metalness: 0.7, roughness: 0.3 }),
+  panel: mat(0x22305a, { metalness: 0.5, roughness: 0.3 }),
+  moonCrystal: glowMat(0x8fe8ff, 0x40c8ff, 1.4),
 };
 
 /** Paint jobs for cars, huts and buildings (picked by variant). */
@@ -885,6 +899,142 @@ function candles(): THREE.Group {
   return g;
 }
 
+// ------------------------------------------------------------------ volcano
+
+/** Hexagonal basalt columns, like a giant's causeway. */
+function basalt(o: DecorOptions): THREE.Group {
+  const g = new THREE.Group();
+  const v = o.variant ?? 0;
+  const cols: [number, number, number][] = [[0, 0, 2.2], [0.75, 0.3, 1.5], [-0.7, 0.35, 1.8], [0.2, -0.75, 1.2], [-0.4, -0.65, 2.6], [0.8, -0.5, 0.9]];
+  cols.forEach(([x, z, h], i) => {
+    const k = 1 + ((v + i) % 3) * 0.18;
+    g.add(mesh(new THREE.CylinderGeometry(0.42, 0.44, h * k, 6), i % 2 ? M.basaltLight : M.basalt, x, (h * k) / 2, z));
+  });
+  if (o.snowy) g.add(mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.12, 6), M.snow, 0, 2.2 + 0.06, 0));
+  return g;
+}
+
+/** A smoking vent: a cracked cone with a glowing mouth. */
+function vent(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.CylinderGeometry(0.55, 1.5, 1.3, 7, 1, true), M.basalt, 0, 0.65, 0));
+  g.add(mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.1, 7), M.lava, 0, 1.15, 0));
+  for (let i = 0; i < 4; i++) g.add(blob(0.35, M.basaltLight, Math.cos(i * 1.7) * 1.4, 0.15, Math.sin(i * 1.7) * 1.4, 0.6, i + 3));
+  return g;
+}
+
+/** A burnt tree: black trunk, a few stubby limbs and glowing embers. */
+function charred(o: DecorOptions): THREE.Group {
+  const g = new THREE.Group();
+  const v = o.variant ?? 0;
+  g.add(mesh(new THREE.CylinderGeometry(0.12, 0.3, 3, 5), M.charred, 0, 1.5, 0));
+  stick(g, [0, 1.8, 0], [0.9 + (v % 2) * 0.3, 2.6, 0.2], 0.08, M.charred, 0.03, 4);
+  stick(g, [0, 2.2, 0], [-0.7, 3.0, -0.3], 0.07, M.charred, 0.02, 4);
+  g.add(mesh(new THREE.IcosahedronGeometry(0.08, 0), M.ember, 0.12, 1.1, 0.25));
+  g.add(mesh(new THREE.IcosahedronGeometry(0.06, 0), M.ember, -0.15, 2.0, 0.1));
+  return g;
+}
+
+/** A crusted rock with lava glowing through its cracks. */
+function lavarock(o: DecorOptions): THREE.Group {
+  const g = new THREE.Group();
+  g.add(blob(0.75, M.lava, 0, 0.45, 0, 0.7, (o.variant ?? 0) + 5));
+  const crust = blob(0.9, M.basalt, 0, 0.5, 0, 0.72, (o.variant ?? 0) + 9);
+  crust.scale.set(0.98, 1, 0.98);
+  g.add(crust);
+  // The crust is broken open on top.
+  g.add(mesh(new THREE.IcosahedronGeometry(0.45, 0), M.lava, 0.1, 0.95, 0.05));
+  return g;
+}
+
+/** Shiny black volcanic glass shards. */
+function obsidian(o: DecorOptions): THREE.Group {
+  const g = new THREE.Group();
+  const v = o.variant ?? 0;
+  for (let i = 0; i < 4; i++) {
+    const h = 0.9 + ((v + i) % 3) * 0.45;
+    const m = mesh(new THREE.ConeGeometry(0.28, h, 4), M.obsidian, Math.cos(i * 1.6) * 0.35, h / 2 - 0.05, Math.sin(i * 1.6) * 0.35);
+    m.rotation.set(Math.sin(i * 2.1) * 0.35, i, Math.cos(i * 1.3) * 0.35);
+    g.add(m);
+  }
+  return g;
+}
+
+// ------------------------------------------------------------------ moon
+
+/** A small crater: a rim of rubble around a dished floor. */
+function crater(o: DecorOptions): THREE.Group {
+  const g = new THREE.Group();
+  const rim = mesh(new THREE.TorusGeometry(1.4, 0.38, 5, 12).rotateX(Math.PI / 2), M.regolith, 0, 0.05, 0);
+  rim.scale.y = 0.6;
+  g.add(rim);
+  g.add(mesh(new THREE.CircleGeometry(1.3, 12).rotateX(-Math.PI / 2), M.regolithDark, 0, 0.02, 0));
+  for (let i = 0; i < 3; i++) g.add(blob(0.22, M.regolithDark, Math.cos(i * 2.3 + (o.variant ?? 0)) * 2, 0.1, Math.sin(i * 2.3) * 2, 0.7, i));
+  return g;
+}
+
+/** A lunar lander: gold-foil body on four splayed legs. */
+function lander(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.CylinderGeometry(1.1, 1.3, 1.1, 8), M.foil, 0, 1.6, 0));
+  g.add(mesh(new THREE.BoxGeometry(1.4, 1, 1.4), M.white, 0, 2.6, 0));
+  g.add(mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.12, 10).rotateZ(Math.PI / 2), M.panel, 0.72, 2.7, 0));
+  for (let i = 0; i < 4; i++) {
+    const a = Math.PI / 4 + (i * Math.PI) / 2;
+    stick(g, [Math.cos(a) * 0.9, 1.3, Math.sin(a) * 0.9], [Math.cos(a) * 1.9, 0.1, Math.sin(a) * 1.9], 0.06, M.steel);
+    g.add(mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 8), M.steel, Math.cos(a) * 1.9, 0.03, Math.sin(a) * 1.9));
+  }
+  return g;
+}
+
+/** A flag planted in the dust (stiffened with a top bar: no wind up here). */
+function moonflag(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 3, 6), M.steel, 0, 1.5, 0));
+  g.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 5).rotateZ(Math.PI / 2), M.steel, 0.75, 2.95, 0));
+  g.add(mesh(new THREE.PlaneGeometry(1.5, 0.9), flagCloth, 0.75, 2.5, 0));
+  return g;
+}
+
+/** A radio dish on a tripod. */
+function dish(): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2;
+    stick(g, [0, 2, 0], [Math.cos(a) * 0.9, 0, Math.sin(a) * 0.9], 0.06, M.steel);
+  }
+  const bowl = mesh(new THREE.SphereGeometry(1.4, 12, 6, 0, Math.PI * 2, 0, Math.PI / 3.2), M.white, 0, 2.2, 0);
+  bowl.rotation.x = Math.PI + 0.6;
+  bowl.position.y = 3.2;
+  g.add(bowl);
+  stick(g, [0, 2.6, 0], [0, 3.1, -0.9], 0.03, M.steel);
+  return g;
+}
+
+/** A six-wheeled rover. */
+function rover(): THREE.Group {
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.BoxGeometry(2, 0.5, 1.2), M.white, 0, 0.9, 0));
+  g.add(mesh(new THREE.BoxGeometry(1.4, 0.06, 1.3), M.panel, -0.2, 1.2, 0));
+  stick(g, [0.8, 1.1, 0], [0.8, 1.9, 0], 0.04, M.steel);
+  g.add(mesh(new THREE.BoxGeometry(0.3, 0.25, 0.4), M.metal, 0.8, 2, 0));
+  for (const x of [-0.75, 0, 0.75]) for (const z of [-0.72, 0.72]) g.add(mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.22, 10).rotateX(Math.PI / 2), M.tire, x, 0.32, z));
+  return g;
+}
+
+/** Glowing blue crystals poking out of the dust. */
+function crystal(o: DecorOptions): THREE.Group {
+  const g = new THREE.Group();
+  const v = o.variant ?? 0;
+  for (let i = 0; i < 3; i++) {
+    const h = 0.8 + ((v + i) % 3) * 0.5;
+    const m = mesh(new THREE.OctahedronGeometry(1, 0).scale(0.22, h / 2, 0.22), M.moonCrystal, Math.cos(i * 2.2) * 0.3, h / 2 - 0.05, Math.sin(i * 2.2) * 0.3);
+    m.rotation.set(Math.sin(i * 1.9) * 0.4, 0, Math.cos(i * 1.4) * 0.4);
+    g.add(m);
+  }
+  return g;
+}
+
 const BUILDERS: Record<DecorKind, (o: DecorOptions) => THREE.Group> = {
   pine,
   snowman,
@@ -925,6 +1075,17 @@ const BUILDERS: Record<DecorKind, (o: DecorOptions) => THREE.Group> = {
   scarecrow,
   crypt,
   candles,
+  basalt,
+  vent,
+  charred,
+  lavarock,
+  obsidian,
+  crater,
+  lander,
+  moonflag,
+  dish,
+  rover,
+  crystal,
 };
 
 export const DECOR_LABELS: Record<DecorKind, string> = {
@@ -967,6 +1128,17 @@ export const DECOR_LABELS: Record<DecorKind, string> = {
   scarecrow: '🌾 Scarecrow',
   crypt: '⚰️ Crypt',
   candles: '🕯️ Candles',
+  basalt: '⬢ Basalt',
+  vent: '♨ Vent',
+  charred: '🪵 Burnt tree',
+  lavarock: '🔥 Lava rock',
+  obsidian: '◆ Obsidian',
+  crater: '◯ Crater',
+  lander: '🛸 Lander',
+  moonflag: '🏳 Moon flag',
+  dish: '📡 Dish',
+  rover: '🚙 Rover',
+  crystal: '💎 Crystal',
 };
 
 export const isDecorKind = (k: unknown): k is DecorKind => typeof k === 'string' && Object.hasOwn(BUILDERS, k);
@@ -1019,6 +1191,17 @@ const ROLE: Record<DecorKind, Role> = {
   tombstone: 'rock',
   crypt: 'building',
   scarecrow: 'flag',
+  basalt: 'rock',
+  vent: 'small',
+  charred: 'tree',
+  lavarock: 'light',
+  obsidian: 'rock',
+  crater: 'rock',
+  lander: 'building',
+  moonflag: 'flag',
+  dish: 'building',
+  rover: 'small',
+  crystal: 'light',
 };
 
 const NATIVE: Record<BiomeId, Record<Role, DecorKind[]>> = {
@@ -1028,6 +1211,8 @@ const NATIVE: Record<BiomeId, Record<Role, DecorKind[]>> = {
   desert: { tree: ['cactus', 'cactus', 'barrel'], small: ['barrel', 'tumbleweed', 'skull'], building: ['windmill'], rock: ['mesa', 'rock'], light: ['lamp'], flag: ['flag'] },
   city: { tree: ['planter'], small: ['cone'], building: ['tower', 'tower', 'billboard'], rock: ['car'], light: ['streetlight'], flag: ['flag'] },
   halloween: { tree: ['deadtree'], small: ['pumpkin', 'ghost', 'pumpkin', 'cauldron'], building: ['crypt'], rock: ['tombstone', 'rock', 'tombstone'], light: ['candles'], flag: ['scarecrow'] },
+  volcano: { tree: ['charred'], small: ['vent', 'obsidian'], building: ['basalt'], rock: ['basalt', 'lavarock', 'obsidian'], light: ['lavarock'], flag: ['flag'] },
+  moon: { tree: ['crystal', 'rock', 'crystal'], small: ['crater', 'rock'], building: ['lander', 'dish'], rock: ['crater', 'rock'], light: ['crystal'], flag: ['moonflag'] },
 };
 
 /**

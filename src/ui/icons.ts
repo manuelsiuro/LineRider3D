@@ -80,6 +80,9 @@ const P: Record<string, string> = {
   desert: '<path d="M10 21V6a2 2 0 0 1 4 0v15"/><path d="M14 13h2a2 2 0 0 0 2-2V8"/><path d="M10 15H8a2 2 0 0 1-2-2v-2"/><path d="M3 21h18"/>',
   city: '<path d="M3 21V9h6v12"/><path d="M9 21V3h8v18"/><path d="M17 21v-9h4v9"/><path d="M12 7h2M12 11h2M12 15h2M5 13h2M5 17h2"/><path d="M2 21h20"/>',
   halloween: '<path d="M12 6.5c-1.2-.9-3.5-1.3-5.5-.3C3.8 7.6 3 11 3.6 14c.7 3.6 3.6 5.5 8.4 5.5s7.7-1.9 8.4-5.5c.6-3-.2-6.4-2.9-7.8-2-1-4.3-.6-5.5.3Z"/><path d="M12 6.5V3.5c.8 0 1.8.3 2.5 1"/><path d="m7.5 11 1.5-1.5 1.5 1.5ZM13.5 11l1.5-1.5 1.5 1.5Z" fill="currentColor"/><path d="M7.5 14.5c1 1.2 2.5 1.8 4.5 1.8s3.5-.6 4.5-1.8l-1.5.6-1-1-1 1-1-1-1 1-1-1-1 1Z" fill="currentColor"/>',
+  volcano: '<path d="M2 21 9 9h6l7 12Z"/><path d="M9 9c0-2 1.5-3 3-3s3 1 3 3"/><path d="M10 13l1.5 1.5L13 12l1 3"/><path d="M8 4c1-1 2-1 3 0M13 3c1-1 2-1 3 0"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/><circle cx="9" cy="14" r="1.2"/><circle cx="14" cy="17" r="0.8"/>',
+  ash: '<path d="M20 15.5A4.5 4.5 0 0 0 17.5 7h-1.3A7 7 0 1 0 4 13.5"/><circle cx="8" cy="18" r="1" fill="currentColor"/><circle cx="12" cy="21" r="1" fill="currentColor"/><circle cx="16" cy="18" r="1" fill="currentColor"/>',
   globe: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20Z"/>',
   // Times of day
   dawn: '<path d="M17 18a5 5 0 0 0-10 0"/><path d="M12 9V2M4.2 10.2l1.4 1.4M1 18h2M21 18h2M18.4 11.6l1.4-1.4M23 22H1"/><path d="m8 6 4-4 4 4"/>',

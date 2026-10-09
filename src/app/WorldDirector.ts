@@ -5,13 +5,14 @@ import { SURFACES, normalizeWorld, sameWorld, surfaceOf, gravityOf, type WorldCo
 import type { WorldPicker } from '../ui/UI';
 import type { Core } from './core';
 
-/** The title screen tours the worlds. */
+/** The title screen tours the worlds (not the Moon: its gravity would change the demo ride). */
 const TITLE_WORLDS: Partial<WorldConfig>[] = [
   { biome: 'alpine', time: 'day', weather: 'snow' },
   { biome: 'forest', time: 'sunset', weather: 'clear' },
   { biome: 'beach', time: 'day', weather: 'clear' },
   { biome: 'city', time: 'night', weather: 'clear' },
   { biome: 'desert', time: 'sunset', weather: 'clear' },
+  { biome: 'volcano', time: 'night', weather: 'clear' },
   { biome: 'forest', time: 'night', weather: 'clear' },
 ];
 

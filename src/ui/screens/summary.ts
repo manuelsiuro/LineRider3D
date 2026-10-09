@@ -38,7 +38,7 @@ export function showSummary(
             : ''
         }
         ${medalLine(info)}
-        ${info.puzzle ? `<p class="ink-line ${info.puzzle.ink <= info.puzzle.par + 1e-6 ? 'under' : ''}">${icon('pencil', 15)} ${info.puzzle.ink.toFixed(1)} m of ink · par ${info.puzzle.par.toFixed(1)} m</p>` : ''}
+        ${info.puzzle ? `<p class="ink-line ${info.puzzle.under ? 'under' : ''}">${icon('pencil', 15)} ${info.puzzle.used} · par ${info.puzzle.par}</p>` : ''}
       </div>
       <ul class="goals">${info.goals.map((g) => `<li class="${g.done ? 'done' : ''}">${icon(g.done ? 'check' : 'circle', 16)}${g.label}</li>`).join('')}</ul>
       <div class="stats">

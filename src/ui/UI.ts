@@ -8,7 +8,7 @@ import { GRADE_LABEL } from '../game/RunStats';
 import { icon } from './icons';
 import { PATH_PIECES, PROFILE_PIECES } from '../editor/pieces';
 import { BIOMES, DEFAULT_WORLD, TIMES, WEATHERS, biomeById, type WorldConfig } from '../world/worlds';
-import { KMH, METERS, TOUCH, button, h, keyless, overlayOpen, setText } from './dom';
+import { KMH, TOUCH, button, h, keyless, overlayOpen, setText } from './dom';
 import type { ScreenCtx, UIHandlers } from './types';
 import { confirm, pickTemplate, showLink } from './screens/dialogs';
 import { BADGE, showTitle, worldCaption } from './screens/title';
@@ -459,14 +459,17 @@ export class UI {
     for (const [id, b] of this.toolButtons) b.classList.toggle('hidden', !!rules && !rules.tools.includes(id));
     this.worldBtn.classList.toggle('hidden', !!rules);
     this.inkMeter.classList.toggle('hidden', !rules);
+    // The budget meter says what the budget is.
+    const [ic, name] = rules?.kind === 'rings' ? ['star', 'Rings'] : rules?.kind === 'erase' ? ['eraser', 'Erase'] : ['pencil', 'Ink'];
+    this.inkMeter.querySelector('.ink-label')!.innerHTML = `${icon(ic, 14)} ${name}`;
     if (this.worldOpen) this.toggleWorldPanel();
     this.selectTool(rules ? rules.tools[0] : this.editor.tool);
   }
 
-  /** Ink left of `total`, with the par mark (all in world units, shown in meters). */
-  setInk(left: number, total: number, par: number) {
+  /** Budget left of `total` (ink, rings or erasures), with the par mark; `label` says what's left. */
+  setInk(left: number, total: number, par: number, label: string) {
     const used = total - left;
-    setText(this.inkMeter.querySelector('.ink-left')!, `${(left * METERS).toFixed(1)} m`);
+    setText(this.inkMeter.querySelector('.ink-left')!, label);
     const fill = this.inkMeter.querySelector<HTMLElement>('.ink-fill')!;
     const width = `${((left / total) * 100).toFixed(1)}%`;
     if (fill.style.width !== width) fill.style.width = width;
@@ -475,6 +478,7 @@ export class UI {
     if (parMark.style.left !== parAt) parMark.style.left = parAt;
     this.inkMeter.classList.toggle('over-par', used > par + 1e-6);
     this.inkMeter.classList.toggle('empty', left < 0.3);
+    this.inkMeter.title = `${label} left`;
   }
 
   toggleWorldPanel() {
@@ -599,7 +603,13 @@ export class UI {
       seg(r1, LINE_TYPES.filter((t) => rules.types.includes(t.id)).map((t) => ({ ...t, color: LINE_COLORS[t.id] })), s.lineType, (v) => (s.lineType = v));
       r1.append(h('span', 'tip', 'Draw from left to right: the colored side is the floor. Press Play to test.'));
     } else if (rules && tool === 'eraser') {
-      row().append(h('span', 'tip', 'Erase your own lines to get the ink back. The given track stays.'));
+      const tips = {
+        rings: 'Erase one of your rings to place it somewhere else.',
+        erase: 'Erase the lines that are in the way. The ground stays; undo puts a line back.',
+      };
+      row().append(h('span', 'tip', rules.kind === 'rings' || rules.kind === 'erase' ? tips[rules.kind] : 'Erase your own lines to get the ink back. The given track stays.'));
+    } else if (rules && tool === 'item') {
+      row().append(h('span', 'tip', 'Tap the track to hang a boost ring over it: it pushes Bosh the way the track runs. Press Play to test.'));
     } else if (tool === 'curve' && this.editor.bending) {
       const r = row();
       const done = button('chip action primary', `${icon('check', 16)}<span>Done</span><kbd>↵</kbd>`, 'Lay the curve down (Enter)');

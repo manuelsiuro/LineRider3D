@@ -5,7 +5,7 @@ import type { BiomeId, WorldConfig } from '../../world/worlds';
 import type { DailyCard, ScreenCtx, TitleChoice } from '../types';
 
 /** Badge icon of each world (the logo follows the world on screen). */
-export const BADGE: Record<BiomeId, string> = { alpine: 'snowflake', forest: 'forest', beach: 'beach', desert: 'desert', city: 'city', halloween: 'pumpkin' };
+export const BADGE: Record<BiomeId, string> = { alpine: 'snowflake', forest: 'forest', beach: 'beach', desert: 'desert', city: 'city', halloween: 'pumpkin', volcano: 'volcano', moon: 'moon' };
 
 /** Title screen; resolves with the player's choice. */
 export function showTitle(ctx: ScreenCtx, hasSave: boolean, stars: number, maxStars: number, daily: DailyCard, season: { stars: number; max: number } | null = null): Promise<TitleChoice> {

@@ -7,12 +7,14 @@ import { disposeTree, rng, setKeepOut, type Backdrop, type BackdropCtx } from '.
 import { desert } from './backdrops/desert';
 import { forest } from './backdrops/forest';
 import { halloween } from './backdrops/halloween';
+import { moon } from './backdrops/moon';
+import { volcano } from './backdrops/volcano';
 import { terrainHeight } from './terrain';
 import { groundTextures } from './textures';
 import { Weather } from './Weather';
 import { DEFAULT_WORLD, normalizeWorld, sameWorld, type BiomeId, type WorldConfig } from './worlds';
 
-const BACKDROPS: Record<BiomeId, (ctx: BackdropCtx) => Backdrop> = { alpine, forest, beach, desert, city, halloween };
+const BACKDROPS: Record<BiomeId, (ctx: BackdropCtx) => Backdrop> = { alpine, forest, beach, desert, city, halloween, volcano, moon };
 
 export type Detail = 'low' | 'medium' | 'high';
 const DETAIL: Record<Detail, number> = { low: 0.35, medium: 0.6, high: 1 };
@@ -165,6 +167,8 @@ export class Environment {
     u.moonCol.value.copy(atm.moon);
     u.moonSize.value = atm.moonSize;
     u.night.value = atm.night;
+    u.stars.value = atm.stars;
+    u.earth.value = atm.earth ? 1 : 0;
     u.overcast.value = atm.overcast;
 
     this.hemi.color.copy(atm.hemiSky);
@@ -181,7 +185,8 @@ export class Environment {
     this.cloudMat.opacity = 0.95;
     this.clouds.children.forEach((cl, i) => {
       // Fewer clouds on clear nights, a low deck under storms.
-      cl.visible = (atm.overcast > 0.3 || i % (atm.night > 0.5 ? 3 : 1) === 0) && atm.fogFar > 200;
+      // No clouds where there's no air (the Moon).
+      cl.visible = (atm.overcast > 0.3 || i % (atm.night > 0.5 ? 3 : 1) === 0) && atm.fogFar > 200 && !atm.earth;
       const s = 1 + atm.overcast * 1.4;
       cl.scale.set(s, 1 + atm.overcast * 0.8, s);
       cl.position.y = cl.userData.baseY * (1 - atm.overcast * 0.45);
@@ -234,10 +239,10 @@ export class Environment {
 
     const kind = this.config.weather === 'snow' && b.ground !== 'snow' ? 'snow' : b.ground;
     const t = groundTextures(kind);
-    for (const tex of [t.map, t.normal]) {
+    for (const tex of [t.map, t.normal, t.emissive?.map ?? null]) {
       if (!tex) continue;
       tex.userData.shared = true;
-      tex.repeat.set(180, 180);
+      tex.repeat.setScalar(t.repeat ?? 180);
     }
     const wet = kind === 'snow' ? 0 : this.atm.wet;
     const old = this.ground.material as THREE.Material;
@@ -249,6 +254,8 @@ export class Environment {
       normalMap: t.normal,
       normalScale: new THREE.Vector2(t.normalScale, t.normalScale),
       vertexColors: true,
+      // Lava in the cracks glows brighter at night.
+      ...(t.emissive ? { emissiveMap: t.emissive.map, emissive: new THREE.Color(t.emissive.color), emissiveIntensity: t.emissive.intensity * (1 + this.atm.night * 0.8) } : {}),
     });
     this.ground.material = material;
     old.dispose();
@@ -281,13 +288,21 @@ export class Environment {
         moonCol: { value: new THREE.Color(0.92, 0.94, 1.0) },
         moonSize: { value: 1 },
         night: { value: 0 },
+        stars: { value: 0 },
+        earth: { value: 0 },
         overcast: { value: 0 },
         time: { value: 0 },
       },
       vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 horizon; uniform vec3 fogCol; uniform vec3 sunDir; uniform vec3 sunGlow; uniform vec3 moonCol; uniform float moonSize;
-        uniform float sunDisc; uniform float night; uniform float overcast; uniform float time; varying vec3 vPos;
+        uniform float sunDisc; uniform float night; uniform float stars; uniform float earth; uniform float overcast; uniform float time; varying vec3 vPos;
         float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+        float vnoise(vec3 p){
+          vec3 i = floor(p); vec3 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                     mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+        }
+        float fbm(vec3 p){ return vnoise(p) * 0.55 + vnoise(p * 2.1) * 0.28 + vnoise(p * 4.3) * 0.17; }
         void main(){
           vec3 d = normalize(vPos);
           float s = max(dot(d, sunDir), 0.0);
@@ -296,14 +311,33 @@ export class Environment {
           vec3 col = mix(hor, mid, smoothstep(0.0, 0.18, d.y));
           col = mix(col, top, smoothstep(0.15, 0.7, d.y));
           col = mix(fogCol, col, smoothstep(-0.08, 0.02, d.y));
-          if (night > 0.0) {
-            // Stars, twinkling, fading toward the horizon and under clouds.
+          float starAmount = max(night, stars);
+          if (starAmount > 0.0) {
+            // Stars, twinkling (not on the Moon: no air), fading toward the horizon and under clouds.
             vec3 g = d * 260.0;
             vec3 cell = floor(g);
             float h = hash(cell);
             float round = smoothstep(0.42, 0.05, length(fract(g) - 0.5));
-            float star = step(0.9965, h) * round * (0.6 + 0.4 * sin(time * 2.0 + h * 400.0)) * 1.6;
-            col += vec3(0.9, 0.95, 1.0) * star * smoothstep(0.05, 0.35, d.y) * night * (1.0 - overcast);
+            float star = step(0.9965, h) * round * mix(0.6 + 0.4 * sin(time * 2.0 + h * 400.0), 0.8 + 0.4 * h, earth) * 1.6;
+            col += vec3(0.9, 0.95, 1.0) * star * smoothstep(earth > 0.5 ? -0.02 : 0.05, 0.35, d.y) * starAmount * (1.0 - overcast);
+          }
+          if (earth > 0.5) {
+            // The Earth: a blue disc with white cloud swirls and a thin glowing rim, fixed in the sky.
+            vec3 ed = normalize(vec3(0.45, 0.42, -0.78));
+            float e = dot(d, ed);
+            float disc = smoothstep(0.99845, 0.99865, e);
+            vec3 q = d - ed * e;
+            // Continents and cloud bands from noise on the disc (slowly turning clouds).
+            float land = smoothstep(0.52, 0.6, fbm(q * 90.0 + vec3(3.1, 7.7, 1.3)));
+            float clouds = smoothstep(0.5, 0.75, fbm(q * vec3(110.0, 220.0, 110.0) + vec3(time * 0.01, 0.0, 5.0)));
+            vec3 earthCol = mix(mix(vec3(0.05, 0.22, 0.65), vec3(0.18, 0.42, 0.16), land), vec3(1.0), clouds * 0.85);
+            // Lit from the sun's side.
+            float lit = 0.25 + 0.75 * smoothstep(-0.2, 0.4, dot(normalize(q + ed * 0.002), normalize(sunDir - ed * dot(sunDir, ed))));
+            col = mix(col, earthCol * lit * 1.4, disc);
+            col += vec3(0.25, 0.5, 1.0) * pow(max(e, 0.0), 6000.0) * 0.6;
+            // The sun (by day) in a black sky: a hard white disc.
+            col += sunGlow * (pow(s, 2200.0) * 4.0 + pow(s, 200.0) * 0.2) * sunDisc * (1.0 - night);
+          } else if (night > 0.0) {
             // Moon: crisp disc with soft maria and a pale halo.
             float m = smoothstep(1.0 - 0.00065 * moonSize, 1.0 - 0.00045 * moonSize, s);
             float maria = 0.85 + 0.15 * sin(d.x * 900.0) * sin(d.z * 800.0);

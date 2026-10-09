@@ -1,23 +1,47 @@
 import { LINE_COLORS, type LineType } from '../../track/types';
+import { biomeById, type BiomeId } from '../../world/worlds';
+import type { PuzzleKind } from '../../levels/puzzles';
 import { closeOverlay, h, hex } from '../dom';
 import { icon } from '../icons';
-import type { PuzzleCard, ScreenCtx } from '../types';
+import type { PuzzleCard, ScreenCtx, WorldTab } from '../types';
 
 const TYPE_NAME: Partial<Record<LineType, string>> = { normal: 'Track', accel: 'Boost', bouncy: 'Bouncy', ice: 'Ice', mud: 'Mud', crumble: 'Crumble' };
 
-/** Puzzle select; resolves with a puzzle index, or null to go back. */
-export function showPuzzles(ctx: ScreenCtx, puzzles: PuzzleCard[]): Promise<number | null> {
+/** Each kind of puzzle: its name, icon, and how to play it. */
+const KINDS: Record<PuzzleKind, { name: string; icon: string; steps: [string, string][] }> = {
+  draw: { name: 'Draw', icon: 'pencil', steps: [['pencil', "Draw what's missing (left to right)"], ['play', 'Press Play to test it'], ['stop', 'Stop, fix, and try again']] },
+  oneline: { name: 'One line', icon: 'line', steps: [['line', 'Draw it all in a single line'], ['play', 'Press Play to test it'], ['eraser', 'Erase it to start over']] },
+  trick: { name: 'Trick', icon: 'replay', steps: [['pencil', 'Draw a ramp or a drop'], ['play', 'Bosh has to land the trick'], ['stop', 'Then reach the finish']] },
+  rings: { name: 'Rings', icon: 'star', steps: [['star', 'Tap the track to hang a boost ring'], ['play', 'Press Play: rings push Bosh along'], ['eraser', 'Erase a ring to move it']] },
+  erase: { name: 'Erase', icon: 'eraser', steps: [['eraser', 'Erase the lines in the way'], ['play', 'Press Play to test it'], ['undo', 'Undo to put a line back']] },
+};
+
+/** Puzzle select, world by world (locked worlds show the puzzle stars they need); resolves with a puzzle index, or null to go back. */
+export function showPuzzles(ctx: ScreenCtx, puzzles: PuzzleCard[], worlds: WorldTab[]): Promise<number | null> {
   return new Promise((resolve) => {
     const total = puzzles.reduce((n, p) => n + p.stars, 0);
-    const cards = puzzles
-      .map(
-        (p, i) => `<button class="level-card puzzle-card" data-i="${i}" style="animation-delay:${i * 0.04}s">
-          <span class="level-num">${i + 1}</span>
+    const card = (p: PuzzleCard, i: number, open: boolean) => `<button class="level-card puzzle-card ${open ? '' : 'locked'}" data-world="${p.world}" data-i="${i}" ${open ? '' : 'disabled'} style="animation-delay:${Math.min(i, 14) * 0.03}s">
+          <span class="level-num">${open ? i + 1 : icon('lock', 20)}</span>
+          <span class="level-badges"><span title="${KINDS[p.kind].name} puzzle">${icon(KINDS[p.kind].icon, 18)}</span></span>
           <span class="level-name">${p.name}</span>
           <span class="level-stars">${[0, 1, 2].map((k) => `<i class="${k < p.stars ? 'on' : ''}">${icon('star', 18)}</i>`).join('')}</span>
-          <span class="level-best">${p.ink > 0 ? `Best ink ${p.ink.toFixed(1)} m · par ${p.par.toFixed(1)} m` : `Par ${p.par.toFixed(1)} m of ink`}</span>
-        </button>`,
-      )
+          <span class="level-best">${p.best ? `Best ${p.best} · par ${p.par}` : `Par ${p.par}`}</span>
+        </button>`;
+    const sections = worlds
+      .map((w) => {
+        const items = puzzles.map((p, i) => [p, i] as const).filter(([p]) => p.world === w.id);
+        if (!items.length) return '';
+        const b = biomeById(w.id);
+        const got = items.reduce((n, [p]) => n + p.stars, 0);
+        return `<section class="chapter puzzles" data-world="${w.id}">
+          <header class="chapter-head">
+            <span class="chapter-icon">${icon(w.open ? w.id : 'lock', 26)}</span>
+            <div><h3>${b.name}</h3><p>${w.open ? `${items.length} puzzles` : `Collect ${w.gate - total} more puzzle stars to open (${total} / ${w.gate})`}</p></div>
+            <span class="pill">${icon('star', 14)} ${got} / ${items.length * 3}</span>
+          </header>
+          <div class="level-grid">${items.map(([p, i]) => card(p, i, w.open)).join('')}</div>
+        </section>`;
+      })
       .join('');
     const overlay = h(
       'div',
@@ -28,13 +52,8 @@ export function showPuzzles(ctx: ScreenCtx, puzzles: PuzzleCard[]): Promise<numb
           <h2>Fix the track</h2>
           <span class="pill big">${icon('star', 16)} ${total} / ${puzzles.length * 3}</span>
         </div>
-        <section class="chapter puzzles">
-          <header class="chapter-head">
-            <span class="chapter-icon">${icon('pencil', 26)}</span>
-            <div><h3>Puzzles</h3><p>Each track is broken. Draw what's missing with the ink you have, then press Play. Less ink, more stars.</p></div>
-          </header>
-          <div class="level-grid">${cards}</div>
-        </section>
+        <p class="screen-sub">Each track is broken: draw what's missing, place rings, or erase what's in the way, then press Play. The less you use, the more stars.</p>
+        <div class="chapters">${sections}</div>
       </div>`,
     );
     overlay.onclick = (e) => {
@@ -50,31 +69,35 @@ export function showPuzzles(ctx: ScreenCtx, puzzles: PuzzleCard[]): Promise<numb
       resolve(Number(btn.dataset.i));
     };
     document.body.append(overlay);
+    // Start at the furthest open world.
+    const open = worlds.filter((w) => w.open && puzzles.some((p) => p.world === w.id));
+    const focus: BiomeId | undefined = open[open.length - 1]?.id;
+    if (focus && focus !== open[0]?.id) overlay.querySelector(`.chapter[data-world="${focus}"]`)?.scrollIntoView({ block: 'start' });
   });
 }
 
-/** Puzzle intro: the goal, the ink and the line types allowed. */
-export function showPuzzleIntro(ctx: ScreenCtx, p: { number: number; name: string; tip: string; ink: number; par: number; types: LineType[]; stars: number; starsTotal: number }): Promise<void> {
+/** Puzzle intro: the goals, the budget, and how this kind of puzzle is played. */
+export function showPuzzleIntro(
+  ctx: ScreenCtx,
+  p: { number: number; name: string; tip: string; kind: PuzzleKind; budget: string; goals: [string, string]; types: LineType[]; stars: number; starsTotal: number },
+): Promise<void> {
   return new Promise((resolve) => {
-    const goals = ['Reach the finish', p.starsTotal ? `Collect all ${p.starsTotal} star${p.starsTotal > 1 ? 's' : ''}` : 'Finish without a crash', `Use ${p.par.toFixed(1)} m of ink or less`];
+    const k = KINDS[p.kind];
+    const goals = [p.goals[0], p.starsTotal > 1 ? `Collect all ${p.starsTotal} stars` : p.starsTotal ? 'Collect the star' : 'Finish without a crash', p.goals[1]];
     const overlay = h(
       'div',
       'modal intro',
       `<div class="card">
-        <span class="badge dark">${icon('pencil', 13)} Puzzle ${p.number}</span>
+        <span class="badge dark">${icon(k.icon, 13)} Puzzle ${p.number} · ${k.name}</span>
         <h2>${p.name}</h2>
         <p>${p.tip}</p>
         <ul class="intro-goals">${goals.map((g, i) => `<li class="${i < p.stars ? 'done' : ''}">${icon('star', 18)}${g}</li>`).join('')}</ul>
         <div class="daily-facts">
-          <span>${icon('pencil', 15)} ${p.ink.toFixed(1)} m of ink</span>
+          <span>${icon(k.icon, 15)} ${p.budget}</span>
           ${p.types.map((t) => `<span class="type-chip" style="--swatch:#${hex(LINE_COLORS[t])}"><i></i>${TYPE_NAME[t] ?? t}</span>`).join('')}
         </div>
-        <ol class="puzzle-steps">
-          <li>${icon('pencil', 16)} Draw what's missing (left to right)</li>
-          <li>${icon('play', 16)} Press Play to test it</li>
-          <li>${icon('stop', 16)} Stop, fix, and try again</li>
-        </ol>
-        <div class="actions"><button class="big-btn primary">${icon('pencil', 18)} Start drawing</button></div>
+        <ol class="puzzle-steps">${k.steps.map(([ic, text]) => `<li>${icon(ic, 16)} ${text}</li>`).join('')}</ol>
+        <div class="actions"><button class="big-btn primary">${icon(k.icon, 18)} Start</button></div>
       </div>`,
     );
     overlay.onclick = (e) => {

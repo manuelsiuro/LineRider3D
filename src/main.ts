@@ -6,9 +6,8 @@ import { CAMERA_LABELS, type CameraMode } from './render/CameraRig';
 import { STEPS_PER_SECOND } from './physics/Simulation';
 import { HOP_FULL, P } from './physics/Rider';
 import { vehicleById, type VehicleDef } from './physics/vehicles';
-import { DEFAULT_WORLD, TIMES, WEATHERS, biomeById, normalizeWorld, sameWorld, surfaceOf, worldLabel, type BiomeId, type WorldConfig } from './world/worlds';
+import { BIOMES, DEFAULT_WORLD, TIMES, WEATHERS, biomeById, normalizeWorld, sameWorld, surfaceOf, worldLabel, type BiomeId, type WorldConfig } from './world/worlds';
 import { UI, type SettingsView, type SummaryInfo } from './ui/UI';
-import { METERS } from './ui/dom';
 import { resetProgress, saveSettings, type Quality as QualitySetting } from './game/settings';
 import { buildDemoTrack } from './demoTrack';
 import { dailyLink, readSharedLink, shareLink } from './game/share';
@@ -16,17 +15,17 @@ import { rateRun } from './game/rating';
 import { beats, encodeInputs, loadGhost, saveGhost, type GhostRecord } from './game/Ghost';
 import { MEDALS, MEDAL_NAME, bestTime, levelMedal, medalFor, medalTimes, recordTime } from './game/medals';
 import { LEVELS, chapterOf } from './levels/levels';
-import { OUTFITS, champions, isUnlocked, outfitUnlocked, loadProgress, saveLevelResult, selectOutfit, selectedOutfit, totalStars } from './game/progress';
+import { OUTFITS, champions, isUnlocked, outfitUnlocked, loadProgress, saveLevelResult, selectOutfit, selectedOutfit, totalStars, worldGate, worldOpen } from './game/progress';
 import { ACHIEVEMENTS, evaluate, loadCounters, noteWorld, selectPaint, unlockedAchievements, type RunContext } from './game/achievements';
 import { KEYS, migrateStorage, readFlag, readJSON, readText, writeFlag, writeJSON, writeText } from './game/storage';
 import { buildTemplate, TEMPLATES, type TemplateId } from './editor/templates';
-import type { EditorPrefs } from './editor/Editor';
+import type { EditorPrefs, Tool } from './editor/Editor';
 import { createSlot, currentSlot, deleteSlot, duplicateSlot, freshName, listSlots, loadSlot, renameSlot, saveSlot, setCurrent } from './game/gallery';
 import { createStage, fitToWindow } from './app/stage';
 import { createCore, type Core } from './app/core';
 import { EDIT, TITLE, autosaves, challengeOf, editing, fixedTrack, freeEdit, inGame, levelOf, type Session } from './app/session';
-import { PUZZLES } from './levels/puzzles';
-import { loadPuzzles, savePuzzle } from './game/puzzleProgress';
+import { PUZZLES, budgetText, finishGoal, parGoal, puzzleBase, puzzleKind, puzzleSpent, puzzleWorld, trickDone, usesInk, type PuzzleBase } from './levels/puzzles';
+import { loadPuzzles, puzzleGate, puzzleWorldOpen, savePuzzle } from './game/puzzleProgress';
 import { dailyInfo, dayKey } from './levels/daily';
 import { loadDaily, recordDaily, streakOn } from './game/dailyRecords';
 import { dailyTrack } from './app/dailyTrack';
@@ -179,6 +178,8 @@ function cycleVehicle() {
 
 /** A freshly loaded demo is not saved, so it never overwrites the player's own track. */
 let pristine = true;
+/** What the current puzzle built (to tell the player's rings and erased lines apart). */
+let puzzleBuilt: PuzzleBase = { rings: new Set(), erasable: new Set() };
 /**
  * The gallery slot of the track in the editor; null until a new, demo or
  * shared track is first edited, which then becomes a new saved track.
@@ -609,7 +610,10 @@ function pickLevel(focus?: BiomeId): Promise<number | null> {
       world: chapterOf(l),
       ride: l.vehicle,
       medal: levelMedal(l.id),
+      difficulty: l.difficulty,
+      skill: !!l.solution,
     })),
+    BIOMES.map((b) => ({ id: b.id, open: worldOpen(b.id, progress), gate: worldGate(b.id) })),
     totalStars(progress),
     focus,
   );
@@ -698,18 +702,33 @@ async function enterDaily(day: string, score = 0, ghost: number[] | null = null)
 
 function pickPuzzle(): Promise<number | null> {
   const done = loadPuzzles();
-  return ui.showPuzzles(PUZZLES.map((p) => ({ name: p.name, tip: p.tip, stars: done[p.id]?.stars ?? 0, ink: (done[p.id]?.ink ?? 0) * METERS, par: p.par * METERS })));
+  return ui.showPuzzles(
+    PUZZLES.map((p) => ({
+      name: p.name,
+      tip: p.tip,
+      stars: done[p.id]?.stars ?? 0,
+      kind: puzzleKind(p),
+      world: puzzleWorld(p),
+      best: done[p.id] ? budgetText(p, done[p.id].ink, true) : '',
+      par: budgetText(p, p.par, true),
+    })),
+    BIOMES.map((b) => ({ id: b.id, open: puzzleWorldOpen(b.id, done), gate: puzzleGate(b.id) })),
+  );
 }
 
 async function startPuzzle(index: number) {
   const p = PUZZLES[index];
   enter({ kind: 'puzzle', index });
+  const kind = puzzleKind(p);
   loadInto(() => {
     track.clear();
     p.build(track);
-    for (const s of track.strokes.values()) s.locked = true;
+    // Erase puzzles keep their erasable lines; everything else the puzzle built is fixed.
+    if (kind !== 'erase') for (const s of track.strokes.values()) s.locked = true;
   });
-  editor.setRules({ ink: p.ink, tools: ['pencil', 'line', 'eraser'], types: p.types });
+  puzzleBuilt = puzzleBase(track);
+  const tools: Tool[] = kind === 'rings' ? ['item', 'eraser'] : kind === 'erase' ? ['eraser'] : ['pencil', 'line', 'eraser'];
+  editor.setRules({ ink: p.ink, tools, types: p.types, kind, base: puzzleBuilt });
   ui.setPuzzle(true);
   worlds.change(normalizeWorld(p.world ?? { biome: 'alpine', time: 'day', weather: 'clear' }));
   pristine = true;
@@ -721,9 +740,10 @@ async function startPuzzle(index: number) {
     number: index + 1,
     name: p.name,
     tip: p.tip,
-    ink: p.ink * METERS,
-    par: p.par * METERS,
-    types: p.types,
+    kind,
+    budget: budgetText(p, p.ink),
+    goals: [finishGoal(p), parGoal(p)],
+    types: usesInk(p) ? p.types : [],
     stars: loadPuzzles()[p.id]?.stars ?? 0,
     starsTotal: track.stars.size,
   });
@@ -857,15 +877,16 @@ function showSummary(wasReplay: boolean) {
 function showPuzzleSummary(index: number) {
   const p = PUZZLES[index];
   const s = runStats.stats;
-  const ink = track.inkUsed();
+  const spent = puzzleSpent(p, track, puzzleBuilt);
   const clean = s.finished && !s.crashed;
   const goals = [
-    { label: 'Reach the finish', done: clean },
-    { label: track.stars.size ? `Collect all ${track.stars.size} stars` : 'Finish without a crash', done: clean && s.stars === track.stars.size },
-    { label: `Use ${(p.par * METERS).toFixed(1)} m of ink or less`, done: clean && ink <= p.par + 1e-6 },
+    { label: finishGoal(p), done: clean && trickDone(p, s) },
+    { label: track.stars.size > 1 ? `Collect all ${track.stars.size} stars` : track.stars.size ? 'Collect the star' : 'Finish without a crash', done: clean && s.stars === track.stars.size },
+    { label: parGoal(p), done: clean && spent <= p.par + 1e-6 },
   ];
-  const stars = clean ? goals.filter((g) => g.done).length : 0;
-  if (clean) savePuzzle(p.id, stars, ink);
+  // No star without the finish (and the trick, in trick puzzles).
+  const stars = goals[0].done ? goals.filter((g) => g.done).length : 0;
+  if (goals[0].done) savePuzzle(p.id, stars, spent);
   if (stars === 3) setTimeout(() => sound.perfect(), 700);
   checkAchievements(true, stars);
   ui.showSummary(
@@ -877,7 +898,7 @@ function showPuzzleSummary(index: number) {
       goals,
       rating: stars,
       starsTotal: track.stars.size,
-      puzzle: { number: index + 1, name: p.name, ink: ink * METERS, par: p.par * METERS, hasNext: index + 1 < PUZZLES.length },
+      puzzle: { number: index + 1, name: p.name, used: budgetText(p, spent), par: budgetText(p, p.par), under: spent <= p.par + 1e-6, hasNext: index + 1 < PUZZLES.length },
     },
     () => {
       run.reset();
@@ -1070,7 +1091,11 @@ function loop(time: number) {
 
   const game = playingGame();
   editor.update(!run.playing && editing(session), dt);
-  if (session.kind === 'puzzle' && editor.rules) ui.setInk(editor.inkLeft(), editor.rules.ink, PUZZLES[session.index].par);
+  if (session.kind === 'puzzle' && editor.rules) {
+    const p = PUZZLES[session.index];
+    const left = editor.budgetLeft();
+    ui.setInk(left, editor.rules.ink, p.par, budgetText(p, left, true));
+  }
   core.trackView.update(t, riderCenter, rider);
   env.update(dt, controls.target, t, camera.position);
   worlds.updateHeadlight(game && core.riderView.root.visible);

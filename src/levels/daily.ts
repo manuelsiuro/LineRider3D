@@ -71,7 +71,9 @@ const SPOOKY_NOUNS = ['Crypt', 'Gully', 'Graveyard', 'Hollow', 'Plunge', 'Nightm
 
 /** Haunted Hollow joins the daily worlds from this day on (earlier dailies stay as they were). */
 const HOLLOW_FROM = '2026-10-09';
-const CLASSIC_WORLDS = BIOMES.filter((b) => b.id !== 'halloween');
+/** The worlds daily rides happen in (the Moon's gravity and Volcano's lava stay out of them). */
+const DAILY_WORLDS = BIOMES.filter((b) => b.id !== 'volcano' && b.id !== 'moon');
+const CLASSIC_WORLDS = DAILY_WORLDS.filter((b) => b.id !== 'halloween');
 
 /** Halloween season on the daily's own UTC date (the same for every player). */
 const spookyDate = (day: string) => {
@@ -181,7 +183,7 @@ export function dailyInfo(day: string): DailyInfo {
   const pick = <T>(list: T[]) => list[Math.floor(rand() * list.length)];
   const vehicle = pick(RIDES);
   const hollow = day >= HOLLOW_FROM;
-  let biome = pick(hollow ? BIOMES : CLASSIC_WORLDS);
+  let biome = pick(hollow ? DAILY_WORLDS : CLASSIC_WORLDS);
   // In the Halloween season, half the days go to the Hollow (an extra seed keeps the rest of the pick as it was).
   if (hollow && spookyDate(day) && (day.endsWith('-10-31') || rng(hash(`lr3d-spooky-${day}`))() < 0.5)) biome = biomeById('halloween');
   const spooky = biome.id === 'halloween';
