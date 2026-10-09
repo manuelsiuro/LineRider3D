@@ -86,6 +86,8 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'champ-desert', title: 'Desert Fox', desc: '3 stars on every Desert level.', check: (c) => !!c.champion.desert },
   { id: 'champ-city', title: 'City Slicker', desc: '3 stars on every City level.', check: (c) => !!c.champion.city },
   { id: 'champ-halloween', title: 'Pumpkin King', desc: '3 stars on every Haunted Hollow level.', check: (c) => !!c.champion.halloween },
+  { id: 'champ-volcano', title: 'Fire Walker', desc: '3 stars on every Volcano level.', check: (c) => !!c.champion.volcano },
+  { id: 'champ-moon', title: 'Lunar Legend', desc: '3 stars on every Moon level.', check: (c) => !!c.champion.moon },
 
   // ---------------------------------------------------------------- haunted hollow
   { id: 'trick-or-treat', title: 'Trick or Treat', desc: 'Finish a level in Haunted Hollow.', check: (c) => hollowFinish(c) },

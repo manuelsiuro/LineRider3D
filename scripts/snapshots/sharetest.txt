@@ -76,8 +76,28 @@ OK   Gravedigger    round trip, compressed
 OK   Nightmare      round trip, compressed
 OK   Ember Run      round trip, compressed
 OK   Ash Chute      round trip, compressed
+OK   Magma Flow     round trip, compressed
+OK   Obsidian Steps round trip, compressed
+OK   Geyser Field   round trip, compressed
+OK   Caldera Crossing round trip, compressed
+OK   Ash Bog        round trip, compressed
+OK   Pyroclastic    round trip, compressed
+OK   Eruption       round trip, compressed
+OK   Firewalk       round trip, compressed
+OK   Cinder Cone    round trip, compressed
+OK   Inferno        round trip, compressed
 OK   Moonwalk       round trip, compressed
 OK   Crater Hop     round trip, compressed
+OK   Low Orbit      round trip, compressed
+OK   Rover Rally    round trip, compressed
+OK   Crater Bounce  round trip, compressed
+OK   Crystal Field  round trip, compressed
+OK   Dust Sea       round trip, compressed
+OK   Fractured Ridge round trip, compressed
+OK   Lander Pad     round trip, compressed
+OK   Earthrise      round trip, compressed
+OK   Far Side       round trip, compressed
+OK   Moonshot       round trip, compressed
 cut off          → That share link is incomplete: was it cut off when copied?
 garbage          → That share link is incomplete: was it cut off when copied?
 unknown encoding → That share link looks broken

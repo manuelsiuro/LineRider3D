@@ -5,7 +5,8 @@
  *   npx tsx scripts/dev/jumpsolve.ts <level-id> [hold steps = 24] [push] [brake]
  * With `brake`, braking stretches are tried too (for levels where too much speed crashes).
  * With `push`, an autopilot pushes whenever the ride touches the ground (for mud and slow
- * climbs); the inputs it played are what gets printed.
+ * climbs); the inputs it played are what gets printed. WINDOW=<steps> (default 70) sets how
+ * far before a failure jumps are tried: falls last longer on the Moon.
  */
 import { INPUT } from '../../src/physics/Rider';
 import { LEVELS } from '../../src/levels/levels';
@@ -33,6 +34,7 @@ const progress = (acts: Action[]) => {
   return { r, score: r.stats.finished ? 1e6 + r.stats.stars * 1e4 : r.end.x };
 };
 const brakes = process.argv.includes('brake');
+const WINDOW = Number(process.env.WINDOW ?? 70);
 
 for (let round = 0; round < 14; round++) {
   const { r } = progress(actions);
@@ -46,7 +48,7 @@ for (let round = 0; round < 14; round++) {
   // Candidates: a full-charge jump let go at each step before the failure, or a brake.
   const tries: Action[] = [];
   // Taps and half charges too: a low spike strip needs only a hop, and a full charge needs time.
-  for (const h of [...new Set([4, 12, hold])]) for (let at = Math.max(after + h, fail - 70); at < fail; at++) tries.push({ from: at - h, to: at, mask: INPUT.jump });
+  for (const h of [...new Set([4, 12, hold])]) for (let at = Math.max(after + h, fail - WINDOW); at < fail; at++) tries.push({ from: at - h, to: at, mask: INPUT.jump });
   if (brakes) for (let end = Math.max(after + 8, fail - 90); end < fail; end += 2) for (const len of [8, 16, 24, 36, 48]) if (end - len >= after) tries.push({ from: end - len, to: end, mask: INPUT.brake });
   let best: { act: Action; score: number } | null = null;
   for (const act of tries) {

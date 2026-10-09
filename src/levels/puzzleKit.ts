@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Track } from '../track/Track';
 import type { DecorKind, HazardKind } from '../track/types';
 import type { PuzzleDef } from './puzzles';
-import { cosine, finish, forest, hazard, landing, line, profile, star, start } from './builders';
+import { cosine, finish, forest, hazard, home, landing, line, profile, star, start } from './builders';
 
 /**
  * Puzzle templates: each builds a family of puzzles from a few numbers, with a solution
@@ -43,6 +43,7 @@ export function bridge(c: Common & { kind?: 'draw' | 'oneline'; y: number; top: 
     par: Math.ceil(need),
     types: ['normal'],
     build(t) {
+      if (c.world) home(t, c.world);
       runIn(t, c.top, c.y);
       let x = 30;
       for (const [a, b] of c.gaps) {
@@ -72,6 +73,7 @@ export function ledge(c: Common & { kind?: 'draw' | 'oneline'; top: number; high
     par: Math.ceil(len + 1),
     types: ['normal'],
     build(t) {
+      if (c.world) home(t, c.world);
       runIn(t, c.top, c.high);
       profile(t, () => c.high, 30, c.edge);
       profile(t, () => c.low, c.land, c.end);
@@ -97,6 +99,7 @@ export function climb(c: Common & { kind: 'rings' | 'draw'; y: number; top: numb
     par: c.kind === 'rings' ? n : n * 9,
     types: c.kind === 'rings' ? ['normal'] : ['accel'],
     build(t) {
+      if (c.world) home(t, c.world);
       runIn(t, c.top, c.y);
       let x = 30;
       for (const { at, height } of c.hills) {
@@ -132,6 +135,7 @@ export function clearPath(c: Common & { top: number; y: number; slope: number; h
     par: c.humps.length,
     types: ['normal'],
     build(t) {
+      if (c.world) home(t, c.world);
       runIn(t, c.top, c.y);
       const run = (x: number) => c.y - (x - 30) * c.slope;
       profile(t, run, 30, c.end);
@@ -171,6 +175,7 @@ export function cliffAir(c: Common & { top: number; y: number; edge: number; flo
     par: 8,
     types: ['normal'],
     build(t) {
+      if (c.world) home(t, c.world);
       runIn(t, c.top, c.y);
       profile(t, () => c.y, 30, c.edge);
       const kicker = profile(t, (x) => c.y + c.kicker * (x - (c.edge - reach)) ** 2, c.edge - reach, c.edge + 1);
@@ -201,6 +206,7 @@ export function mudBrakes(c: Common & { top: number; y: number; slope: number; b
     par: Math.ceil(24 * Math.hypot(1, c.slope) + 1),
     types: ['mud'],
     build(t) {
+      if (c.world) home(t, c.world);
       runIn(t, c.top, c.y);
       const run = (x: number) => c.y - (x - 30) * c.slope;
       profile(t, run, 30, c.bumpAt);
@@ -234,6 +240,7 @@ export function bounce(c: Common & { dy: number }): PuzzleDef {
     par: 13,
     types: ['normal', 'bouncy'],
     build(t) {
+      if (c.world) home(t, c.world);
       const h = cosine(y(20), y(12), -2, 24);
       profile(t, h, -2, 24);
       profile(t, () => y(12), 24, 32);
@@ -263,6 +270,7 @@ export function crumbleRush(c: Common & { kind: 'rings' | 'draw'; top: number; y
     par: c.kind === 'rings' ? c.boosts : c.boosts * 9,
     types: c.kind === 'rings' ? ['normal'] : ['accel'],
     build(t) {
+      if (c.world) home(t, c.world);
       runIn(t, c.top, c.y);
       profile(t, () => c.y, 30, 30 + c.boosts * 14);
       const a = 30 + c.boosts * 14;

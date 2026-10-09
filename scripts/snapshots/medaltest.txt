@@ -117,6 +117,41 @@ ember-run:sled             8.7 / 7.7 / 7.5 / 7.2
 ember-run:moto             8.8 / 7.7 / 7.5 / 7.3
 ash-chute:skis             10.5 / 9.2 / 9 / 8.7
 ash-chute:buggy            10.5 / 8.5 / 8.1 / 7.7
-moonwalk:snowboard         10.3 / 7.9 / 7.1 / 6.8
-moonwalk:coffin            10.3 / 9.1 / 8.9 / 8.5
-crater-hop:bike            13 / 11.4 / 11.2 / 10.7
+magma-flow:snowboard       13.7 / 10.1 / 8.7 / 8.3
+magma-flow:coffin          14.8 / 11 / 9.6 / 9.2
+obsidian-steps:bike        15.4 / 12.7 / 12.5 / 12
+geyser-field:sled          11 / 9.6 / 9.4 / 9.1
+geyser-field:moto          undefined
+caldera-crossing:skis      undefined
+caldera-crossing:buggy     10.8 / 9.5 / 9.3 / 8.9
+ash-bog:snowboard          undefined
+ash-bog:coffin             undefined
+pyroclastic:bike           undefined
+eruption:sled              9.9 / 8.7 / 8.5 / 8.2
+eruption:moto              10 / 8.8 / 8.6 / 8.3
+firewalk:skis              undefined
+firewalk:buggy             11.8 / 10.3 / 10.1 / 9.8
+cinder-cone:snowboard      undefined
+cinder-cone:coffin         undefined
+inferno:bike               13.9 / 12.2 / 12 / 11.5
+moonwalk:sled              10.3 / 9.1 / 8.9 / 8.5
+moonwalk:moto              10.4 / 9.2 / 9 / 8.6
+crater-hop:skis            12.9 / 11.3 / 11.1 / 10.7
+crater-hop:buggy           12.9 / 11.3 / 11.1 / 10.7
+low-orbit:snowboard        13.4 / 10.3 / 9.4 / 9.1
+low-orbit:coffin           13.5 / 11.8 / 11.6 / 11.1
+rover-rally:bike           10.8 / 7.8 / 6.6 / 6.3
+crater-bounce:sled         14.4 / 12.6 / 12.4 / 11.9
+crater-bounce:moto         14.4 / 12.6 / 12.4 / 11.9
+crystal-field:skis         14.8 / 12.9 / 12.7 / 12.3
+crystal-field:buggy        14.9 / 13 / 12.8 / 12.3
+dust-sea:snowboard         undefined
+dust-sea:coffin            undefined
+fractured-ridge:bike       13.8 / 12 / 11.8 / 11.4
+lander-pad:sled            10.5 / 8 / 7.3 / 7
+lander-pad:moto            11.1 / 9.7 / 9.5 / 9.1
+earthrise:skis             14.5 / 11.4 / 10.6 / 10.2
+earthrise:buggy            14.8 / 12.9 / 12.7 / 12.3
+far-side:snowboard         undefined
+far-side:coffin            16.1 / 14.1 / 13.9 / 13.3
+moonshot:bike              undefined

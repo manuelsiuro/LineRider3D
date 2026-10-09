@@ -76,5 +76,25 @@ OK   Gravedigger    stars 3/3  finish 6.0s  score 1200/600  ★★★  end x=150
 OK   Nightmare      stars 5/5  finish 11.0s  score 1120/4000  ★★☆  end x=307,y=9.5,z=0.0 f480  solution (12 changes)
 OK   Ember Run      stars 4/4  finish 7.3s  score 1320/6000  ★★☆  end x=188,y=0.1,z=-0.1 f331
 OK   Ash Chute      stars 4/4  finish 8.8s  score 660/8000  ★★☆  end x=248,y=-0.3,z=0.1 f392
+OK   Magma Flow     stars 4/4  finish 12.3s  score 1000/1500  ★★☆  end x=271,y=21.7,z=1.9 f533
+OK   Obsidian Steps stars 5/5  finish 12.8s  score 0/7000  ★★☆  end x=340,y=6.0,z=-0.0 f553
+OK   Geyser Field   stars 4/4  finish 9.1s  score 0/2500  ★★☆  end x=244,y=-0.7,z=-0.1 f405  solution (6 changes)
+OK   Caldera Crossing stars 5/5  finish 8.9s  score 0/2500  ★★☆  end x=246,y=1.8,z=0.0 f397  solution (10 changes)
+OK   Ash Bog        stars 5/5  finish 11.6s  score 0/1500  ★★☆  end x=236,y=2.2,z=0.0 f504  solution (10 changes)
+OK   Pyroclastic    stars 3/3  finish 5.8s  score 280/600  ★★☆  end x=135,y=0.5,z=0.0 f271  solution (2 changes)
+OK   Eruption       stars 5/5  finish 8.3s  score 0/8000  ★★☆  end x=297,y=5.1,z=0.1 f371
+OK   Firewalk       stars 5/5  finish 9.8s  score 0/3000  ★★☆  end x=273,y=11.5,z=0.0 f433  solution (8 changes)
+OK   Cinder Cone    stars 5/5  finish 10.2s  score 0/2000  ★★☆  end x=264,y=6.1,z=0.0 f447  solution (10 changes)
+OK   Inferno        stars 6/6  finish 11.6s  score 1890/4000  ★★☆  end x=325,y=12.0,z=0.0 f506  solution (14 changes)
 OK   Moonwalk       stars 3/3  finish 8.6s  score 0/4000  ★★☆  end x=142,y=1.5,z=0.0 f383
 OK   Crater Hop     stars 4/4  finish 10.8s  score 2880/3000  ★★☆  end x=196,y=1.1,z=0.0 f473  solution (6 changes)
+OK   Low Orbit      stars 3/3  finish 11.2s  score 1380/5000  ★★☆  end x=187,y=7.5,z=0.0 f488
+OK   Rover Rally    stars 4/4  finish 9.0s  score 3875/4000  ★★☆  end x=264,y=4.1,z=0.0 f401
+OK   Crater Bounce  stars 4/4  finish 12.0s  score 1910/6000  ★★☆  end x=242,y=6.9,z=0.0 f521
+OK   Crystal Field  stars 4/4  finish 12.4s  score 3140/3000  ★★★  end x=238,y=1.4,z=0.0 f537  solution (6 changes)
+OK   Dust Sea       stars 4/4  finish 11.9s  score 1430/1500  ★★☆  end x=225,y=4.7,z=0.0 f519  solution (10 changes)
+OK   Fractured Ridge stars 5/5  finish 11.5s  score 2540/2500  ★★★  end x=224,y=21.8,z=0.0 f501  solution (4 changes)
+OK   Lander Pad     stars 3/3  finish 8.7s  score 1600/600  ★★★  end x=121,y=5.1,z=0.0 f388  solution (2 changes)
+OK   Earthrise      stars 5/5  finish 12.3s  score 2415/9000  ★★☆  end x=280,y=9.2,z=0.0 f531
+OK   Far Side       stars 5/5  finish 13.4s  score 4120/3000  ★★★  end x=265,y=15.5,z=0.0 f577  solution (8 changes)
+OK   Moonshot       stars 6/6  finish 20.5s  score 2370/4000  ★★☆  end x=299,y=20.3,z=0.0 f860  solution (4 changes)

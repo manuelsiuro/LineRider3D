@@ -72,3 +72,29 @@ tower-drop      unsolved fails    solved 5.95s stars 1/1 ink 35.8/36/53
 deadwood        unsolved fails    solved 7.35s stars 3/3 erased 3/3/4
 swamp-slide     unsolved fails    solved 7.72s stars 1/1 ink 25.1/27/36
 haunted-pier    unsolved fails    solved 6.15s stars 3/3 ink 30.0/30/41
+lava-gap        unsolved fails    solved 4.95s stars 1/1 ink 12.0/12/17
+magma-hill      unsolved fails    solved 6.83s stars 1/1 rings 1/1/3
+rockslide       unsolved fails    solved 6.85s stars 2/2 erased 2/2/5
+crater-leap     unsolved fails    solved 6.15s stars 1/1 ink 7.2/8/14 trick Perfect Big Air
+basalt-steps    unsolved fails    solved 5.75s stars 3/3 ink 32.0/32/44
+hot-spring      unsolved fails    solved 6.58s stars 1/1 ink 12.1/13/18
+cracked-crust   unsolved fails    solved 5.80s stars 1/1 ink 9.0/9/14
+vent-drop       unsolved fails    solved 5.95s stars 1/1 ink 35.8/36/53
+fire-ramp       unsolved fails    solved 8.43s stars 2/2 ink 18.0/18/28
+lava-river      unsolved fails    solved 6.15s stars 3/3 ink 30.0/30/41
+obsidian-wall   unsolved fails    solved 7.35s stars 3/3 erased 3/3/4
+collapsing-caldera unsolved fails    solved 6.05s stars 1/1 rings 2/2/4
+last-descent    unsolved fails    solved 6.03s stars 1/1 ink 40.3/41/60
+crater-gap      unsolved fails    solved 7.17s stars 1/1 ink 14.0/14/19
+crater-rim      unsolved fails    solved 9.22s stars 1/1 rings 1/1/3
+boulder-field   unsolved fails    solved 10.00s stars 2/2 erased 2/2/5
+moon-leap       unsolved fails    solved 9.03s stars 1/1 ink 7.2/8/14 trick Good Big Air
+rille-crossing  unsolved fails    solved 8.35s stars 3/3 ink 32.0/32/44
+crater-descent  unsolved fails    solved 8.85s stars 1/1 ink 41.4/42/61
+brittle-crust   unsolved fails    solved 7.58s stars 1/1 ink 9.0/9/14
+lunar-ledge     unsolved fails    solved 8.65s stars 1/1 ink 35.8/36/53
+boost-ridge     unsolved fails    solved 11.63s stars 2/2 ink 18.0/18/28
+lunar-bridges   unsolved fails    solved 9.30s stars 3/3 ink 30.0/30/41
+space-debris    unsolved fails    solved 10.72s stars 3/3 erased 3/3/4
+crumbling-crater unsolved fails    solved 7.97s stars 1/1 rings 2/2/4
+escape-velocity unsolved fails    solved 8.88s stars 1/1 ink 7.2/8/14 trick Good Big Air
